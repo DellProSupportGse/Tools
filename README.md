@@ -1,6 +1,6 @@
 # Tools
 All tools are run from ISE as administorator. They do not work from PowerShell. 
-
+[logo]: https://github.com/adam-p/markdown-here/raw/master/src/common/images/icon48.png "Logo Title Text 2"
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ___  ____ _    _       ____ _   _ ____ ___ ____ _  _    _  _ ___  ___  ____ ___ ____ ____ 
 |  \ |___ |    |       [__   \_/  [__   |  |___ |\/|    |  | |__] |  \ |__|  |  |___ |__/ 
