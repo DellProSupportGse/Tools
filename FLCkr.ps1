@@ -84,7 +84,7 @@ $Loc = Read-Host "Run FLTMC Locally? [y/n]"
 
 #use the credentials of the current user to authenticate on the proxy server
 $Wcl = new-object System.Net.WebClient
-$Wcl.Headers.Add(“user-agent”, “PowerShell Script”)
+$Wcl.Headers.Add("user-agent", "PowerShell Script")
 $Wcl.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials 
 #gets the the list or known file system minifilter drivers
 #$URL="https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md"
