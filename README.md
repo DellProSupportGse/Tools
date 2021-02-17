@@ -1,6 +1,16 @@
 # Tools
 #### All tools are run from ISE as administorator. They do not work from PowerShell. 
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## FLCkr
+   This tool lookups up filter drivers in Microsoft's known good list
+   URL: https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md
+   
+   How To Use: 
+      From ISE or PowerShell as admin execute the following and follow the prompts:
+```Powershell
+iex ('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
+```
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## Dell System Updater
    This tool will automatically download and 
    install Drivers/Firmware on Dell Servers
