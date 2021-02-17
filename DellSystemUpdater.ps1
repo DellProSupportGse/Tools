@@ -15,6 +15,7 @@ Function Invoke-DellSystemUpdater {
 CLS
 # Dell Server Check
 IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
+
 $text=@"
 v1.0
 ___  ____ _    _       ____ _   _ ____ ___ ____ _  _    _  _ ___  ___  ____ ___ ____ ____ 
@@ -25,10 +26,11 @@ By: Jim Gandy
 "@
 Write-Host $text
 $Title=@()
+    $Title+="Welcome"
     Write-host $Title
     Write-host " "
-    Write-host "   This tool will automatically download and "
-    Write-host "   install Drivers/Firmware on Dell Servers"
+    Write-host "   This tool is used to install Drivers "
+    Write-host "   and Firmware on Dell Servers"
     Write-host " "
 if ($PSCmdlet.ShouldProcess($param)) { 
 
@@ -247,8 +249,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Write-Host "Executing DSU..."
         Run-DSU
     }
-}Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red
-Write-host "Dell System Updater will ONLY work on Dell Servers" -ForegroundColor Red
-}
+}Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
 }               
                 
+
