@@ -199,7 +199,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 }
                 IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
                     Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
-                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue
+                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
                 }
                 IF($ASHCI -eq "YES"){
                     Write-Host "Exiting Storage Maintenance Mode..."
