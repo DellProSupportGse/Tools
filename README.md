@@ -8,7 +8,7 @@
   How To Use:
     From ISE as admin execute the following to run Dell Sysem Updater
 ```Powershell
-iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://github.com/DellProSupportGse/Tools/blob/main/DellSystemUpdater.ps1'));Invoke-DellSystemUpdater
+iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/blob/main/DellSystemUpdater.ps1'));Invoke-DellSystemUpdater
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## TSR Collector
@@ -18,7 +18,7 @@ iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.web
   How To Use:
     From ISE as admin execute the following to run
 ```Powershell
-iex ('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://github.com/DellProSupportGse/Tools/blob/main/TSRCollector.ps1'));Invoke-TSRCollector
+iex ('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/blob/main/TSRCollector.ps1'));Invoke-TSRCollector
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 
