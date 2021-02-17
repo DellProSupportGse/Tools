@@ -147,20 +147,28 @@ if ($PSCmdlet.ShouldProcess($param)) {
                         cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$ENV:Temp\Catalog.xml <c:\ans.txt&&del c:\ans.txt"
                 }
             # Check Status
-                $DupsStatus=Get-Content 'C:\ProgramData\Dell\DELL EMC System Update\dell_dup\DSU_STATUS.json'| ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus | Select -ExpandProperty UpdateableComponent 
-            # Check reboot required
-                Write-Host "`n`n"
-                Write-Host "Installation Report"
-                "-"*100
+                $DupsStatus=Get-Content 'C:\ProgramData\Dell\DELL EMC System Update\dell_dup\DSU_STATUS.json'| ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus 
                 Switch($DupsStatus){
-                    {$DupsStatus | Where-Object{$_.updateStatus -ne "SUCCESS"}}
-                        {
-                            $DupsStatus | FL *
-                            Write-Host "ERROR: Some updates failed to install. Please review logs for further information. C:\ProgramData\Dell\UpdatePackage\log" -ForegroundColor Red
-                            EndScript
+                    {$DupsStatus.InvokerInfo.statusMessage -imatch 'No Applicable Update'}{
+                        Write-Host "`n`n"
+                        Write-Host "Installation Report"
+                        "-"*100
+                        $DupsStatus.InvokerInfo | FL *
                         }
-                    {$DupsStatus | Where-Object{$_.rebootRequired -eq "True"}}
-                        {
+                    {$DupsStatus.UpdateableComponent}{$DupsStatus = $DupsStatus.UpdateableComponent
+                        # Check reboot required
+                            Write-Host "`n`n"
+                            Write-Host "Installation Report"
+                            "-"*100
+                            Switch($DupsStatus){
+                                {$DupsStatus | Where-Object{$_.updateStatus -ne "SUCCESS"}}
+                                    {
+                                        $DupsStatus | FL *
+                                        Write-Host "ERROR: Some updates failed to install. Please review logs for further information. C:\ProgramData\Dell\UpdatePackage\log" -ForegroundColor Red
+                                        EndScript
+                                    }
+                                {$DupsStatus | Where-Object{$_.rebootRequired -eq "True"}}
+                                                                                                                                                                                                                                                                                    {
                             $DupsStatus | FL *
                             Write-Host "Please reboot to complete installation" -ForegroundColor Yellow
                             $Reboot = Read-Host "Ready to reboot? [y/n]"
@@ -176,21 +184,24 @@ if ($PSCmdlet.ShouldProcess($param)) {
                                     EndScript
                                     }
                                 "n"{
-                                    Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
-                                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue
-                                    IF($ASHCI -eq "YES"){
-                                        Write-Host "Exiting Storage Maintenance Mode..."
-                                        Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
-                                    }
                                     EndScript
                                     }
                             }
                             EndScript
                         }
-                    Default{
-                        $DupsStatus | FL *
-                        EndScript
+                                Default{
+                                    Write-Host "No reboot required"
+                                    $DupsStatus | FL *
+                                    EndScript
+                                }
+                            }
                     }
+                }
+                Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
+                Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue
+                IF($ASHCI -eq "YES"){
+                    Write-Host "Exiting Storage Maintenance Mode..."
+                    Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
                 }
         }
 
