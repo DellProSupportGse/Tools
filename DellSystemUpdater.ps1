@@ -206,17 +206,30 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
                 }
         }
-
-        Write-Host "Downloading Dell EMC System Update(DSU)..."
-        $DSUInstallerLocation=Download-File 'https://dl.dell.com/FOLDER06526860M/1/Systems-Management_Application_8CTK7_WN64_1.9.0_A00.EXE'
-        Write-Host "Installing DSU..."
-        Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
-        $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
-        IF(((Get-Content "C:\ProgramData\Dell\UpdatePackage\log\$DSUInstallStatus.txt" | select-string -Pattern 'Exit code ' -SimpleMatch | Select-Object -Last 1) -split "= ")[-1] -eq 1){
-            Write-Host "    ERROR: Failed to install DSU." -ForegroundColor Red
-            EndScript
-        }Else{Write-Host "    SUCCESS: DSU Installed Successfully." -ForegroundColor Green }
-    
+    #Check if DSU is already installed
+        Write-Host "Checking if DSU is installed..."
+        Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+        $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
+        ForEach($Key in $RegKeyPaths){
+            IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
+                IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]'1.8.0'}){
+                    Write-Host "    FOUND: DSU already installed" -ForegroundColor Green
+                    $IsDSUInstalled="YES"
+                    Set-Location c:\
+                }
+            }
+        }
+        IF(-not ($IsDSUInstalled -eq "YES")){
+            Write-Host "Downloading Dell EMC System Update(DSU)..."
+            $DSUInstallerLocation=Download-File 'https://dl.dell.com/FOLDER06526860M/1/Systems-Management_Application_8CTK7_WN64_1.9.0_A00.EXE'
+            Write-Host "Installing DSU..."
+            Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
+            $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
+            IF(((Get-Content "C:\ProgramData\Dell\UpdatePackage\log\$DSUInstallStatus.txt" | select-string -Pattern 'Exit code ' -SimpleMatch | Select-Object -Last 1) -split "= ")[-1] -eq 1){
+                Write-Host "    ERROR: Failed to install DSU." -ForegroundColor Red
+                EndScript
+            }Else{Write-Host "    SUCCESS: DSU Installed Successfully." -ForegroundColor Green }
+        }
         Write-Host "Gather Server Model Info..."
         # Find Storage Spaces Direct RN or AX info
             $Model=(Get-WmiObject -Class Win32_ComputerSystem).model
