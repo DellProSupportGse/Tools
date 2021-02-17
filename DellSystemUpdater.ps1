@@ -121,7 +121,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
             }
         }
 
-                                                                Function Run-ClusterPre{
+    Function Run-ClusterPre{
         Write-Host "Executing Cluster Pre-Checks..."
         Try{
             # Suspend Cluster Host to prevent chicken-egg scenario
@@ -199,8 +199,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
                             }
                     }
                 }
-                Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
-                Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue
+                IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
+                    Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
+                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue
+                }
                 IF($ASHCI -eq "YES"){
                     Write-Host "Exiting Storage Maintenance Mode..."
                     Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
@@ -226,6 +228,8 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 $InFile="$env:temp\ASHCI-Catalog.xml.gz"
             }Else{
                 $ASHCI="NO"
+                # Check if node is a Cluster memeber
+                IF(Get-Service clussvc -ErrorAction SilentlyContinue){$IsClusterMember = "YES"}Else{$IsClusterMember = "NO"}
                 $URL="https://dl.dell.com/catalog/Catalog.xml.gz"
                 $InFile="$env:temp\Catalog.xml.gz"
             }
@@ -243,7 +247,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
     
         IF($ASHCI -eq "YES"){
             Run-ASHCIPre
-        }ElseIf((Get-ClusterNode).name -contains $env:COMPUTERNAME){
+        }ElseIf($IsClusterMember -eq "YES"){
             Run-ClusterPre
         }
         Write-Host "Executing DSU..."
