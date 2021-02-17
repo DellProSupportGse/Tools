@@ -49,8 +49,6 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Try{Invoke-WebRequest $URL -OutFile $OutFile -UseDefaultCredentials}
             Catch{
                 Write-Host "        ERROR: Downloading $URL" -ForegroundColor Red
-                Write-Host ($Error[0]).PadLeft( ($string).length + (2 * $count) ) -ForegroundColor Red 
-                #Write-Host $Error[0] -ForegroundColor Red
                 EndScript
             }
             Finally{
