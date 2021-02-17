@@ -10,7 +10,8 @@
 .UPDATES
     v1.0 - Initial release
 #>
-Function Invoke-FLCkr(){
+Function Invoke-FLCkr{
+param($param)
 Remove-Variable * -ErrorAction SilentlyContinue
 CLS
 $URL="https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md"
