@@ -144,7 +144,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                         cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$ENV:Temp\ASHCI-Catalog.xml <c:\ans.txt&&del c:\ans.txt"
                 }Else{
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$ENV:Temp\Catalog.xml <c:\ans.txt&&del c:\ans.txt"
+                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
                 }
             # Check Status
                 $DupsStatus=Get-Content 'C:\ProgramData\Dell\DELL EMC System Update\dell_dup\DSU_STATUS.json'| ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus 
@@ -232,20 +232,20 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 $InFile="$env:temp\Catalog.xml.gz"
             }
         Write-Host "    SUCCESS: $Model" -ForegroundColor Green
-        Write-Host "Downloading Catalog..."
-        $CatalogLocation=Download-File $URL
-        Write-Host "Expanding Catalog for use..."
-        Try{Expand-Gz $InFile}
-        Catch{Write-Host "    ERROR: Failed to expand catalog" -ForegroundColor Red}
-        Finally{
-            IF([System.IO.File]::Exists(($InFile -replace ".gz",""))){
-                Write-Host "    SUCCESS: Catalog expanded" -ForegroundColor Green
-            }
-        }
-    
         IF($ASHCI -eq "YES"){
+            Write-Host "Downloading Catalog..."
+            $CatalogLocation=Download-File $URL
+            Write-Host "Expanding Catalog for use..."
+            Try{Expand-Gz $InFile}
+            Catch{Write-Host "    ERROR: Failed to expand catalog" -ForegroundColor Red}
+            Finally{
+                IF([System.IO.File]::Exists(($InFile -replace ".gz",""))){
+                    Write-Host "    SUCCESS: Catalog expanded" -ForegroundColor Green
+                }
+            }
             Run-ASHCIPre
-        }ElseIf($IsClusterMember -eq "YES"){
+        }
+        If($IsClusterMember -eq "YES"){
             Run-ClusterPre
         }
         Write-Host "Executing DSU..."
