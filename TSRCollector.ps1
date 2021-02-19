@@ -1,9 +1,16 @@
-Function Invoke-TSRCollector {
-[CmdletBinding(
-    SupportsShouldProcess = $true,
-    ConfirmImpact = 'High')]
-    param($param)
-
+    <#
+    .Synopsis
+       Invoke-TSRCollector
+    .DESCRIPTION
+       This tool is used to collect TSRs from all nodes in a cluster and bring them back to a single share
+    .EXAMPLE
+       Invoke-TSRCollector
+    #>
+Function Invoke-TSRCollector{
+    [CmdletBinding(
+        SupportsShouldProcess = $true,
+        ConfirmImpact = 'High')]
+        param($param)
 ## Gather Tech Support Report Collector for all nodes in a cluster
     CLS
 Function EndScript{  
@@ -24,7 +31,7 @@ $Title=@()
     Write-host $Title
     Write-host " "
     Write-host "   This tool is used to collect TSRs from"
-    Write-host "   all nodes in a cluster"
+    Write-host "   all nodes in a cluster and bring them back to a single share"
     Write-host " "
     if ($PSCmdlet.ShouldProcess($param)) {
 add-type @"
