@@ -18,7 +18,7 @@ iex ('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclien
   How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/blob/main/DellSystemUpdater.ps1'));Invoke-DellSystemUpdater
+iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellSystemUpdater.ps1'));Invoke-DellSystemUpdater
 ```
 
 ### Documentation:
@@ -50,7 +50,7 @@ iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.web
   How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-iex ('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/blob/main/TSRCollector.ps1'));Invoke-TSRCollector
+iex ('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 
