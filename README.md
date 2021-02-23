@@ -47,9 +47,8 @@ iex ('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclien
  How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-iex ('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-SDDC.ps1
+iex ('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-SDDC
 ```
-
 ---
 ## TSR Collector
    This tool is used to collect TSRs from
