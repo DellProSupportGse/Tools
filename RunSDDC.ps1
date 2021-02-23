@@ -8,11 +8,11 @@
     #>
     
 Function Invoke-SDDC {
-[CmdletBinding(
-    SupportsShouldProcess = $true,
-    ConfirmImpact = 'High')]
-    param($param)
-CLS
+    [CmdletBinding(
+        SupportsShouldProcess = $true,
+        ConfirmImpact = 'High')]
+        param($param)
+    CLS
 # Clean old PrivateCloud.DiagnosticInfo
     Write-Host "Cleaning PrivateCloud.DiagnosticInfo on all nodes..."
     Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
