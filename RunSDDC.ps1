@@ -1,3 +1,18 @@
+    <#
+    .Synopsis
+       Run-SDDC
+    .DESCRIPTION
+       This script will remove old SDDC's, install new SDDC and Run SddcDiagnosticInfo
+    .EXAMPLE
+       Run-SDDC
+    #>
+    
+Function Run-SDDC {
+[CmdletBinding(
+    SupportsShouldProcess = $true,
+    ConfirmImpact = 'High')]
+    param($param)
+CLS
 # Clean old PrivateCloud.DiagnosticInfo
     Write-Host "Cleaning PrivateCloud.DiagnosticInfo on all nodes..."
     Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
@@ -38,3 +53,4 @@
     
 # Run SDDC
     Get-SddcDiagnosticInfo
+}
