@@ -1,16 +1,6 @@
 # Tools
 #### All tools are run from ISE as administorator. They do not work from PowerShell. 
 -------------------------------------------------------------------------------------------------------------------------------------------------
-## FLCkr
-   This tool lookups up filter drivers in Microsoft's known good list
-   URL: https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md
-   
-   How To Use: 
-      From ISE or PowerShell as admin execute the following and follow the prompts:
-```Powershell
-iex ('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
-```
--------------------------------------------------------------------------------------------------------------------------------------------------
 ## Dell System Updater
    This tool will automatically download and 
    install Drivers/Firmware on Dell Servers
@@ -43,6 +33,24 @@ iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.web
         - No reboot required: Show Installation Report
         - Failed Update: We show you the failed update and exit so we can look into the errors and decide how to proceed.
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## FLCkr
+   This tool lookups up filter drivers in Microsoft's known good list
+   URL: https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md
+   
+   How To Use: 
+      From ISE or PowerShell as admin execute the following and follow the prompts:
+```Powershell
+iex ('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
+```
+-------------------------------------------------------------------------------------------------------------------------------------------------
+## Run SDDC
+ How To Use:
+    From ISE or PowerShell as admin execute the following:
+```Powershell
+iex ('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Run-SDDC.ps1
+```
+
+---
 ## TSR Collector
    This tool is used to collect TSRs from
     all nodes in a cluster"
