@@ -15,7 +15,7 @@ Function Invoke-SDDC {
     CLS
 # Clean old PrivateCloud.DiagnosticInfo
     Write-Host "Cleaning PrivateCloud.DiagnosticInfo on all nodes..."
-    Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
+    Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock {
         # Remove PrivateCloud.DiagnosticInfo
             Remove-Module 'PrivateCloud.DiagnosticInfo' -Force -Confirm:$False -ErrorAction SilentlyContinue
 
