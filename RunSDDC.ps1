@@ -1,13 +1,13 @@
     <#
     .Synopsis
-       Run-SDDC
+       Invoke-SDDC
     .DESCRIPTION
        This script will remove old SDDC's, install new SDDC and Run SddcDiagnosticInfo
     .EXAMPLE
-       Run-SDDC
+       Invoke-SDDC
     #>
     
-Function Run-SDDC {
+Function Invoke-SDDC {
 [CmdletBinding(
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
