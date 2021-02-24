@@ -89,7 +89,7 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
         }
         Catch{
             IF($RespErr){
-                $credential=Get-Credential
+                $credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials for $idrac_ip"
                 $result= Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $credential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr
             }
         }
