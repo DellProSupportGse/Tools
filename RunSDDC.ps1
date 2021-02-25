@@ -13,6 +13,8 @@ Function Invoke-SDDC {
         ConfirmImpact = 'High')]
         param($param)
     CLS
+# Fix 8.3 temp paths
+    $MyTemp=(Get-Item $env:temp).fullname
 # Clean old PrivateCloud.DiagnosticInfo
     Write-Host "Cleaning PrivateCloud.DiagnosticInfo on all nodes..."
     Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock {
@@ -31,11 +33,11 @@ Function Invoke-SDDC {
     # If this is not set, the Invoke-WebRequest fails with "The request was aborted: Could not create SSL/TLS secure channel."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls11
     $module = 'PrivateCloud.DiagnosticInfo'; $branch = 'master'
-    Invoke-WebRequest -Uri https://github.com/DellProSupportGse/$module/archive/$branch.zip -OutFile $env:TEMP\$branch.zip
-    Expand-Archive -Path $env:TEMP\$branch.zip -DestinationPath $env:TEMP -Force
+    Invoke-WebRequest -Uri https://github.com/DellProSupportGse/$module/archive/$branch.zip -OutFile $MyTemp\$branch.zip
+    Expand-Archive -Path $MyTemp\$branch.zip -DestinationPath $MyTemp -Force
     $md = "$env:ProgramFiles\WindowsPowerShell\Modules"
-    cp -Recurse $env:TEMP\$module-$branch\$module $md -Force -ErrorAction Stop
-    rm -Recurse $env:TEMP\$module-$branch,$env:TEMP\$branch.zip
+    cp -Recurse $MyTemp\$module-$branch\$module $md -Force -ErrorAction Stop
+    rm -Recurse $MyTemp\$module-$branch,$MyTemp\$branch.zip
     $ModulePath=$md+"\"+$module
     Import-Module $ModulePath -Force
     
