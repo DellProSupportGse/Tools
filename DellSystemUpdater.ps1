@@ -15,7 +15,8 @@ Function Invoke-DellSystemUpdater {
 CLS
 # Dell Server Check
 IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
-
+# Fix 8.3 temp paths
+    $MyTemp=(Get-Item $env:temp).fullname
 $text=@"
 v1.0
 ___  ____ _    _       ____ _   _ ____ ___ ____ _  _    _  _ ___  ___  ____ ___ ____ ____ 
@@ -42,7 +43,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Param($URL)
             $DLFileName=$URL.Split('\/')[-1]
             Write-Host "    Downloading $URL..."
-            $OutFile=$env:TEMP+"\"+$DLFileName
+            $OutFile=$MyTemp+"\"+$DLFileName
             # Use TLS 1.2
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             # Download file
@@ -141,7 +142,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Check if HCI and run DSU install needed updates
                 IF($ASHCI -eq "YES"){
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$ENV:Temp\ASHCI-Catalog.xml <c:\ans.txt&&del c:\ans.txt"
+                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$MyTemp\ASHCI-Catalog.xml <c:\ans.txt&&del c:\ans.txt"
                 }Else{
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
                         cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
@@ -236,13 +237,13 @@ if ($PSCmdlet.ShouldProcess($param)) {
             IF($Model -imatch 'Storage Spaces Direct' -or $Model -imatch 'AX'){
                 $ASHCI="YES"
                 $URL="https://dl.dell.com/catalog/ASHCI-Catalog.xml.gz"
-                $InFile="$env:temp\ASHCI-Catalog.xml.gz"
+                $InFile="$MyTemp\ASHCI-Catalog.xml.gz"
             }Else{
                 $ASHCI="NO"
                 # Check if node is a Cluster memeber
                 IF(Get-Service clussvc -ErrorAction SilentlyContinue){$IsClusterMember = "YES"}Else{$IsClusterMember = "NO"}
                 $URL="https://dl.dell.com/catalog/Catalog.xml.gz"
-                $InFile="$env:temp\Catalog.xml.gz"
+                $InFile="$MyTemp\Catalog.xml.gz"
             }
         Write-Host "    SUCCESS: $Model" -ForegroundColor Green
         IF($ASHCI -eq "YES"){
