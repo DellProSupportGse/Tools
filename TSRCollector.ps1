@@ -34,6 +34,8 @@ $Title=@()
     Write-host "   all nodes in a cluster and bring them back to a single share"
     Write-host " "
     if ($PSCmdlet.ShouldProcess($param)) {
+# Fix 8.3 temp paths
+    $MyTemp=(Get-Item $env:temp).fullname
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
 add-type @"
     using System.Net;
@@ -55,7 +57,7 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
 # Create a new folder and shares it
     Write-Host "Creating a new shared folder to save the TSRs..."
     $ShareName = "TSRdata"
-    $ShareFolder=$ENV:TEMP+"\"+$ShareName
+    $ShareFolder=$MyTemp+"\"+$ShareName
     New-Item -ItemType Directory -Force -Path $ShareFolder  >$null 2>&1
     New-SmbShare -Name "TSRdata" -Path "$ShareFolder" -Temporary -FullAccess Everyone  >$null 2>&1
     Write-Host "    Share location is $ShareFolder"
