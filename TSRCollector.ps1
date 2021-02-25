@@ -34,6 +34,7 @@ $Title=@()
     Write-host "   all nodes in a cluster and bring them back to a single share"
     Write-host " "
     if ($PSCmdlet.ShouldProcess($param)) {
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
 add-type @"
     using System.Net;
     using System.Security.Cryptography.X509Certificates;
