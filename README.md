@@ -1,5 +1,5 @@
 # Tools
-#### All tools are run from ISE as administorator. They do not work from PowerShell. 
+#### NOTE: All tools should be run from ISE as administorator unless otherwise noted. 
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## Dell System Updater
    This tool will automatically download and 
