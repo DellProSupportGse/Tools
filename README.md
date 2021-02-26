@@ -8,7 +8,7 @@
   How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellSystemUpdater.ps1'));Invoke-DellSystemUpdater
+Invoke-Expression('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellSystemUpdater.ps1'));Invoke-DellSystemUpdater
 ```
 
 ### Documentation:
@@ -41,14 +41,14 @@ iex ('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.web
    How To Use: 
       From ISE or PowerShell as admin execute the following and follow the prompts:
 ```Powershell
-iex ('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
+Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## Run SDDC
  How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-iex ('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-SDDC
+Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-SDDC
 ```
 ---
 ## TSR Collector
@@ -58,7 +58,7 @@ iex ('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).Downl
   How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-iex ('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
+Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 
