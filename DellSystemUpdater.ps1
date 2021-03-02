@@ -207,13 +207,30 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
                 }
         }
-    #Check if DSU is already installed
+   # Find latest DSU version on dl.dell.com
+       Try{
+           # Use TLS 1.2
+           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+           Write-Host "Finding Latest Dell EMC System Update(DSU) version..."
+           $URL="https://dl.dell.com/omimswac/dsu/"
+           $Results=Invoke-WebRequest $URL -UseDefaultCredentials
+           $DellDownloadsColumns=@()
+           $DellDownloadsColumns=(($Results.ParsedHtml.body.innerhtml -split '<br><br>')[-1] -split '<br>')|Select @{L='Date';E={($_ -split '\s{2}')[0]}},@{L='Time';E={($_ -split '\s{2}')[1]}},@{L='DTNum';E={((($_ -split '\s{5}')[1]) -split '\s\<')[0]}},@{L='Link';E={((($_ -split 'href\=\"')[1]) -split '\"\>')[0]}},@{L='Version';E={$DSUVer=(((($_ -split '\"\>')[1] -split 'WN64')[1]) -replace '\.EXE\<\/A\>',"");($DSUVer -split '_')[1]}}
+           $LatestDSULink="https://dl.dell.com"+($DellDownloadsColumns | Sort DTNum -Descending | Select -First 1).link
+           $LatestDSUVersion=($DellDownloadsColumns | Sort DTNum -Descending | Select -First 1).version
+           Write-Host "    Found:"$LatestDSUVersion -ForegroundColor Green
+       }
+       Catch{
+           Write-Host "    ERROR: Failed to find DSU version. Exiting..." -ForegroundColor Red
+           EndScript
+       }
+   # Check if DSU is already installed
         Write-Host "Checking if DSU is installed..."
         Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
         ForEach($Key in $RegKeyPaths){
             IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
-                IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]'1.8.0'}){
+                IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSUVersion}){
                     Write-Host "    FOUND: DSU already installed" -ForegroundColor Green
                     $IsDSUInstalled="YES"
                     Set-Location c:\
