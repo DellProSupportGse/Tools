@@ -239,7 +239,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
         IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell EMC System Update(DSU)..."
-            $DSUInstallerLocation=Download-File 'https://dl.dell.com/FOLDER06526860M/1/Systems-Management_Application_8CTK7_WN64_1.9.0_A00.EXE'
+            $DSUInstallerLocation=Download-File $LatestDSULink
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
             $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
