@@ -1,14 +1,14 @@
 # Tools
 #### NOTE: All tools should be run from ISE as administorator unless otherwise noted. 
 -------------------------------------------------------------------------------------------------------------------------------------------------
-## Dell System Updater
+## Dell Server Updater
    This tool will automatically download and 
    install Drivers/Firmware on Dell Servers
   
   How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-Invoke-Expression('$module="DellSystemUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellSystemUpdater.ps1'));Invoke-DellSystemUpdater
+Invoke-Expression('$module="DellServerUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellServerUpdater.ps1'));Invoke-DellServerUpdater
 ```
 
 ### Documentation:
