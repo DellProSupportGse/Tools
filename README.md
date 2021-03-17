@@ -8,7 +8,7 @@
   How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-Invoke-Expression('$module="DellServerUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellServerUpdater.ps1'));Invoke-DellServerUpdater
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DellServerUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellServerUpdater.ps1'));Invoke-DellServerUpdater
 ```
 
 ### Documentation:
