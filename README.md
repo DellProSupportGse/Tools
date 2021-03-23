@@ -3,7 +3,7 @@
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## Dell Server Updater
    This tool will automatically download and 
-   install Drivers/Firmware on Dell Servers
+   install Windows Updates, Drivers/Firmware on Dell Servers
   
   How To Use:
     From ISE or PowerShell as admin execute the following:
@@ -18,17 +18,20 @@
    4. Is Azure Stack HCI (Storage Spaces Direct Ready Node or AX node)
       - We download and extract the AZHCI-Catalog to use for DSU
       - We Pause & Drain the node and Enable Storage Maintenance Mode
+      - Install Windows Updates
       - Run DSU
         - No reboot required: We resume the node, disable Storage Maintenance Mode and show Installation Report
         - Reboot Required: We setup a logon task that will resume the node and disable Storage Maintenance Mode after the reboot and logon
         - Failed Update: We show you the failed update and exit so we can look into the errors and decide how to proceed.
    6. Is Cluster member
       - We Pause & Drain the node and Enable Storage Maintenance Mode
+      - Install Windows Updates
       - Run DSU
         - No reboot required: We resume the node and show Installation Report
         - Reboot Required: We setup a logon task that will resume the node after the reboot and logon
         - Failed Update: We show you the failed update and exit so we can look into the errors and decide how to proceed.
-   8. Is Regual Power Edge
+   8. Is Regular Power Edge
+      - Install Windows Updates 
       - Run DSU
         - No reboot required: Show Installation Report
         - Failed Update: We show you the failed update and exit so we can look into the errors and decide how to proceed.
