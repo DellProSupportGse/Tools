@@ -282,7 +282,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         # Check if Windows
         IF([System.Environment]::OSVersion.VersionString -imatch 'Windows'){
             Write-Host "Executing Windows Updates..."
-            Start-Process -FilePath "$env:comspec" -ArgumentList "/c del c:\ans.txt&&echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
+            Start-Process -FilePath "$env:comspec" -ArgumentList "/c echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
         }        
         Write-Host "Executing DSU..."
         Run-DSU
