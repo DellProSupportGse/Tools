@@ -2,7 +2,7 @@
 #### NOTE: All tools should be run from ISE as administorator unless otherwise noted. 
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## DART
-   Dell eAsy seRver updaTer
+   Dell eAsy seRver updaTer 
    This tool will automatically download and 
    install Windows Updates, Drivers/Firmware on Dell Servers
   
