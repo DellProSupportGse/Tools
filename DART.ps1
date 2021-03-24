@@ -88,7 +88,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 Start-Sleep 5
             }until(
                 # Running Repair Jobs are less than 1
-                ((Get-StorageJob | Where-Object {$_.Name -imatch 'Repair' -and $_.JobState -ne 'Completed'}) | Measure-Object).Count -lt 1
+                ((Get-StorageJob | Where-Object {$_.Name -imatch 'Repair' -and $_.JobState -ne 'Running'}) | Measure-Object).Count -lt 1
             )
 
             # Suspend Cluster Host to prevent chicken-egg scenario
