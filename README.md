@@ -1,14 +1,15 @@
 # Tools
 #### NOTE: All tools should be run from ISE as administorator unless otherwise noted. 
 -------------------------------------------------------------------------------------------------------------------------------------------------
-## Dell Server Updater
+## DART
+   Dell eAsy seRver updaTer
    This tool will automatically download and 
    install Windows Updates, Drivers/Firmware on Dell Servers
   
   How To Use:
     From ISE or PowerShell as admin execute the following:
 ```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DellServerUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellServerUpdater.ps1'));Invoke-DellServerUpdater
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DellServerUpdater";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DellServerUpdater.ps1'));Invoke-DART
 ```
 
 ### Documentation:
