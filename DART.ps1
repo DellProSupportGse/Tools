@@ -88,7 +88,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 $SJobs=((Get-StorageJob | Where-Object {$_.Name -imatch 'Repair' -and ($_.JobState -eq 'Running')}) | Measure-Object).Count
                 IF($SJobs -gt 1){
                     Start-Sleep 5
-                    Write-Host "        Next check in 5 seconds..."
+                    Write-Host "        Found Running storage jobs. Next check in 5 seconds..."
                 }
             }until(
                 ## Running Repair Jobs are less than 1
