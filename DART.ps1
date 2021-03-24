@@ -85,10 +85,14 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Write-Host "Executing Azure Stack HCI Pre-Checks..."
             Write-Host "    Checking for Running storage jobs..."
             do {
-                Start-Sleep 5
+                $SJobs=((Get-StorageJob | Where-Object {$_.Name -imatch 'Repair' -and ($_.JobState -eq 'Running')}) | Measure-Object).Count
+                IF($SJobs -gt 1){
+                    Start-Sleep 5
+                    Write-Host "        Next check in 5 seconds..."
+                }
             }until(
-                # Running Repair Jobs are less than 1
-                ((Get-StorageJob | Where-Object {$_.Name -imatch 'Repair' -and $_.JobState -ne 'Running'}) | Measure-Object).Count -lt 1
+                ## Running Repair Jobs are less than 1
+                    $SJobs -lt 1
             )
 
             # Suspend Cluster Host to prevent chicken-egg scenario
