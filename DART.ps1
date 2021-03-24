@@ -29,9 +29,8 @@ Write-Host $text
 $Title=@()
     Write-host $Title
     Write-host "   Dell eAsy seRver updaTer"
-    Write-host "   This tool is used to install"
-    Write-host "   Windows updates and Dell Driver"
-    Write-host "   & Firmware updates on Dell Servers."
+    Write-host "   This tool will automatically download and"
+    Write-host "   install Windows Updates, Drivers/Firmware on Dell Servers"
     Write-host " "
 if ($PSCmdlet.ShouldProcess($param)) { 
 
