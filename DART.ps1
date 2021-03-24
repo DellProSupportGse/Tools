@@ -120,10 +120,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback
                     Write-Host "        ERROR: Failed to enter storage maintenance mode. Node resumed" -ForegroundColor Red
                     endscript
-                }Finally{
-                    IF($Maint -eq "Success"){
-                        Write-Host "        SUCCESS: Storage Scale Unit entered Storage Maintenance Mode" -ForegroundColor Green
                 }
+                IF($Maint -eq "Success"){
+                    Write-Host "        SUCCESS: Storage Scale Unit entered Storage Maintenance Mode" -ForegroundColor Green
+                
             }
         }
 
@@ -154,6 +154,13 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
                         cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
                 }
+                Do {  
+                    $ProcessesFound = Get-Process -Name DSU -ErrorAction SilentlyContinue
+                    If ($ProcessesFound) {
+                        Write-Host "    Still running: $($ProcessesFound)"
+                        Start-Sleep 10
+                    }
+                } Until (!$ProcessesFound)
             # Check Status
                 $DupsStatus=Get-Content 'C:\ProgramData\Dell\DELL EMC System Update\dell_dup\DSU_STATUS.json'| ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus 
                 Switch($DupsStatus){
@@ -298,7 +305,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         IF($RunDSF -ieq "y"){
             Write-Host "Executing DSU..."
             Run-DSU
-        }Else{Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor DarkYellow }
+        }Else{Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor DarkYellow}
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
 }               
