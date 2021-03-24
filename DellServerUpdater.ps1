@@ -2,12 +2,12 @@
     .Synopsis
        Get-DellUpdates
     .DESCRIPTION
-       This script will install Dell Drivers and Firmware on a single node
+       This script will install Windows updates and Dell Drivers and Firmware on a single node
     .EXAMPLE
        Install-DellUpdates
     #>
     
-Function Invoke-DellServerUpdater {
+Function Invoke-DART {
 [CmdletBinding(
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
@@ -19,19 +19,19 @@ IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and 
     $MyTemp=(Get-Item $env:temp).fullname
 $text=@"
 v1.0
-___  ____ _    _       ____ ____ ____ _  _ ____ ____    _  _ ___  ___  ____ ___ ____ ____ 
-|  \ |___ |    |       [__  |___ |__/ |  | |___ |__/    |  | |__] |  \ |__|  |  |___ |__/ 
-|__/ |___ |___ |___    ___] |___ |  \  \/  |___ |  \    |__| |    |__/ |  |  |  |___ |  \ 
-                                                                                          
-                                                                            By: Jim Gandy
+ __        __  ___ 
+|  \  /\  |__)  |  
+|__/ /~~\ |  \  |  
+                   
+       By: Jim Gandy
 "@
 Write-Host $text
 $Title=@()
-    $Title+="Welcome"
     Write-host $Title
-    Write-host " "
-    Write-host "   This tool is used to install Drivers "
-    Write-host "   and Firmware on Dell Servers"
+    Write-host "   Dell eAsy seRver updaTer"
+    Write-host "   This tool is used to install"
+    Write-host "   Windows updates and Dell Driver"
+    Write-host "   & Firmware updates on Dell Servers."
     Write-host " "
 if ($PSCmdlet.ShouldProcess($param)) { 
 
