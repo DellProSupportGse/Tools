@@ -13,6 +13,10 @@ Function Invoke-DART {
     ConfirmImpact = 'High')]
     param($param)
 CLS
+IF(!($args)){
+    #Variable Cleanup
+    Remove-Variable * -ErrorAction SilentlyContinue
+}
 # Dell Server Check
 IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
 # Fix 8.3 temp paths
@@ -35,7 +39,7 @@ $Title=@()
 if ($PSCmdlet.ShouldProcess($param)) { 
 
         Function EndScript{  
-            break
+            break script
         }
 
         Function Download-File{
@@ -51,11 +55,11 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 Write-Host "        ERROR: Downloading $URL" -ForegroundColor Red
                 EndScript
             }
-            Finally{
+            #Finally{
                 IF([System.IO.File]::Exists($OutFile)){
                     Write-Host "        SUCCESS: File downloaded successfully" -ForegroundColor Green
                 }
-            }
+            #}
             Return $OutFile
         }
 
@@ -280,11 +284,17 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
         # Check if Windows
         IF([System.Environment]::OSVersion.VersionString -imatch 'Windows'){
-            Write-Host "Executing Windows Updates..."
-            Start-Process -FilePath "$env:comspec" -ArgumentList "/c echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
-        }        
-        Write-Host "Executing DSU..."
-        Run-DSU
+            $RunWindowsUpdates = Read-Host "Do you want to install Windows Updates? [y/n]"
+            IF($RunWindowsUpdates -ieq "y"){ 
+                Write-Host "Executing Windows Updates..."
+                Start-Process -FilePath "$env:comspec" -ArgumentList "/K echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
+            }Else{Write-Host "Skipping Windows Updates" -ForegroundColor DarkYellow}
+        }
+        $RunDSF= Read-Host "Do you want to install Dell Drivers and Firmware? [y/n]"       
+        IF($RunDSF -ieq "y"){
+            Write-Host "Executing DSU..."
+            Run-DSU
+        }Else{Write-Host "Skipped Dell Drivers and Firmware" -ForegroundColor DarkYellow }
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
 }               
