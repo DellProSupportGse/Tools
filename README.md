@@ -3,7 +3,7 @@
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## DART
    Dell eAsy seRver updaTer 
-   This tool will automatically download and 
+   is a tool that will automatically download and 
    install Windows Updates, Drivers/Firmware on Dell Servers
   
   How To Use:
