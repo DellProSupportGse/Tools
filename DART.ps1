@@ -292,13 +292,13 @@ if ($PSCmdlet.ShouldProcess($param)) {
             IF($RunWindowsUpdates -ieq "y"){ 
                 Write-Host "Executing Windows Updates..."
                 Start-Process -FilePath "$env:comspec" -ArgumentList "/K echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
-            }Else{Write-Host "Skipping Windows Updates" -ForegroundColor DarkYellow}
+            }Else{Write-Host "    Skipping Windows Updates" -ForegroundColor DarkYellow}
         }
         $RunDSF= Read-Host "Do you want to install Dell Drivers and Firmware? [y/n]"       
         IF($RunDSF -ieq "y"){
             Write-Host "Executing DSU..."
             Run-DSU
-        }Else{Write-Host "Skipped Dell Drivers and Firmware" -ForegroundColor DarkYellow }
+        }Else{Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor DarkYellow }
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
 }               
