@@ -212,14 +212,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                             }
                     }
                 }
-                IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
-                    Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
-                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
-                }
-                IF($ASHCI -eq "YES"){
-                    Write-Host "Exiting Storage Maintenance Mode..."
-                    Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
-                }
+
         }
    # Find latest DSU version on dl.dell.com
        Try{
@@ -306,6 +299,18 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Write-Host "Executing DSU..."
             Run-DSU
         }Else{Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor DarkYellow}
+        
+        # Resume Cluster
+        IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
+            Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
+            Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
+        }
+
+        # Disable Storage Maintenance Mode
+        IF($ASHCI -eq "YES"){
+            Write-Host "Exiting Storage Maintenance Mode..."
+            Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
+        }
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
 }               
