@@ -12,17 +12,11 @@ Function Invoke-DART {
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
     param(
-    [Parameter(Mandatory=$False, Position=1, HelpMessage="True if you want to install Windows Updates")]
+    [Parameter(Mandatory=$True, Position=1, HelpMessage="True if you want to install Windows Updates")]
     [bool] $WindowsUpdates,
-    [Parameter(Mandatory=$False, Position=2, HelpMessage="True if you want to install Drivers and Firmware")]
+    [Parameter(Mandatory=$True, Position=2, HelpMessage="True if you want to install Drivers and Firmware")]
     [bool] $DriverandFirmware,
     $param)
-#CLS
-#$args
-#IF(!($args)){
-#    #Variable Cleanup
-#    Remove-Variable * -ErrorAction SilentlyContinue
-#}
 
 # Dell Server Check
 IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
@@ -298,21 +292,15 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
         # Check if Windows
         IF([System.Environment]::OSVersion.VersionString -imatch 'Windows'){
-            IF($WindowsUpdates -ne $True){
-                $RunWindowsUpdates = Read-Host "Do you want to install Windows Updates? [y/n]"
-            }ElseIF($WindowsUpdates -eq $True){$RunWindowsUpdates="y"}
-                IF($RunWindowsUpdates -ieq "y"){ 
-                    Write-Host "    Executing Windows Updates..."
-                    cmd /c "echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
-                }Else{Write-Host "    Skipping Windows Updates" -ForegroundColor Yellow}
+            IF($WindowsUpdates -eq $True){ 
+                Write-Host "    Executing Windows Updates..."
+                cmd /c "echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
+            }ElseIF($WindowsUpdates -eq $False){Write-Host "    Skipping Windows Updates" -ForegroundColor Yellow}
         }
-        IF($DriverandFirmware -ne $True){
-            $RunDSF= Read-Host "Do you want to install Dell Drivers and Firmware? [y/n]"       
-        }ElseIF($DriverandFirmware -eq $True){$RunDSF="y"}
-        IF($RunDSF -ieq "y"){
+        IF($DriverandFirmware -eq $True){
             Write-Host "    Executing DSU..."
             Run-DSU
-        }Else{Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
+        }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
         
         # Resume Cluster
         IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
