@@ -11,12 +11,19 @@ Function Invoke-DART {
 [CmdletBinding(
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
-    param($param)
-CLS
-IF(!($args)){
-    #Variable Cleanup
-    Remove-Variable * -ErrorAction SilentlyContinue
-}
+    param(
+    [Parameter(Mandatory=$False, Position=1, HelpMessage="True if you want to install Windows Updates")]
+    [bool] $WindowsUpdates,
+    [Parameter(Mandatory=$False, Position=2, HelpMessage="True if you want to install Drivers and Firmware")]
+    [bool] $DriverandFirmware,
+    $param)
+#CLS
+#$args
+#IF(!($args)){
+#    #Variable Cleanup
+#    Remove-Variable * -ErrorAction SilentlyContinue
+#}
+
 # Dell Server Check
 IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
 # Fix 8.3 temp paths
@@ -38,7 +45,8 @@ $Title=@()
     Write-host " "
 if ($PSCmdlet.ShouldProcess($param)) { 
 
-        Function EndScript{  
+        Function EndScript{
+            Write-Host "End"  
             break script
         }
 
@@ -83,6 +91,9 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Function Run-ASHCIPre{
             # Check for any outstanding Storage Jobs
             Write-Host "Executing Azure Stack HCI Pre-Checks..."
+            IF(Get-VirtualDisk | Where-Object{$_.OperationalStatus -ine "OK"}){
+                Write-Host "    ERROR: Virtual Disk(s) UnHealth Please remediate before continuing" -ForegroundColor Red
+                EndScript}
             Write-Host "    Checking for Running storage jobs..."
             do {
                 $SJobs=((Get-StorageJob | Where-Object {$_.Name -imatch 'Repair' -and ($_.JobState -eq 'Running')}) | Measure-Object).Count
@@ -97,29 +108,26 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
             # Suspend Cluster Host to prevent chicken-egg scenario
                 Write-Host "    Suspending $env:COMPUTERNAME..."
-                Try{
-                    Suspend-ClusterNode -Name $env:COMPUTERNAME -Drain -ForceDrain -Wait  -ErrorVariable $ClusPreERR >$null
-                }Catch{
+                    Suspend-ClusterNode -Name $env:COMPUTERNAME -Drain -ForceDrain -Wait -ErrorAction Inquire >$null
+                IF($ClusPreERR){
                     Write-Host "        ERROR: Failed to suspend cluster node. Exiting..." -ForegroundColor Red
                     EndScript
-                }Finally{ 
-                    IF((Get-ClusterNode -Name $env:COMPUTERNAME).State -eq "Paused"){
-                        Write-Host "        SUCCESS: Cluster node is suspended" -ForegroundColor Green
                     }
+                IF((Get-ClusterNode -Name $env:COMPUTERNAME).State -eq "Paused"){
+                    Write-Host "        SUCCESS: Cluster node is suspended" -ForegroundColor Green
                 }
-
 
             # Enter Storage Maintenance Mode
                 Write-Host "    Enabling Storage Maintenance Mode on $env:COMPUTERNAME..."
                 try {
-                    Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Enable-StorageMaintenanceMode
+                    Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Enable-StorageMaintenanceMode -ErrorAction Inquire
                     $Maint="Success"
                 }
                 catch {
                     $Maint="Failed"
                     Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback
                     Write-Host "        ERROR: Failed to enter storage maintenance mode. Node resumed" -ForegroundColor Red
-                    endscript
+                    EndScript
                 }
                 IF($Maint -eq "Success"){
                     Write-Host "        SUCCESS: Storage Scale Unit entered Storage Maintenance Mode" -ForegroundColor Green
@@ -129,18 +137,20 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
     Function Run-ClusterPre{
         Write-Host "Executing Cluster Pre-Checks..."
+        IF(Get-VirtualDisk | Where-Object{$_.OperationalStatus -ine "OK"}){
+            Write-Host "    ERROR: Virtual Disk(s) UnHealth Please remediate before continuing" -ForegroundColor Red
+            EndScript}
         Try{
             # Suspend Cluster Host to prevent chicken-egg scenario
                 Write-Host "    Suspending $env:COMPUTERNAME..."
-                Suspend-ClusterNode -Name $env:COMPUTERNAME -Drain -ForceDrain -Wait -ErrorVariable $ClusPreERR
+                Suspend-ClusterNode -Name $env:COMPUTERNAME -Drain -ForceDrain -Wait -ErrorAction Inquire
         }Catch{
             Write-Host "    ERROR: Failed to suspend cluster node. Exiting..." -ForegroundColor Red
             EndScript
-        }Finally{
+            }
             IF(-not $ClusPreERR){
                 Write-Host "    SUCCESS: Cluster node suspended." -ForegroundColor Green
             }
-        }
     }
 
         Function Run-DSU{
@@ -149,7 +159,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Check if HCI and run DSU install needed updates
                 IF($ASHCI -eq "YES"){
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$MyTemp\ASHCI-Catalog.xml <c:\ans.txt&&del c:\ans.txt"
+                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$MyTemp\ASHCI-Catalog.xml --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
                 }Else{
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
                         cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
@@ -288,17 +298,21 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
         # Check if Windows
         IF([System.Environment]::OSVersion.VersionString -imatch 'Windows'){
-            $RunWindowsUpdates = Read-Host "Do you want to install Windows Updates? [y/n]"
-            IF($RunWindowsUpdates -ieq "y"){ 
-                Write-Host "Executing Windows Updates..."
-                Start-Process -FilePath "$env:comspec" -ArgumentList "/K echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
-            }Else{Write-Host "    Skipping Windows Updates" -ForegroundColor DarkYellow}
+            IF($WindowsUpdates -ne $True){
+                $RunWindowsUpdates = Read-Host "Do you want to install Windows Updates? [y/n]"
+            }ElseIF($WindowsUpdates -eq $True){$RunWindowsUpdates="y"}
+                IF($RunWindowsUpdates -ieq "y"){ 
+                    Write-Host "    Executing Windows Updates..."
+                    cmd /c "echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
+                }Else{Write-Host "    Skipping Windows Updates" -ForegroundColor Yellow}
         }
-        $RunDSF= Read-Host "Do you want to install Dell Drivers and Firmware? [y/n]"       
+        IF($DriverandFirmware -ne $True){
+            $RunDSF= Read-Host "Do you want to install Dell Drivers and Firmware? [y/n]"       
+        }ElseIF($DriverandFirmware -eq $True){$RunDSF="y"}
         IF($RunDSF -ieq "y"){
-            Write-Host "Executing DSU..."
+            Write-Host "    Executing DSU..."
             Run-DSU
-        }Else{Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor DarkYellow}
+        }Else{Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
         
         # Resume Cluster
         IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
