@@ -80,8 +80,8 @@ Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.web
 Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
-Support
+### Support
 Please note this code is provided as-is and currently not supported by Dell EMC.
 
-Report problems or provide feedback
-If you run into any problems or would like to provide feedback, please open an issue here 
+### Report problems or provide feedback
+If you run into any problems or would like to provide feedback, please open an issue here https://github.com/DellProSupportGse/Tools/issues
