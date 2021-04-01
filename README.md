@@ -2,8 +2,8 @@
 #### NOTE: All tools should be run from ISE as administorator unless otherwise noted. 
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## DART
-   **D**ell **A**utomated se**R**ver upda**T**er is a tool that will automatically download and 
-   install Windows Updates, Drivers/Firmware on Dell Servers
+   **D**ell **A**utomated se**R**ver upda**T**er is a Windows Failover Cluster and HCI/S2D aware tool that will automatically download and 
+   install Windows Updates, Drivers/Firmware on Dell Servers.
   
   How To Use:
     From ISE or PowerShell as admin execute the following:
