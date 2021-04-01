@@ -1,13 +1,21 @@
     <#
     .Synopsis
-       Get-DellUpdates
+       DART.ps1
     .DESCRIPTION
        This script will install Windows updates and Dell Drivers and Firmware on a single node
-    .EXAMPLE
-       Install-DellUpdates
+    .EXAMPLES
+       Install Windows Updates, Drivers and Firmware:
+            Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$True
+       Install Driver and Firmware Only:
+            Invoke-DART -WindowsUpdates:$False -DriverandFirmware:$True
+       Install Windows Updates Only:
+            Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$False
+       Fully Automated
+            Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$True -Confirm:$false
     #>
     
 Function Invoke-DART {
+
 [CmdletBinding(
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
@@ -33,7 +41,7 @@ v1.0
 Write-Host $text
 $Title=@()
     Write-host $Title
-    Write-host "   Dell eAsy seRver updaTer"
+    Write-host "   Dell Automated seRver updaTer"
     Write-host "   This tool will automatically download and"
     Write-host "   install Windows Updates, Drivers/Firmware on Dell Servers"
     Write-host " "
