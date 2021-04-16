@@ -1,9 +1,11 @@
-Function Invoke-SDDC {
+Function Invoke-SDDCOffline {
     [CmdletBinding(
         SupportsShouldProcess = $true,
         ConfirmImpact = 'High')]
         param($param)
     CLS
+$Run=Read-host "Ready to run? [y/n]"
+IF($Run -ine "y"){break}
 # Fix 8.3 temp paths
     $MyTemp=(Get-Item $env:temp).fullname
 # Clean old PrivateCloud.DiagnosticInfo
@@ -18,6 +20,8 @@ Function Invoke-SDDC {
                 Remove-Item "$p\PrivateCloud.DiagnosticInfo" -Force -Confirm:$False -Recurse -ErrorAction SilentlyContinue
             }
     }
+$SDDCFileCheck=Read-Host "Do you have the SDDC copied locally? [y/n]"
+IF($SDDCFileCheck -ine "y"){Write-Host "Please download from https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip";break}
 
 # Fresh import of PrivateCloud.DiagnosticInfo
     # Allow Tls12 and Tls11 -- GitHub now requires Tls12
@@ -28,8 +32,9 @@ Function Invoke-SDDC {
     Function Get-CatFile($initialDirectory)
             {
                 [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null
-                $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog -Property @{Multiselect = $true}
+                $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog -Property @{Multiselect = $false}
                 $OpenFileDialog.Title = "Please Select local SDDC ZIP file..."
+                $OpenFileDialog.ShowHelp = 'Please download SDDDC from this link: https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip'
                 $OpenFileDialog.initialDirectory = $initialDirectory
                 $OpenFileDialog.filter = "ZIP (*.zip)| *.zip"
                 $OpenFileDialog.ShowDialog() | Out-Null
@@ -48,4 +53,4 @@ Function Invoke-SDDC {
 # Run SDDC
     Get-SddcDiagnosticInfo
 }
-Invoke-SDDC 
+Invoke-SDDCOffline 
