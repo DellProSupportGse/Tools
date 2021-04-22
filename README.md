@@ -64,7 +64,19 @@ Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(new-object System
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## Run SDDC
  How To Use:
-    From ISE or PowerShell as admin execute the following:
+    
+    1. Download the SDDC from this link https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip 
+    2. Copy to the node where you will run it
+    3. Open SDDCOffline (https://raw.githubusercontent.com/DellProSupportGse/Tools/main/SDDCOffline.ps1) and copy/paste into ISE on the node where you want to run SDDC
+    4. Run the copied code
+    5. It will ask you for the location of the downloaded SDDC from step 1 ans 2
+    6. The rest will run as normal
+
+---
+-------------------------------------------------------------------------------------------------------------------------------------------------
+## SDDC Offline
+ How To Use:
+    
 ```Powershell
 Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-SDDC
 ```
