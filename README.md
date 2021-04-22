@@ -72,6 +72,7 @@ Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.web
 ---
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## SDDC Offline
+ 
  How To Use:
     1. Download the SDDC from this link https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip 
     2. Copy to the node where you will run it
@@ -79,7 +80,8 @@ Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.web
     4. Run the copied code
     5. It will ask you for the location of the downloaded SDDC from step 1 ans 2
     6. The rest will run as normal
----
+   
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## TSR Collector
    This tool is used to collect TSRs from
     all nodes in a cluster"
