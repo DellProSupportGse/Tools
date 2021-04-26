@@ -250,9 +250,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
         ForEach($Key in $RegKeyPaths){
+            $DSUVer=$_.DisplayVersion
             IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
                 IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSUVersion}){
-                    Write-Host "    FOUND: DSU $_.DisplayVersion already installed" -ForegroundColor Green
+                    Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
                     $IsDSUInstalled="YES"
                     Set-Location c:\
                 }
