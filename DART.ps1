@@ -15,8 +15,7 @@
     #>
     
 Function Invoke-DART {
-$DateTime=Get-Date -Format yyyyMMdd_HHmmss
-Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
+
 [CmdletBinding(
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
@@ -26,6 +25,9 @@ Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
     [Parameter(Mandatory=$True, Position=2, HelpMessage="Enter True if you want to install Drivers and Firmware and False if you do not")]
     [bool] $DriverandFirmware,
     $param)
+
+$DateTime=Get-Date -Format yyyyMMdd_HHmmss
+Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
 
 # Dell Server Check
 IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
