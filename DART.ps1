@@ -324,5 +324,5 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
-}               
 Stop-Transcript
+}               
