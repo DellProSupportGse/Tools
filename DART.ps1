@@ -203,7 +203,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                             $Reboot = Read-Host "Ready to reboot? [y/n]"
                             Switch ($Reboot){
                                 "y"{
-                                    $Script='CLS;Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;Pause'
+                                    $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript;Pause'
                                     IF(-not(Test-Path c:\dell)){
                                         New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
                                     }
@@ -251,7 +251,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
         ForEach($Key in $RegKeyPaths){
             IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
-                $DSUVer=Get-ItemProperty -Path $Key.PSPath.DisplayVersion
+                $DSUVer=(Get-ItemProperty -Path $Key.PSPath).DisplayVersion
                 IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSUVersion}){
                     Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
                     $IsDSUInstalled="YES"
