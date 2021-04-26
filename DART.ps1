@@ -15,7 +15,8 @@
     #>
     
 Function Invoke-DART {
-
+$DateTime=Get-Date -Format yyyyMMdd_HHmmss
+Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
 [CmdletBinding(
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
@@ -324,4 +325,4 @@ if ($PSCmdlet.ShouldProcess($param)) {
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
 }               
-                
+Stop-Transcript
