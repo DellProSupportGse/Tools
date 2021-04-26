@@ -252,7 +252,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         ForEach($Key in $RegKeyPaths){
             IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
                 IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSUVersion}){
-                    Write-Host "    FOUND: DSU already installed" -ForegroundColor Green
+                    Write-Host "    FOUND: DSU $_.DisplayVersion already installed" -ForegroundColor Green
                     $IsDSUInstalled="YES"
                     Set-Location c:\
                 }
