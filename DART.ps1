@@ -15,7 +15,6 @@
     #>
     
 Function Invoke-DART {
-
 [CmdletBinding(
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
