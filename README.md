@@ -50,6 +50,8 @@
       - Runs DSU
         - No reboot required: Show Installation Report
         - Failed Update: We show you the failed update and exit so we can look into the errors and decide how to proceed.
+   Transcript Logging: C:\ProgramData\Dell\DART
+   
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## FLCkr
    **FL**tmc **C**hec**k**e**r**
