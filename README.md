@@ -53,6 +53,8 @@
    
    Transcript Logging: C:\ProgramData\Dell\DART
    
+   Use -IgnoreChecks:$True to install updates without suspending cluster node or enabling storage maintenance mode for Azure Stack HCI
+   
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## FLCkr
    **FL**tmc **C**hec**k**e**r**
