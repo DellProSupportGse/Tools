@@ -23,6 +23,8 @@ Function Invoke-DART {
     [bool] $WindowsUpdates,
     [Parameter(Mandatory=$True, Position=2, HelpMessage="Enter True if you want to install Drivers and Firmware and False if you do not")]
     [bool] $DriverandFirmware,
+    [Parameter(Mandatory=$False, Position=3)]
+    [bool] $IgnoreChecks,
     $param)
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
@@ -296,11 +298,14 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     Write-Host "    SUCCESS: Catalog expanded" -ForegroundColor Green
                 }
             }
-            Run-ASHCIPre
+            If($IgnoreChecks -ne $True){
+                Run-ASHCIPre
+            }
         }
-        If($IsClusterMember -eq "YES"){
+        If($IgnoreChecks -ne $True){
             Run-ClusterPre
         }
+        If($IgnoreChecks -eq $True){Write-Host "Ignoring ASHCI/Cluster Prechecks" -ForegroundColor Yellow}
         # Check if Windows
         IF([System.Environment]::OSVersion.VersionString -imatch 'Windows'){
             IF($WindowsUpdates -eq $True){ 
@@ -314,15 +319,19 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
         
         # Resume Cluster
-        IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
-            Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
-            Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
+        IF($IgnoreChecks -ne $True){
+            IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
+                Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
+                Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
+            }
         }
 
         # Disable Storage Maintenance Mode
-        IF($ASHCI -eq "YES"){
-            Write-Host "Exiting Storage Maintenance Mode..."
-            Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
+        IF($IgnoreChecks -ne $True){
+            IF($ASHCI -eq "YES"){
+                Write-Host "Exiting Storage Maintenance Mode..."
+                Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
+            }
         }
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
