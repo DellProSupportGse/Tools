@@ -95,27 +95,27 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Function Run-ASHCIPre{
             # Check for any outstanding Storage Jobs
             Write-Host "Executing Azure Stack HCI Pre-Checks..."
-            IF(Get-VirtualDisk | Where-Object{$_.OperationalStatus -ine "OK"}){
-                Write-Host "    ERROR: Virtual Disk(s) UnHealth Please remediate before continuing" -ForegroundColor Red
-                EndScript}
-            Write-Host "    Checking for Running storage jobs..."
-            do {
-                $SJobs=((Get-StorageJob | Where-Object {$_.Name -imatch 'Repair' -and ($_.JobState -eq 'Running')}) | Measure-Object).Count
-                IF($SJobs -gt 1){
-                    Start-Sleep 5
-                    Write-Host "        Found Running storage jobs. Next check in 5 seconds..."
-                }
-            }until(
+            #IF(Get-VirtualDisk | Where-Object{$_.OperationalStatus -ine "OK"}){
+            #    Write-Host "    ERROR: Virtual Disk(s) UnHealth Please remediate before continuing" -ForegroundColor Red
+            #    EndScript}
+            #Write-Host "    Checking for Running storage jobs..."
+            #do {
+            #    $SJobs=((Get-StorageJob | Where-Object {$_.Name -imatch 'Repair' -and ($_.JobState -eq 'Running')}) | Measure-Object).Count
+            #    IF($SJobs -gt 1){
+            #        Start-Sleep 5
+            #        Write-Host "        Found Running storage jobs. Next check in 5 seconds..."
+            #    }
+            #}until(
                 ## Running Repair Jobs are less than 1
-                    $SJobs -lt 1
-            )
+            #        $SJobs -lt 1
+            #)
 
             # Suspend Cluster Host to prevent chicken-egg scenario
                 Write-Host "    Suspending $env:COMPUTERNAME..."
                     #Suspend-ClusterNode -Name $env:COMPUTERNAME -Drain -ForceDrain -Wait -ErrorAction Inquire >$null
                 IF($ClusPreERR){
                     Write-Host "        ERROR: Failed to suspend cluster node. Exiting..." -ForegroundColor Red
-                    EndScript
+                    #EndScript
                     }
                 IF((Get-ClusterNode -Name $env:COMPUTERNAME).State -eq "Paused"){
                     Write-Host "        SUCCESS: Cluster node is suspended" -ForegroundColor Green
