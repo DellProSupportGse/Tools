@@ -296,7 +296,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     Write-Host "    SUCCESS: Catalog expanded" -ForegroundColor Green
                 }
             }
-            Run-ASHCIPre
+            #Run-ASHCIPre
         }
         If($IsClusterMember -eq "YES"){
             Run-ClusterPre
