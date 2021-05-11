@@ -141,20 +141,20 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
     Function Run-ClusterPre{
         Write-Host "Executing Cluster Pre-Checks..."
-        IF(Get-VirtualDisk | Where-Object{$_.OperationalStatus -ine "OK"}){
-            Write-Host "    ERROR: Virtual Disk(s) UnHealth Please remediate before continuing" -ForegroundColor Red
-            EndScript}
-        Try{
+        #IF(Get-VirtualDisk | Where-Object{$_.OperationalStatus -ine "OK"}){
+        #    Write-Host "    ERROR: Virtual Disk(s) UnHealth Please remediate before continuing" -ForegroundColor Red
+        #    EndScript}
+        #Try{
             # Suspend Cluster Host to prevent chicken-egg scenario
-                Write-Host "    Suspending $env:COMPUTERNAME..."
+        #        Write-Host "    Suspending $env:COMPUTERNAME..."
                 #Suspend-ClusterNode -Name $env:COMPUTERNAME -Drain -ForceDrain -Wait -ErrorAction Inquire
-        }Catch{
-            Write-Host "    ERROR: Failed to suspend cluster node. Exiting..." -ForegroundColor Red
-            EndScript
-            }
-            IF(-not $ClusPreERR){
-                Write-Host "    SUCCESS: Cluster node suspended." -ForegroundColor Green
-            }
+        #}Catch{
+        #    Write-Host "    ERROR: Failed to suspend cluster node. Exiting..." -ForegroundColor Red
+        #    EndScript
+        #    }
+        #    IF(-not $ClusPreERR){
+        #        Write-Host "    SUCCESS: Cluster node suspended." -ForegroundColor Green
+        #    }
     }
 
         Function Run-DSU{
