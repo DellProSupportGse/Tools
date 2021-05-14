@@ -300,10 +300,13 @@ if ($PSCmdlet.ShouldProcess($param)) {
             }
             If($IgnoreChecks -ne $True){
                 Run-ASHCIPre
+                $NoClusterPre=$True
             }
         }
-        If($IgnoreChecks -ne $True){
-            Run-ClusterPre
+        IF($NoClusterPre -ne $True){
+            If($IgnoreChecks -ne $True){
+                Run-ClusterPre
+            }
         }
         If($IgnoreChecks -eq $True){Write-Host "Ignoring ASHCI/Cluster Prechecks" -ForegroundColor Yellow}
         # Check if Windows
