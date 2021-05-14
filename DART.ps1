@@ -311,7 +311,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
             IF($WindowsUpdates -eq $True){ 
                 Write-Host "    Executing Windows Updates..."
                 #cmd /c "echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
-                Start-Process -WindowStyle Normal -FilePath "$env:comspec" -ArgumentList '/K echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt'
+                Start-Process -WindowStyle Normal -FilePath "$env:comspec" -ArgumentList '/C echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt'
             }ElseIF($WindowsUpdates -eq $False){Write-Host "    Skipping Windows Updates" -ForegroundColor Yellow}
         }
         IF($DriverandFirmware -eq $True){
