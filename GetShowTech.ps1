@@ -59,7 +59,7 @@ Function Invoke-GetShowTech {
 
     # Gathering the show techs 
         ForEach($SwIp in $SwIPs){
-            IF($SwSameUser -ieq 'n'){
+            IF($SwSameUser -ine 'y'){
                  # Switch creds
                      $SwUser=Read-Host "Please enter user name for switch $SwIP"
             }
