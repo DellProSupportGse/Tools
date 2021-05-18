@@ -56,15 +56,14 @@
    Use -IgnoreChecks:$True to install updates without suspending cluster node or enabling storage maintenance mode for Azure Stack HCI
    
 -------------------------------------------------------------------------------------------------------------------------------------------------
-## FLCkr
-   **FL**tmc **C**hec**k**e**r**
-   This tool lookups up filter drivers in Microsoft's known good list
-   URL: https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md
+## GetShowTech
+   
+   This tool is used to collect Dell switch logs
    
    How To Use: 
       From ISE or PowerShell as admin execute the following and follow the prompts:
 ```Powershell
-Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
+Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## Run SDDC
@@ -96,6 +95,17 @@ Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.web
     From ISE or PowerShell as admin execute the following:
 ```Powershell
 Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
+```
+-------------------------------------------------------------------------------------------------------------------------------------------------
+## FLCkr
+   **FL**tmc **C**hec**k**e**r**
+   This tool lookups up filter drivers in Microsoft's known good list
+   URL: https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md
+   
+   How To Use: 
+      From ISE or PowerShell as admin execute the following and follow the prompts:
+```Powershell
+Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ### Support
