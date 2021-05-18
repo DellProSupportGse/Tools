@@ -81,7 +81,7 @@ Function Invoke-GetShowTech {
 
     # Clean up show techs
         Write-Host "Clean up..."
-        Remove-Item "$ENV:Temp\*_ShowTech.log" -Force
+        Remove-Item "$ENV:Temp\ShowTechs" -Recurse -Confirm:$false -Force
 
     # Remove SSH if installed during this script
         IF($ChkIfSSHInstalled.state -ne 'Installed'){
