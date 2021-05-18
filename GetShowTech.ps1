@@ -5,6 +5,9 @@
        This script will collect Show Tech-Support from single or multiple switches
     .EXAMPLES
             Invoke-GetShowTech
+    .Authors
+            Jim Gandy
+            Jonah Farve
     #>
 Function Invoke-GetShowTech {
     [CmdletBinding(
