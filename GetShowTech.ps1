@@ -13,6 +13,9 @@ Function Invoke-GetShowTech {
     param(
     $param)
 
+    $DateTime=Get-Date -Format yyyyMMdd_HHmmss
+    Start-Transcript -NoClobber -Path "C:\programdata\Dell\GetShowTech\GetShowTech_$DateTime.log"
+
     # Collect Show Techs
         Remove-Variable * -ErrorAction SilentlyContinue
         Clear-Host
@@ -85,4 +88,10 @@ Function Invoke-GetShowTech {
             Write-Host "Removing SSH Client..."
             Remove-WindowsCapability -Online -Name $ChkIfSSHInstalled.name  > $null
         }
+        
+    # Remove Function:\Invoke-GetShowTech
+        Remove-Item -Path Function:\Invoke-GetShowTech > $null
+
+        Stop-Transcript
+
 }# end of Invoke-GetShowTech
