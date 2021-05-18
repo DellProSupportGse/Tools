@@ -36,7 +36,7 @@ Write-Host ""
 if ($PSCmdlet.ShouldProcess($param)) {
 
     # Fix 8.3 temp paths
-        $MyTemp=(Get-Item $MyTemp).fullname
+        $MyTemp=(Get-Item $ENV:Temp).fullname
 
     # Collect Show Techs
         Write-Host "Gathering Show Tech-Support(s)..."
@@ -73,7 +73,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
 
     # Clean up old switch logs
-        Remove-Item "$MyTemp\ShowTechs" -Recurse -Confirm:$false -Force
+        Remove-Item "$MyTemp\ShowTechs" -Recurse -Confirm:$false -Force > $null
 
     # Create temp folder
         Write-Host "Creating temp output location..."
