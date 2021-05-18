@@ -5,20 +5,17 @@
        This script will collect Show Tech-Support from single or multiple switches
     .EXAMPLES
             Invoke-GetShowTech
-    .Authors
-            Jim Gandy
-            Jonah Farve
     #>
 Function Invoke-GetShowTech {
     [CmdletBinding(
-    SupportsShouldProcess = $true,
-    ConfirmImpact = 'High')]
-    param(
-    $param)
+        SupportsShouldProcess = $true,
+        ConfirmImpact = 'High')]
+        param($param)
+
     
     Remove-Variable * -ErrorAction SilentlyContinue
     Clear-Host
-        
+    
     $DateTime=Get-Date -Format yyyyMMdd_HHmmss
     Start-Transcript -NoClobber -Path "C:\programdata\Dell\GetShowTech\GetShowTech_$DateTime.log"
 
@@ -36,11 +33,14 @@ Write-Host $text
 Write-Host ""
 Write-Host "This tool is used to collect Dell switch logs"
 Write-Host ""
+if ($PSCmdlet.ShouldProcess($param)) {
+
+    # Fix 8.3 temp paths
+        $MyTemp=(Get-Item $MyTemp).fullname
 
     # Collect Show Techs
         Write-Host "Gathering Show Tech-Support(s)..."
 
-    
     # Get switch IP addresses
         $SwIPs=Read-Host "Please enter comma delimited list of switch IP addresse(s)"
         $i=0
@@ -73,11 +73,11 @@ Write-Host ""
         }
 
     # Clean up old switch logs
-        Remove-Item "$ENV:Temp\ShowTechs" -Recurse -Confirm:$false -Force
+        Remove-Item "$MyTemp\ShowTechs" -Recurse -Confirm:$false -Force
 
     # Create temp folder
         Write-Host "Creating temp output location..."
-        New-Item -Path $ENV:Temp -Name ShowTechs -ItemType Directory -Force > $null
+        New-Item -Path $MyTemp -Name ShowTechs -ItemType Directory -Force > $null
         #Test-Path C:\Users\JIM~1.GAN\AppData\Local\Temp\ShowTechs
 
     # Gathering the show techs 
@@ -90,18 +90,18 @@ Write-Host ""
              # Connect to switch
                 Write-Host "Collecting Show Tech-Support for $SwIP..."
                 $Switchout=ssh $SwIp -l $SwUser -o StrictHostKeyChecking=no show tech-support
-                $Switchout | Out-File -FilePath "$ENV:Temp\ShowTechs\$($SwIp)_ShowTech.log" -Force
+                $Switchout | Out-File -FilePath "$MyTemp\ShowTechs\$($SwIp)_ShowTech.log" -Force
          }
 
     # Zip up show techs
         Write-Host "Compressing show techs..."
         $DT=Get-Date -Format "yyyyMMddHHmm"
-        Compress-Archive -Path "$ENV:Temp\ShowTechs\*.*" -DestinationPath "$ENV:Temp\ShowTechs_$($DT)"
-        Write-Host "Logs can be found here: $ENV:Temp\ShowTechs_$($DT).zip"
+        Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\ShowTechs_$($DT)"
+        Write-Host "Logs can be found here: $MyTemp\ShowTechs_$($DT).zip"
 
     # Clean up show techs
         Write-Host "Clean up..."
-        Remove-Item "$ENV:Temp\ShowTechs" -Recurse -Confirm:$false -Force
+        Remove-Item "$MyTemp\ShowTechs" -Recurse -Confirm:$false -Force
 
     # Remove SSH if installed during this script
         IF($ChkIfSSHInstalled.state -ne 'Installed'){
@@ -113,5 +113,5 @@ Write-Host ""
         Remove-Item -Path Function:\Invoke-GetShowTech > $null
 
         Stop-Transcript
-
+} #end if ShouldProcess
 }# end of Invoke-GetShowTech
