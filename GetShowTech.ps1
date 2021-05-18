@@ -15,7 +15,10 @@ Function Invoke-GetShowTech {
     ConfirmImpact = 'High')]
     param(
     $param)
-
+    
+    Remove-Variable * -ErrorAction SilentlyContinue
+    Clear-Host
+        
     $DateTime=Get-Date -Format yyyyMMdd_HHmmss
     Start-Transcript -NoClobber -Path "C:\programdata\Dell\GetShowTech\GetShowTech_$DateTime.log"
 
@@ -30,12 +33,15 @@ v1.0
        By: Jim Gandy
 "@
 Write-Host $text
+Write-Host $text
+Write-Host ""
+Write-Host "This tool is used to collect Dell switch logs"
+Write-Host ""
 
     # Collect Show Techs
-        Remove-Variable * -ErrorAction SilentlyContinue
-        Clear-Host
         Write-Host "Gathering Show Tech-Support(s)..."
 
+    
     # Get switch IP addresses
         $SwIPs=Read-Host "Please enter comma delimited list of switch IP addresse(s)"
         $i=0
