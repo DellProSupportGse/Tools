@@ -19,6 +19,18 @@ Function Invoke-GetShowTech {
     $DateTime=Get-Date -Format yyyyMMdd_HHmmss
     Start-Transcript -NoClobber -Path "C:\programdata\Dell\GetShowTech\GetShowTech_$DateTime.log"
 
+$text=@"
+v1.0
+   ____      _   ____  _                   _____         _     
+  / ___| ___| |_/ ___|| |__   _____      _|_   _|__  ___| |__  
+ | |  _ / _ \ __\___ \| '_ \ / _ \ \ /\ / / | |/ _ \/ __| '_ \ 
+ | |_| |  __/ |_ ___) | | | | (_) \ V  V /  | |  __/ (__| | | |
+  \____|\___|\__|____/|_| |_|\___/ \_/\_/   |_|\___|\___|_| |_|
+                                                               
+       By: Jim Gandy
+"@
+Write-Host $text
+
     # Collect Show Techs
         Remove-Variable * -ErrorAction SilentlyContinue
         Clear-Host
