@@ -33,7 +33,6 @@ v1.0
        By: Jim Gandy
 "@
 Write-Host $text
-Write-Host $text
 Write-Host ""
 Write-Host "This tool is used to collect Dell switch logs"
 Write-Host ""
