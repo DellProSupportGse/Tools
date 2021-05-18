@@ -31,7 +31,7 @@ v1.0
 "@
 Write-Host $text
 Write-Host ""
-Write-Host "This tool is used to collect Dell switch logs"
+Write-Host "    This tool is used to collect Dell switch logs"
 Write-Host ""
 if ($PSCmdlet.ShouldProcess($param)) {
 
