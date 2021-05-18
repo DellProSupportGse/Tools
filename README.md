@@ -61,7 +61,7 @@
    This tool is used to collect Dell switch logs
    
    How To Use: 
-      From ISE or PowerShell as admin execute the following and follow the prompts:
+      From PowerShell as admin execute the following and follow the prompts:
 ```Powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech
 ```
