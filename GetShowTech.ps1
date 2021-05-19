@@ -62,6 +62,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         IF($SwIPs.count -gt 1){
             $SwIPs=$SwIPs -split ','
             $SwSameUser=Read-Host "Use the same user for all switches?[Y/N]"
+            Write-Host "Password will need to be provided for each switch for security."
         }
         IF($SwSameUser -ieq 'y'){$SWUser=Read-Host "Please enter user name"}
 
@@ -73,7 +74,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
 
     # Clean up old switch logs
-        Remove-Item "$MyTemp\ShowTechs" -Recurse -Confirm:$false -Force > $null
+        IF(Test-Path $MyTemp\ShowTechs){Remove-Item "$MyTemp\ShowTechs" -Recurse -Confirm:$false -Force > $null}
 
     # Create temp folder
         Write-Host "Creating temp output location..."
