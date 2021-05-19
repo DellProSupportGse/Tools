@@ -23,15 +23,15 @@ v1.0
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
    |_| |___/_|_\  \___\___/_|_\___\__|\__\___/_|  
                                                   
-by: Jim Gandy
+                                    by: Jim Gandy
 "@
 Write-Host $text
 $Title=@()
-    $Title+="Welcome to Tech Support Report Collector"
+    #$Title+="Welcome to Tech Support Report Collector"
     Write-host $Title
-    Write-host " "
+#    Write-host " "
     Write-host "   This tool is used to collect TSRs from"
-    Write-host "   all nodes in a cluster and bring them back to a single share"
+    Write-host "   all nodes in a cluster into a single share"
     Write-host " "
     if ($PSCmdlet.ShouldProcess($param)) {
 # Fix 8.3 temp paths
@@ -56,10 +56,10 @@ $credential = New-Object System.Management.Automation.PSCredential($user, $secpa
 $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | ?{$_.DefaultIPGateway.length -gt 0}).ipaddress[0]
 # Create a new folder and shares it
     Write-Host "Creating a new shared folder to save the TSRs..."
-    $ShareName = "TSRdata"
+    $ShareName = "Logs"
     $ShareFolder=$MyTemp+"\"+$ShareName
     New-Item -ItemType Directory -Force -Path $ShareFolder  >$null 2>&1
-    New-SmbShare -Name "TSRdata" -Path "$ShareFolder" -Temporary -FullAccess Everyone  >$null 2>&1
+    New-SmbShare -Name "Logs" -Path "$ShareFolder" -Temporary -FullAccess Everyone  >$null 2>&1
     Write-Host "    Share location is $ShareFolder"
 # Gets the logged on creds
     Write-Host "Gathering the credentials to access the share..."
@@ -103,6 +103,11 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
     cd $ShareFolder
     Invoke-Expression "explorer ."
     Write-Host "Please wait while TSRs are collected. Ussually this takes 2-5 minutes per node."
-    
+# Wait for TSRs to arrive
+     $i=0
+     While (!((Get-Item "$ShareFolder\TSR*.zip").count -eq $iDRACIPs.count)) { Start-Sleep 60;$i++;IF($i -ge 10){Write-Host "ERROR: Failed to return all TSRs in 10m. Please investigate." -ForegroundColor Red; Break Script}}
+# Remove share
+    Write-Host "Removing SMB share called Logs..."
+    Remove-SmbShare -Name "Logs" -Force
 }
 }
