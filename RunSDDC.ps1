@@ -66,6 +66,7 @@ Write-Host ""
         Copy-Item -Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip" -Destination "$MyTemp\logs\"
         cd "$MyTemp\logs"
         Invoke-Expression "explorer ."
-        
+        # Removes logs SMB share 
+        IF(Get-SmbShare | Where-Object{$_.Name -imatch 'logs'}){Remove-SmbShare -Name "Logs" -Force}
     }
 }
