@@ -7,12 +7,25 @@
        Invoke-SDDC
     #>
     
-Function Invoke-SDDC {
+Function Invoke-RunSDDC {
     [CmdletBinding(
         SupportsShouldProcess = $true,
         ConfirmImpact = 'High')]
         param($param)
     CLS
+    CLS
+$text=@"
+v1.0
+  ___           ___ ___  ___   ___ 
+ | _ \_  _ _ _ / __|   \|   \ / __|
+ |   / || | ' \\__ \ |) | |) | (__ 
+ |_|_\\_,_|_||_|___/___/|___/ \___|
+                     By: Jim Gandy
+"@
+Write-Host $text
+Write-Host ""
+Write-Host "This tool is used to collect SDDC logs"
+Write-Host "" 
 # Fix 8.3 temp paths
     $MyTemp=(Get-Item $env:temp).fullname
 # Clean old PrivateCloud.DiagnosticInfo
