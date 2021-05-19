@@ -19,6 +19,8 @@ Function Invoke-TSRCollector{
 Function EndScript{  
     break
 }
+$DateTime=Get-Date -Format yyyyMMdd_HHmmss
+Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 $text=@"
 v1.1
   _____ ___ ___    ___     _ _        _           
@@ -114,5 +116,6 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
             Write-Host "Removing SMB share called Logs..."
             Remove-SmbShare -Name "Logs" -Force
     }
-}
-}
+} #End ShouldProcess
+Stop-Transcript
+}# End Invoke-TSRCollector
