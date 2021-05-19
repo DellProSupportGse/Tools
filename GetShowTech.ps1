@@ -51,7 +51,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
             $SwIPs=Read-Host "Please enter comma delimited list of switch IP addresses"
             IF($SwIPs -imatch ','){$SwIPs=$SwIPs -split ','}
             IF($i -ge 2){
-                Write-Host "ERROR: No valid IP found. Exiting..." -ForegroundColor Red
+                Write-Host "ERROR: Too many attempts. Exiting..." -ForegroundColor Red
                 break script
             }
         }
@@ -62,7 +62,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         IF($SwIPs.count -gt 1){
             $SwIPs=$SwIPs -split ','
             $SwSameUser=Read-Host "Use the same user for all switches?[Y/N]"
-            Write-Host "Password will need to be provided for each switch for security."
+            Write-Host "For security reasons a password will need to be provided for each switch."
         }
         IF($SwSameUser -ieq 'y'){$SWUser=Read-Host "Please enter user name"}
 
