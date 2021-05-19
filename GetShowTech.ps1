@@ -96,8 +96,13 @@ if ($PSCmdlet.ShouldProcess($param)) {
     # Zip up show techs
         Write-Host "Compressing show techs..."
         $DT=Get-Date -Format "yyyyMMddHHmm"
-        Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\ShowTechs_$($DT)"
-        Write-Host "Logs can be found here: $MyTemp\ShowTechs_$($DT).zip"
+        IF(Test-Path -Path "$MyTemp\logs"){
+            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($DT)"
+            Write-Host "Logs can be found here: $MyTemp\logs\ShowTechs_$($DT).zip"
+        }Else{
+            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\ShowTechs_$($DT)"
+            Write-Host "Logs can be found here: $MyTemp\ShowTechs_$($DT).zip"
+        }
 
     # Clean up show techs
         Write-Host "Clean up..."
