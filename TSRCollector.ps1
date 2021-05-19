@@ -10,7 +10,10 @@ Function Invoke-TSRCollector{
     [CmdletBinding(
         SupportsShouldProcess = $true,
         ConfirmImpact = 'High')]
-        param($param)
+        param(
+            [Parameter(Mandatory=$False, Position=1)]
+            [bool] $LeaveShare,
+            $param)
 ## Gather Tech Support Report Collector for all nodes in a cluster
     CLS
 Function EndScript{  
@@ -103,11 +106,13 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
     cd $ShareFolder
     Invoke-Expression "explorer ."
     Write-Host "Please wait while TSRs are collected. Ussually this takes 2-5 minutes per node."
-# Wait for TSRs to arrive
-     $i=0
-     While (!((Get-Item "$ShareFolder\TSR*.zip").count -eq $iDRACIPs.count)) { Start-Sleep 60;$i++;IF($i -ge 10){Write-Host "ERROR: Failed to return all TSRs in 10m. Please investigate." -ForegroundColor Red; Break Script}}
-# Remove share
-    Write-Host "Removing SMB share called Logs..."
-    Remove-SmbShare -Name "Logs" -Force
+    IF(!($LeaveShare -eq $True)){
+        # Wait for TSRs to arrive
+            $i=0
+            While (!((Get-Item "$ShareFolder\TSR*.zip").count -eq $iDRACIPs.count)) { Start-Sleep 60;$i++;IF($i -ge 10){Write-Host "ERROR: Failed to return all TSRs in 10m. Please investigate." -ForegroundColor Red; Break Script}}
+        # Remove share
+            Write-Host "Removing SMB share called Logs..."
+            Remove-SmbShare -Name "Logs" -Force
+    }
 }
 }
