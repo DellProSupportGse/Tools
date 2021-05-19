@@ -40,7 +40,19 @@ Function Invoke-SDDC {
     rm -Recurse $MyTemp\$module-$branch,$MyTemp\$branch.zip
     $ModulePath=$md+"\"+$module
     Import-Module $ModulePath -Force
-    
+
+# Clean up old SDDC's
+    IF(Test-Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip"){Remove-Item $env:USERPROFILE\HealthTest-S2DCluster-*.zip -Force}    
+
 # Run SDDC
     Get-SddcDiagnosticInfo
+
+# Wait for new SDDC
+    While (!(Test-Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip")) { Start-Sleep 60 }
+    IF(Test-Path -Path "$MyTemp\logs"){
+        Copy-Item -Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip" -Destination "$MyTemp\logs\"
+        cd "$MyTemp\logs"
+        Invoke-Expression "explorer ."
+        
+    }
 }
