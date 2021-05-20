@@ -59,5 +59,8 @@ Write-Host ""
 
 # Run SDDC
     Get-SddcDiagnosticInfo
-
+# Move to Logs if exists
+IF(Test-Path -Path "$MyTemp\logs"){
+        Copy-Item -Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip" -Destination "$MyTemp\logs\"
+        }
 }
