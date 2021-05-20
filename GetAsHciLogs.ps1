@@ -134,3 +134,4 @@ Function ZipNClean{
 }
 ShowMenu
 }# End invoke-GetAsHciLogs
+
