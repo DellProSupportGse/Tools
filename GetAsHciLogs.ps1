@@ -135,5 +135,6 @@ Function ZipNClean{
 
 }
 ShowMenu
+Stop-Transcript
 }# End invoke-GetAsHciLogs
 
