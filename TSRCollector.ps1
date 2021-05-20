@@ -129,15 +129,18 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
     }
     Write-Host "Please wait while TSRs are collected. Ussually this takes 2-5 minutes per node."
     IF(!($LeaveShare -eq $True)){
-        # Wait for TSRs to arrive
-            $i=0
-            While (!((Get-Item "$ShareFolder\TSR*.zip").count -eq $iDRACIPs.count)) { Start-Sleep 60;$i++;IF($i -ge 10){Write-Host "ERROR: Failed to return all TSRs in 10m. Please investigate." -ForegroundColor Red; Break Script}}
+        # Creating Scheduled Job to remove SMB share in 10 mins
+            Write-Host "Creating Scheduled Job to remove SMB share in 10 mins..."
+            $dateTime = (Get-Date).AddSeconds(600)
+            $T = New-JobTrigger -Once -At "$($dateTime.ToString("MM/dd/yyyy HH:mm"))" 
+            IF(Get-ScheduledJob | Where-Object{$_.Name -eq "TSRCollector"}){Unregister-ScheduledJob -Name "TSRCollector"}
+            Register-ScheduledJob -Name "TSRCollector" -Trigger $T -ScriptBlock {
+                # Remove share
+                    Remove-SmbShare -Name "Logs" -Force
+            }
         # Change directory to the shared folder were the TSRs will be put
             cd $ShareFolder
             Invoke-Expression "explorer ."
-        # Remove share
-            Write-Host "Removing SMB share called Logs..."
-            Remove-SmbShare -Name "Logs" -Force
     }
 } #End ShouldProcess
 Stop-Transcript
