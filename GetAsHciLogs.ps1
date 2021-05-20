@@ -19,6 +19,8 @@ Clear-Host
 # Logs
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\AsHciLogs\AsHciLogs_$DateTime.log"
+# Clean up
+IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
 $Ver="1.0"
 $text = @"
 v$Ver
