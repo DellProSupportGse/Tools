@@ -86,7 +86,7 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
                 Write-Host "    ERROR: Failed too many time. Exiting..." -ForegroundColor Red
                 Break script
             }
-        }Write-Host "    SUCCESS: Able to access file share with provided creds." -ForegroundColor Green
+        }Write-Host "    SUCCESS: Able to access SMB share with provided creds." -ForegroundColor Green
             
     }Else{
         Write-Host "    ERROR: File share not created. Exiting." -ForegroundColor Red
