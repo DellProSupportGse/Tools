@@ -15,11 +15,11 @@ Function Invoke-GetAsHciLogs{
 Function EndScript{  
     break
 }
+Clear-Host
 # Logs
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\AsHciLogs\AsHciLogs_$DateTime.log"
 $Ver="1.0"
-Clear-Host
 $text = @"
 v$Ver
    ___     _       _   ___ _  _  ___ ___   _                  
