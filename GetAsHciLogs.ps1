@@ -118,6 +118,7 @@ Function ZipNClean{
         $DT=Get-Date -Format "yyyyMMddHHmm"
         IF(Test-Path -Path "$MyTemp\logs"){
             Compress-Archive -Path "$MyTemp\logs\*.*" -DestinationPath "c:\dell\AzHciLogs_$($DT)"
+            Sleep 60            
             IF(Test-Path -Path "c:\dell\AzHciLogs_$($DT)"){
                 Write-Host "Logs can be found here: C:Dell\AzHciLogs_$($DT).zip"
                 # Clean up
