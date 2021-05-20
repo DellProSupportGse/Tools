@@ -60,13 +60,4 @@ Write-Host ""
 # Run SDDC
     Get-SddcDiagnosticInfo
 
-# Wait for new SDDC
-    While (!(Test-Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip")) { Start-Sleep 60 }
-    IF(Test-Path -Path "$MyTemp\logs"){
-        Copy-Item -Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip" -Destination "$MyTemp\logs\"
-        cd "$MyTemp\logs"
-        Invoke-Expression "explorer ."
-        # Removes logs SMB share 
-        IF(Get-SmbShare | Where-Object{$_.Name -imatch 'logs'}){Remove-SmbShare -Name "Logs" -Force}
-    }
 }
