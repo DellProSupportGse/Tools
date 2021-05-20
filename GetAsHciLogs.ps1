@@ -47,7 +47,7 @@ Function ShowMenu{
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
-         $selection = Read-Host "Please make a selection"
+         $selection = Read-Host "Please make a selection"
      }
     until ($selection -match '[1-4,qQ,hH]')
     $Global:CollectSTS  = "N"
