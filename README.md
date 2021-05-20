@@ -56,6 +56,16 @@
    Use -IgnoreChecks:$True to install updates without suspending cluster node or enabling storage maintenance mode for Azure Stack HCI
    
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## GetAsHciLogs
+   
+   This tool is used to collect all the logs for Azure Stack HCI (Switches, Servers and OS)
+   
+   How To Use: 
+      From PowerShell as admin execute the following and follow the prompts:
+```Powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetAsHciLogs";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetAsHciLogs.ps1'));Invoke-GetAsHciLogs
+```
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## GetShowTech
    
    This tool is used to collect Dell switch logs
