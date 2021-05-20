@@ -119,7 +119,7 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
         }
         Catch{
             IF(($RespErr.message| ConvertFrom-Json).error.'@Message.ExtendedInfo'.message -match 'already running'){
-                Write-Host "ERROR: A SupportAssist job is already running on the server. Please try again later." -ForegroundColor Red
+                Write-Host "    ERROR: A SupportAssist job is already running on the server. Please try again later." -ForegroundColor Red
             }ElseIF(($RespErr.message| ConvertFrom-Json).error.'@Message.ExtendedInfo'.message -imatch 'The authentication credentials included with this request are missing or invalid.'){
                 $credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials for $idrac_ip"
                 $result= Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $credential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr
