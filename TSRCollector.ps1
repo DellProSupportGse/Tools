@@ -127,14 +127,14 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
         }
     IF($result.StatusCode -eq 202){Write-Host "    StatusCode:"$result.StatusCode "Successfully scheduled TSR" -ForegroundColor Green }Else{Write-Host "    ERROR: StatusCode:" $result.StatusCode "Failed to scheduled TSR" -ForegroundColor Red}
     }
-# Change directory to the shared folder were the TSRs will be put
-    cd $ShareFolder
-    Invoke-Expression "explorer ."
     Write-Host "Please wait while TSRs are collected. Ussually this takes 2-5 minutes per node."
     IF(!($LeaveShare -eq $True)){
         # Wait for TSRs to arrive
             $i=0
             While (!((Get-Item "$ShareFolder\TSR*.zip").count -eq $iDRACIPs.count)) { Start-Sleep 60;$i++;IF($i -ge 10){Write-Host "ERROR: Failed to return all TSRs in 10m. Please investigate." -ForegroundColor Red; Break Script}}
+        # Change directory to the shared folder were the TSRs will be put
+            cd $ShareFolder
+            Invoke-Expression "explorer ."
         # Remove share
             Write-Host "Removing SMB share called Logs..."
             Remove-SmbShare -Name "Logs" -Force
