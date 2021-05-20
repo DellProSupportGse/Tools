@@ -71,6 +71,27 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
     $sus = $env:UserName
     $sdom = (Get-WmiObject win32_computersystem).Domain
     $ShareCreds=Get-Credential -Message "Enter credentials to access the share name to copy the TSR to the share." -UserName $sus
+# Test SBM share
+    Write-Host "Checking SMB share exists..."
+    IF(Get-SmbShare | Where-Object{$_.Name -imatch 'Logs'}){
+        Write-Host "    SUCCESS: SMB share found." -ForegroundColor Green
+        Write-Host "Connecting to SMB share with provdied creds..."
+        $s=0
+        While(-not(cmd /c "net use \\$ShareIP\$ShareName /user:$($ShareCreds.GetNetworkCredential().Username) $($ShareCreds.GetNetworkCredential().Password)")){
+            $s++
+            Write-Host "    WARNING: Failed to access share with provided creds. Please try again." -ForegroundColor Yellow
+            Sleep 3
+            $ShareCreds=Get-Credential -Message "Enter credentials to access the share name to copy the TSR to the share." -UserName $sus
+            IF($s -ge 3){
+                Write-Host "    ERROR: Failed too many time. Exiting..." -ForegroundColor Red
+                Break script
+            }
+        }Write-Host "    SUCCESS: Able to access file share with provided creds." -ForegroundColor Green
+            
+    }Else{
+        Write-Host "    ERROR: File share not created. Exiting." -ForegroundColor Red
+        Break script
+    }
 # Gathers the iDRAC IP addresses from all nodes
     Write-Host "Gathering the iDRAC IP Addresses from cluster nodes..."
     $iDRACIPs=Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
