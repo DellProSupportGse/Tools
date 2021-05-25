@@ -60,6 +60,8 @@
    
    This tool is used to collect all the logs for Azure Stack HCI (Switches, Servers and OS)
    
+   ![alt text](readme/GetAsHciLogsMenu.jpg)
+   
    How To Use: 
       From PowerShell as admin execute the following and follow the prompts:
 ```Powershell
