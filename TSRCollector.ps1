@@ -22,7 +22,7 @@ Function EndScript{
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 $text=@"
-v1.1
+v1.2
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -93,9 +93,27 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
         Break script
     }
 # Gathers the iDRAC IP addresses from all nodes
-    Write-Host "Gathering the iDRAC IP Addresses from cluster nodes..."
-    $iDRACIPs=Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
-    (Get-PcsvDevice).IPv4Address
+    If(Get-Service clussvc1 -ErrorAction SilentlyContinue){
+        Write-Host "Gathering the iDRAC IP Addresses from cluster nodes..."
+        $iDRACIPs=Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
+        (Get-PcsvDevice).IPv4Address
+        }
+    }Else{
+        # Get iDRAC IP addresses
+        $iDIPs=Read-Host "Please enter comma delimited list of iDRAC IP addresse(s)"
+        $i=0
+        IF($iDIPs -imatch ','){$iDIPs=$iDIPs -split ','}
+        While(($iDIPs.count -eq ($iDIPs | %{[IPAddress]$_.Trim()}).count) -eq $False){
+            $i++
+            Write-Host "WARNING: Not a valid IP. Please try again." -ForegroundColor Yellow
+            $iDIPs=Read-Host "Please enter comma delimited list of switch IP addresses"
+            IF($iDIPs -imatch ','){$iDIPs=$iDIPs -split ','}
+            IF($i -ge 2){
+                Write-Host "ERROR: Too many attempts. Exiting..." -ForegroundColor Red
+                break script
+            }
+        }
+        $iDRACIPs=$iDIPs
     }
     Write-Host "    FOUND:$iDRACIPs"
 # Run TechSupportReport on each node
