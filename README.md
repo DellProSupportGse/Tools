@@ -60,7 +60,7 @@
    
    This tool is used to collect all the logs for Azure Stack HCI (Switches, Servers and OS)
    
-   ![alt text](readme/1.jpg)
+   ![alt text](readme/GetLogs.jpg)
    
    How To Use: 
       From PowerShell as admin execute the following and follow the prompts:
