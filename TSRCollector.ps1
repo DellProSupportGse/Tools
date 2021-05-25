@@ -93,7 +93,7 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
         Break script
     }
 # Gathers the iDRAC IP addresses from all nodes
-    If(Get-Service clussvc1 -ErrorAction SilentlyContinue){
+    If(Get-Service clussvc -ErrorAction SilentlyContinue){
         Write-Host "Gathering the iDRAC IP Addresses from cluster nodes..."
         $iDRACIPs=Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
         (Get-PcsvDevice).IPv4Address
