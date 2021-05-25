@@ -58,7 +58,7 @@
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## GetLogs
    
-   This tool is used to collect all the logs for Azure Stack HCI (Switches, Servers and OS)
+   This tool is used to collect all the logs Switches, Servers and OS
    
    ![alt text](readme/GetLogs.jpg)
    
