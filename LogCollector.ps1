@@ -119,7 +119,7 @@ Function ZipNClean{
         IF(Test-Path -Path "$MyTemp\logs"){
             Compress-Archive -Path "$MyTemp\logs\*.*" -DestinationPath "c:\dell\LogCollector_$($DT)"
             Sleep 60            
-            IF(Test-Path -Path "c:\dell\AzHciLogs_$($DT).zip"){
+            IF(Test-Path -Path "c:\dell\LogCollector_$($DT).zip"){
                 Write-Host "Logs can be found here: C:Dell\LogCollector_$($DT).zip"
                 # Clean up
                 Write-Host "Clean up..."
