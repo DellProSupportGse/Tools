@@ -235,16 +235,21 @@ if ($PSCmdlet.ShouldProcess($param)) {
            # Use TLS 1.2
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
            Write-Host "Finding Latest Dell EMC System Update(DSU) version..."
-           $URL="https://dl.dell.com/omimswac/dsu/"
-           $Results=Invoke-WebRequest $URL -UseDefaultCredentials
-           $DellDownloadsColumns=@()
-           $DellDownloadsColumns=(($Results.ParsedHtml.body.innerhtml -split '<br><br>')[-1] -split '<br>')|Select @{L='Date';E={($_ -split '\s{2}')[0]}},@{L='Time';E={($_ -split '\s{2}')[1]}},@{L='DTNum';E={((($_ -split '\s{5}')[1]) -split '\s\<')[0]}},@{L='Link';E={((($_ -split 'href\=\"')[1]) -split '\"\>')[0]}},@{L='Version';E={$DSUVer=(((($_ -split '\"\>')[1] -split 'WN64')[1]) -replace '\.EXE\<\/A\>',"");($DSUVer -split '_')[1]}}
-           $LatestDSULink="https://dl.dell.com"+($DellDownloadsColumns | Sort DTNum -Descending | Select -First 1).link
-           $LatestDSUVersion=($DellDownloadsColumns | Sort DTNum -Descending | Select -First 1).version
-           Write-Host "    Found:"$LatestDSUVersion -ForegroundColor Green
+           $URL = "https://dl.dell.com/omimswac/dsu/"
+           $Results = Invoke-WebRequest $URL -UseDefaultCredentials
+           ## Parse the href tag to find the links on the page
+           $results.Links.href | Where-Object {$_ -match "\d"} | ForEach-Object {
+           ## build an object showing the link and version
+           [PSCustomObject]@{
+               Link = "https://dl.dell.com" + $_
+               Version = ((($_ -split "_A00.EXE") -split "WN64_") -match "\d")[1]
+           }
+           } | ForEach-Object {
+               Write-Host "Found: $($_.Version) | $($_.Link)" -ForegroundColor Green
+           }      
        }
        Catch{
-           Write-Host "    ERROR: Failed to find DSU version. Exiting..." -ForegroundColor Red
+           Write-Warning "    Failed to find DSU version. Exiting..."
            EndScript
        }
    # Check if DSU is already installed
