@@ -30,25 +30,77 @@ Function Invoke-DART {
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
 
-# Dell Server Check
-IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
-# Fix 8.3 temp paths
-    $MyTemp=(Get-Item $env:temp).fullname
 $text=@"
-v1.0
+v1.1
  __        __  ___ 
 |  \  /\  |__)  |  
 |__/ /~~\ |  \  |  
-                   
-       By: Jim Gandy
 "@
-Write-Host $text
-$Title=@()
-    Write-host $Title
-    Write-host "   Dell Automated seRver updaTer"
-    Write-host "   This tool will automatically download and"
-    Write-host "   install Windows Updates, Drivers/Firmware on Dell Servers"
-    Write-host " "
+# Run Menu
+Function ShowMenu{
+    do
+     {
+         $selection=""
+         Clear-Host
+         Write-Host $text
+         Write-Host ""
+         Write-Host "This code is provided as-is and is not supported by Dell Technologies"
+         Write-Host ""
+         Write-Host "==================== Please make a selection ====================="
+         Write-Host ""
+         Write-Host "Press '1' to Install Windows Updates"
+         Write-Host "Press '2' to Install Dell Drivers and Firmware"
+         Write-Host "Press '3' to Install Windows Updates and Dell Drivers and Firmware"
+         Write-Host "Press 'H' to Display Help"
+         Write-Host "Press 'Q' to Quit"
+         Write-Host ""
+         $selection = Read-Host "Please make a selection"
+     }
+    until ($selection -match '[1-4,qQ,hH]')
+    IF($selection -imatch 'h'){
+        Clear-Host
+        Write-Host ""
+        Write-Host "What's New in"$Ver":"
+        Write-Host $WhatsNew 
+        Write-Host ""
+        Write-Host "Useage:"
+        Write-Host "    Make a select by entering a comma delimited string of numbers from the menu."
+        Write-Host ""
+        Write-Host "        Example: 1 will Install Windows Updates."
+        Write-Host ""
+        Write-Host "        Example: 1,3 will Install Windows Updates and Install CPLD"
+        Write-Host ""
+        Pause
+        ShowMenu
+    }
+    IF($selection -match 1){
+        Write-Host "Installing Windows Updates..."
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$False -Confirm:$false
+    }
+
+    IF($selection -match 2){
+        Write-Host "Installing Dell Drivers and Firmware..."
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -WindowsUpdates:$False -DriverandFirmware:$True -Confirm:$false
+    }
+    IF($selection -match 3){
+        Write-Host "Installing Windows Updates and Dell Drivers and Firmware..."
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$True -Confirm:$false
+    }
+    ElseIF($selection -eq 4){
+        Write-Host "Installing CPLD..."
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -CPLD:$True -Confirm:$false
+
+    }
+    IF($selection -imatch 'q'){
+        Write-Host "Bye Bye..."
+        EndScript
+    }
+}#End of ShowMenu
+ShowMenu
+# Dell Server Check
+IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
+    # Fix 8.3 temp paths
+        $MyTemp=(Get-Item $env:temp).fullname
 if ($PSCmdlet.ShouldProcess($param)) { 
 
         Function EndScript{
