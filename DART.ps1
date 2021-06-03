@@ -1,4 +1,4 @@
-    <#
+<#
     .Synopsis
        DART.ps1
     .DESCRIPTION
@@ -19,9 +19,9 @@ Function Invoke-DART {
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
     param(
-    [Parameter(Mandatory=$False, Position=1, HelpMessage="Enter True if you want to install Windows Updates and False if you do not")]
+    [Parameter(Mandatory=$True, Position=1, HelpMessage="Enter True if you want to install Windows Updates and False if you do not")]
     [bool] $WindowsUpdates,
-    [Parameter(Mandatory=$False, Position=2, HelpMessage="Enter True if you want to install Drivers and Firmware and False if you do not")]
+    [Parameter(Mandatory=$True, Position=2, HelpMessage="Enter True if you want to install Drivers and Firmware and False if you do not")]
     [bool] $DriverandFirmware,
     [Parameter(Mandatory=$False, Position=3)]
     [bool] $IgnoreChecks,
@@ -30,81 +30,25 @@ Function Invoke-DART {
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
 
-Function EndScript{ 
-    Stop-Transcript
-    break
-}
-
+# Dell Server Check
+IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
+# Fix 8.3 temp paths
+    $MyTemp=(Get-Item $env:temp).fullname
 $text=@"
-v1.1
+v1.0
  __        __  ___ 
 |  \  /\  |__)  |  
 |__/ /~~\ |  \  |  
+                   
+       By: Jim Gandy
 "@
-# Run Menu
-Function ShowMenu{
-    do
-     {
-         $selection=""
-         Clear-Host
-         Write-Host $text
-         Write-Host ""
-         Write-Host "This code is provided as-is and is not supported by Dell Technologies"
-         Write-Host ""
-         Write-Host "==================== Please make a selection ====================="
-         Write-Host ""
-         Write-Host "Press '1' to Install Windows Updates"
-         Write-Host "Press '2' to Install Dell Drivers and Firmware"
-         Write-Host "Press '3' to Install Windows Updates and Dell Drivers and Firmware"
-         Write-Host "Press 'H' to Display Help"
-         Write-Host "Press 'Q' to Quit"
-         Write-Host ""
-         $selection = Read-Host "Please make a selection"
-     }
-    until ($selection -match '[1-4,qQ,hH]')
-    IF($selection -imatch 'h'){
-        Clear-Host
-        Write-Host ""
-        Write-Host "What's New in"$Ver":"
-        Write-Host $WhatsNew 
-        Write-Host ""
-        Write-Host "Useage:"
-        Write-Host "    Make a select by entering a comma delimited string of numbers from the menu."
-        Write-Host ""
-        Write-Host "        Example: 1 will Install Windows Updates."
-        Write-Host ""
-        Write-Host "        Example: 1,3 will Install Windows Updates and Install CPLD"
-        Write-Host ""
-        Pause
-        ShowMenu
-    }
-    IF($selection -match 1){
-        Write-Host "Installing Windows Updates..."
-        $WindowsUpdates=$True
-        $DriverandFirmware=$False
-    }
-
-    IF($selection -match 2){
-        Write-Host "Installing Dell Drivers and Firmware..."
-        $WindowsUpdates=$False
-        $DriverandFirmware=$True
-    }
-    IF($selection -match 3){
-        Write-Host "Installing Windows Updates and Dell Drivers and Firmware..."
-        $WindowsUpdates=$True
-        $DriverandFirmware=$True
-    }
-
-    IF($selection -imatch 'q'){
-        Write-Host "Bye Bye..."
-        EndScript
-    }
-}#End of ShowMenu
-ShowMenu
-# Dell Server Check
-IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
-    # Fix 8.3 temp paths
-        $MyTemp=(Get-Item $env:temp).fullname
+Write-Host $text
+$Title=@()
+    Write-host $Title
+    Write-host "   Dell Automated seRver updaTer"
+    Write-host "   This tool will automatically download and"
+    Write-host "   install Windows Updates, Drivers/Firmware on Dell Servers"
+    Write-host " "
 if ($PSCmdlet.ShouldProcess($param)) { 
 
         Function EndScript{
@@ -396,4 +340,4 @@ if ($PSCmdlet.ShouldProcess($param)) {
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
 Stop-Transcript
-}               
+}  
