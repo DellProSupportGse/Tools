@@ -94,6 +94,7 @@ Function ShowMenu{
         $WindowsUpdates=$True
         $DriverandFirmware=$True
     }
+
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
         EndScript
