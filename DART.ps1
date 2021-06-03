@@ -19,9 +19,9 @@ Function Invoke-DART {
     SupportsShouldProcess = $true,
     ConfirmImpact = 'High')]
     param(
-    [Parameter(Mandatory=$True, Position=1, HelpMessage="Enter True if you want to install Windows Updates and False if you do not")]
+    [Parameter(Mandatory=$False, Position=1, HelpMessage="Enter True if you want to install Windows Updates and False if you do not")]
     [bool] $WindowsUpdates,
-    [Parameter(Mandatory=$True, Position=2, HelpMessage="Enter True if you want to install Drivers and Firmware and False if you do not")]
+    [Parameter(Mandatory=$False, Position=2, HelpMessage="Enter True if you want to install Drivers and Firmware and False if you do not")]
     [bool] $DriverandFirmware,
     [Parameter(Mandatory=$False, Position=3)]
     [bool] $IgnoreChecks,
