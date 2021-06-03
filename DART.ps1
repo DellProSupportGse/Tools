@@ -96,7 +96,7 @@ Function ShowMenu{
     }
     ElseIF($selection -eq 4){
         Write-Host "Installing CPLD..."
-        $CPLD:$True
+        $CPLD=$True
     }
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
