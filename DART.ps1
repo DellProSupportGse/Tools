@@ -30,6 +30,11 @@ Function Invoke-DART {
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
 
+Function EndScript{ 
+    Stop-Transcript
+    break
+}
+
 $text=@"
 v1.1
  __        __  ___ 
@@ -75,21 +80,20 @@ Function ShowMenu{
     }
     IF($selection -match 1){
         Write-Host "Installing Windows Updates..."
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$False -Confirm:$false
+        $WindowsUpdates=$True $DriverandFirmware=$False
     }
 
     IF($selection -match 2){
         Write-Host "Installing Dell Drivers and Firmware..."
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -WindowsUpdates:$False -DriverandFirmware:$True -Confirm:$false
+        $WindowsUpdates=$False $DriverandFirmware=$True
     }
     IF($selection -match 3){
         Write-Host "Installing Windows Updates and Dell Drivers and Firmware..."
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$True -Confirm:$false
+        $WindowsUpdates=$True $DriverandFirmware=$True
     }
     ElseIF($selection -eq 4){
         Write-Host "Installing CPLD..."
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -CPLD:$True -Confirm:$false
-
+        $CPLD:$True
     }
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
