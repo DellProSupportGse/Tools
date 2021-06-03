@@ -94,10 +94,6 @@ Function ShowMenu{
         $WindowsUpdates=$True
         $DriverandFirmware=$True
     }
-    ElseIF($selection -eq 4){
-        Write-Host "Installing CPLD..."
-        $CPLD = $True
-    }
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
         EndScript
