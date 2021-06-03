@@ -80,16 +80,19 @@ Function ShowMenu{
     }
     IF($selection -match 1){
         Write-Host "Installing Windows Updates..."
-        $WindowsUpdates=$True $DriverandFirmware=$False
+        $WindowsUpdates=$True
+        $DriverandFirmware=$False
     }
 
     IF($selection -match 2){
         Write-Host "Installing Dell Drivers and Firmware..."
-        $WindowsUpdates=$False $DriverandFirmware=$True
+        $WindowsUpdates=$False
+        $DriverandFirmware=$True
     }
     IF($selection -match 3){
         Write-Host "Installing Windows Updates and Dell Drivers and Firmware..."
-        $WindowsUpdates=$True $DriverandFirmware=$True
+        $WindowsUpdates=$True
+        $DriverandFirmware=$True
     }
     ElseIF($selection -eq 4){
         Write-Host "Installing CPLD..."
