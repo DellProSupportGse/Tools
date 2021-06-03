@@ -1,5 +1,9 @@
 # Tools
 #### NOTE: All tools should be run from ISE as administorator unless otherwise noted. 
+
+### Support
+Please note this code is provided as-is and currently not supported by Dell EMC.
+
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## DART
    **D**ell **A**utomated se**R**ver upda**T**er is a Windows Failover Cluster and HCI/S2D aware tool that will automatically download and 
@@ -120,8 +124,6 @@
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
-### Support
-Please note this code is provided as-is and currently not supported by Dell EMC.
 
 ### Report problems or provide feedback
 If you run into any problems or would like to provide feedback, please open an issue here https://github.com/DellProSupportGse/Tools/issues
