@@ -1,4 +1,4 @@
-<#
+    <#
     .Synopsis
        DART.ps1
     .DESCRIPTION
@@ -15,46 +15,101 @@
     #>
     
 Function Invoke-DART {
-[CmdletBinding(
-    SupportsShouldProcess = $true,
-    ConfirmImpact = 'High')]
+
     param(
-    [Parameter(Mandatory=$True, Position=1, HelpMessage="Enter True if you want to install Windows Updates and False if you do not")]
-    [bool] $WindowsUpdates,
-    [Parameter(Mandatory=$True, Position=2, HelpMessage="Enter True if you want to install Drivers and Firmware and False if you do not")]
-    [bool] $DriverandFirmware,
-    [Parameter(Mandatory=$False, Position=3)]
+    [Parameter(Mandatory=$False, Position=1)]
     [bool] $IgnoreChecks,
     $param)
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
 
-# Dell Server Check
-IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
-# Fix 8.3 temp paths
-    $MyTemp=(Get-Item $env:temp).fullname
+Function EndScript{ 
+    Stop-Transcript
+    break
+}
+
 $text=@"
-v1.0
+v1.1
  __        __  ___ 
 |  \  /\  |__)  |  
 |__/ /~~\ |  \  |  
-                   
-       By: Jim Gandy
 "@
-Write-Host $text
-$Title=@()
-    Write-host $Title
-    Write-host "   Dell Automated seRver updaTer"
-    Write-host "   This tool will automatically download and"
-    Write-host "   install Windows Updates, Drivers/Firmware on Dell Servers"
-    Write-host " "
-if ($PSCmdlet.ShouldProcess($param)) { 
+# Run Menu
+Function ShowMenu{
+    do
+     {
+         $selection=""
+         Clear-Host
+         Write-Host $text
+         Write-Host ""
+         Write-Host "This code is provided as-is and is not supported by Dell Technologies"
+         Write-Host ""
+         Write-Host "==================== Please make a selection ====================="
+         Write-Host ""
+         Write-Host "Press '1' to Install Windows Updates"
+         Write-Host "Press '2' to Install Dell Drivers and Firmware"
+         Write-Host "Press '3' to Install Windows Updates and Dell Drivers and Firmware"
+         Write-Host "Press 'H' to Display Help"
+         Write-Host "Press 'Q' to Quit"
+         Write-Host ""
+         $selection = Read-Host "Please make a selection"
+     }
+    until ($selection -match '[1-3,qQ,hH]')
+    $Global:WindowsUpdates=$False
+    $Global:DriverandFirmware=$False
+    $Global:Confirm=$False
+    IF($selection -imatch 'h'){
+        Clear-Host
+        Write-Host ""
+        Write-Host "What's New in"$Ver":"
+        Write-Host $WhatsNew 
+        Write-Host ""
+        Write-Host "Useage:"
+        Write-Host "    Make a select by entering a comma delimited string of numbers from the menu."
+        Write-Host ""
+        Write-Host "        Example: 1 will Install Windows Updates."
+        Write-Host ""
+        Write-Host "        Example: 1,3 will Install Windows Updates and Install CPLD"
+        Write-Host ""
+        Pause
+        ShowMenu
+    }
+    IF($selection -match 1){
+        Write-Host "Installing Windows Updates..."
+        $Global:WindowsUpdates=$True
+        $Global:DriverandFirmware=$False
+        $Global:Confirm=$false
+    }
 
-        Function EndScript{
-            Write-Host "End"  
-            break script
-        }
+    IF($selection -match 2){
+        Write-Host "Installing Dell Drivers and Firmware..."
+        $Global:WindowsUpdates=$False
+        $Global:DriverandFirmware=$True
+        $Global:Confirm=$false
+    }
+    IF($selection -match 3){
+        Write-Host "Installing Windows Updates and Dell Drivers and Firmware..."
+        $Global:WindowsUpdates=$True
+        $Global:DriverandFirmware=$True
+        $Global:Confirm=$false
+    }
+
+    IF($selection -imatch 'q'){
+        Write-Host "Bye Bye..."
+        EndScript
+    }
+}#End of ShowMenu
+ShowMenu
+
+#Check for ignore checks
+If($IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}Else{Write-Host "IgnoreChecks:False"}
+
+# Dell Server Check
+IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
+    # Fix 8.3 temp paths
+        $MyTemp=(Get-Item $env:temp).fullname
+if ($PSCmdlet.ShouldProcess($param)) { 
 
         Function Download-File{
             Param($URL)
@@ -165,10 +220,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Check if HCI and run DSU install needed updates
                 IF($ASHCI -eq "YES"){
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$MyTemp\ASHCI-Catalog.xml --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
+                        cmd /c "echo a>c:\ansd.txt&&echo c>>c:\ansd.txt&&DSU.exe --catalog-location=$MyTemp\ASHCI-Catalog.xml --apply-upgrades <c:\ansd.txt&&del c:\ansd.txt"
                 }Else{
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
+                        cmd /c "echo a>c:\ansd.txt&&echo c>>c:\ansd.txt&&DSU.exe --apply-upgrades <c:\ansd.txt&&del c:\ansd.txt"
                 }
                 Do {  
                     $ProcessesFound = Get-Process -Name DSU -ErrorAction SilentlyContinue
@@ -340,4 +395,4 @@ if ($PSCmdlet.ShouldProcess($param)) {
     }
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
 Stop-Transcript
-}  
+}               
