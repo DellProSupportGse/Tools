@@ -103,7 +103,7 @@ Function ShowMenu{
 ShowMenu
 
 #Check for ignore checks
-If($IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}Else{Write-Host "IgnoreChecks:False"}
+If($IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}
 
 # Dell Server Check
 IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
