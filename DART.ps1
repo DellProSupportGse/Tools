@@ -295,11 +295,17 @@ if ($PSCmdlet.ShouldProcess($param)) {
            Write-Host "Finding Latest Dell EMC System Update(DSU) version..."
            $URL="https://dl.dell.com/omimswac/dsu/"
            $Results=Invoke-WebRequest $URL -UseDefaultCredentials
-           $DellDownloadsColumns=@()
-           $DellDownloadsColumns=(($Results.ParsedHtml.body.innerhtml -split '<br><br>')[-1] -split '<br>')|Select @{L='Date';E={($_ -split '\s{2}')[0]}},@{L='Time';E={($_ -split '\s{2}')[1]}},@{L='DTNum';E={((($_ -split '\s{5}')[1]) -split '\s\<')[0]}},@{L='Link';E={((($_ -split 'href\=\"')[1]) -split '\"\>')[0]}},@{L='Version';E={$DSUVer=(((($_ -split '\"\>')[1] -split 'WN64')[1]) -replace '\.EXE\<\/A\>',"");($DSUVer -split '_')[1]}}
-           $LatestDSULink="https://dl.dell.com"+($DellDownloadsColumns | Sort DTNum -Descending | Select -First 1).link
-           $LatestDSUVersion=($DellDownloadsColumns | Sort DTNum -Descending | Select -First 1).version
-           Write-Host "    Found:"$LatestDSUVersion -ForegroundColor Green
+           ## Parse the href tag to find the links on the page
+           $LatestDSU=@()
+           $results.Links.href | Where-Object {$_ -match "\d"} | ForEach-Object {
+                ## build an object showing the link and version
+                $LatestDSU+=[PSCustomObject]@{
+                    Link = "https://dl.dell.com" + $_
+                    Version = ((($_ -split "_A00.EXE") -split "WN64_") -match "\d")[1]
+                }
+           }
+           $LatestDSU=$LatestDSU|sort Version | select -Last 1
+           Write-Host "    Found: $($LatestDSU.Version) | $($LatestDSU.Link)" -ForegroundColor Green
        }
        Catch{
            Write-Host "    ERROR: Failed to find DSU version. Exiting..." -ForegroundColor Red
@@ -312,7 +318,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         ForEach($Key in $RegKeyPaths){
             IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
                 $DSUVer=(Get-ItemProperty -Path $Key.PSPath).DisplayVersion
-                IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSUVersion}){
+                IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSU.Version}){
                     Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
                     $IsDSUInstalled="YES"
                     Set-Location c:\
@@ -321,7 +327,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
         IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell EMC System Update(DSU)..."
-            $DSUInstallerLocation=Download-File $LatestDSULink
+            $DSUInstallerLocation=Download-File $LatestDSU.Link
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
             $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
