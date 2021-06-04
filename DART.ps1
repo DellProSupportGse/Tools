@@ -181,19 +181,22 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Enter Storage Maintenance Mode
                 Write-Host "    Enabling Storage Maintenance Mode on $env:COMPUTERNAME..."
                 try {
-                    Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Enable-StorageMaintenanceMode -ErrorAction Inquire
-                    $Maint="Success"
+                    $Maint=$Null
+                    Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Enable-StorageMaintenanceMode -ErrorAction Stop -ErrorVariable Maint
+                    IF($Maint -eq $Null){$Maint="Success"}
                 }
                 catch {
+                    Write-Host "        ERROR: Failed to enter storage maintenance mode." -ForegroundColor Red
+                    Write-Host "$Maint" -ForegroundColor Red
+                    Write-Host "    Resuming Node..."
+                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate
                     $Maint="Failed"
-                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback
-                    Write-Host "        ERROR: Failed to enter storage maintenance mode. Node resumed" -ForegroundColor Red
                     EndScript
                 }
                 IF($Maint -eq "Success"){
                     Write-Host "        SUCCESS: Storage Scale Unit entered Storage Maintenance Mode" -ForegroundColor Green
                 
-            }
+                }
         }
 
     Function Run-ClusterPre{
