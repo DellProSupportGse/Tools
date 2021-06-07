@@ -70,7 +70,7 @@ Function ShowMenu{
         Write-Host ""
         Write-Host "        Example: 1 will Install Windows Updates."
         Write-Host ""
-        Write-Host "        Example: 1,3 will Install Windows Updates and Install CPLD"
+        Write-Host "        Example: 2 will Install Dell Drivers and Firmware"
         Write-Host ""
         Pause
         ShowMenu
