@@ -98,7 +98,7 @@ Write-Host ""
                 }Else{
                     Write-Error "    ERROR: Failed to connect to cluster $ClusterToCollectLogsFrom. Please check the cluster name and run again."
                 }
-            }Else{Write-Error "ERROR: $ClusterToCollectLogsFrom is not pingable."}
+            }
 # Move to Logs if exists
 IF(Test-Path -Path "$MyTemp\logs"){
         Copy-Item -Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip" -Destination "$MyTemp\logs\"
