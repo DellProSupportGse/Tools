@@ -30,7 +30,10 @@ Write-Host ""
     $MyTemp=(Get-Item $env:temp).fullname
 # Clean old PrivateCloud.DiagnosticInfo
     Write-Host "Cleaning PrivateCloud.DiagnosticInfo on all nodes..."
-    Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock {
+    IF(Get-Service clussvc -ErrorAction SilentlyContinue){
+        $CNames=(Get-ClusterNode).Name
+    }Else{$CNames=$env:COMPUTERNAME}
+    Invoke-Command -ComputerName $CNames -ScriptBlock {
         # Remove PrivateCloud.DiagnosticInfo
             Remove-Module 'PrivateCloud.DiagnosticInfo' -Force -Confirm:$False -ErrorAction SilentlyContinue
 
