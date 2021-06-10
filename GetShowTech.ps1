@@ -100,8 +100,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($DT)"
             Write-Host "Logs can be found here: $MyTemp\logs\ShowTechs_$($DT).zip"
         }Else{
-            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\ShowTechs_$($DT)"
-            Write-Host "Logs can be found here: $MyTemp\ShowTechs_$($DT).zip"
+            $OutFolder=$MyTemp+"\Logs"
+            New-Item -ItemType Directory -Force -Path $OutFolder  >$null 2>&1
+            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($DT)"
+            Write-Host "Logs can be found here: $MyTemp\logs\ShowTechs_$($DT).zip"
         }
 
     # Clean up show techs
