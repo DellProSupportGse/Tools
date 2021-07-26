@@ -58,7 +58,14 @@ $user = "root"
 $pass= "calvin"
 $secpasswd = ConvertTo-SecureString $pass -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($user, $secpasswd)
-$ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | ?{$_.DefaultIPGateway.length -gt 0}).ipaddress[0]
+# IP address of the machine sharing
+    Write-Host "Gathering Host IP Address..."
+    $NSLookupOut=cmd /c "nslookup $env:COMPUTERNAME"
+    ForEach($item in $NSLookupOut){
+        $NSLookupAll+=$item
+    }
+    $ShareIP=(($NSLookupAll -split 'Name:    ')[-1] -split 'Address:  ')[-1]
+    Write-Host "    Host IP: $ShareIP"
 # Create a new folder and shares it
     Write-Host "Creating a new shared folder to save the TSRs..."
     $ShareName = "Logs"
