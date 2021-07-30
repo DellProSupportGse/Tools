@@ -76,7 +76,9 @@ $credential = New-Object System.Management.Automation.PSCredential($user, $secpa
 # Gets the logged on creds
     Write-Host "Gathering the credentials to access the share..."
     $sus = $env:UserName
-    $sdom = (Get-WmiObject win32_computersystem).Domain
+    #$sdom = (Get-WmiObject win32_computersystem).Domain
+    $sdom = cmd /c "whoami"
+    $sdom = ($sdom -split "\\")[0]
     $ShareCreds=Get-Credential -Message "Enter credentials to access the share name to copy the TSR to the share." -UserName $sus
 # Test SBM share
     Write-Host "Checking SMB share exists..."
