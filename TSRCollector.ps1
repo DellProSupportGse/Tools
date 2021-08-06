@@ -85,8 +85,11 @@ $credential = New-Object System.Management.Automation.PSCredential($user, $secpa
     IF(Get-SmbShare | Where-Object{$_.Name -imatch 'Logs'}){
         Write-Host "    SUCCESS: SMB share found." -ForegroundColor Green
         Write-Host "Connecting to SMB share with provdied creds..."
+        Remove-PSDrive -Name logs >$null 2>&1
+        sleep 3
         $s=0
-        While(-not(cmd /c "net use \\$ShareIP\$ShareName /user:$($ShareCreds.GetNetworkCredential().Username) $($ShareCreds.GetNetworkCredential().Password)")){
+        New-PSDrive -Credential $ShareCreds1 -Name Logs -Root "\\$ShareIP\$ShareName" -PSProvider FileSystem  >$null 2>&1
+        While(-not(Get-PSDrive -Name Logs)){
             $s++
             Write-Host "    WARNING: Failed to access share with provided creds. Please try again." -ForegroundColor Yellow
             Sleep 3
@@ -95,8 +98,9 @@ $credential = New-Object System.Management.Automation.PSCredential($user, $secpa
                 Write-Host "    ERROR: Failed too many time. Exiting..." -ForegroundColor Red
                 Break script
             }
+            New-PSDrive -Credential $ShareCreds1 -Name Logs -Root "\\$ShareIP\$ShareName" -PSProvider FileSystem
         }Write-Host "    SUCCESS: Able to access SMB share with provided creds." -ForegroundColor Green
-            
+    Remove-PSDrive -Name logs >$null 2>&1
     }Else{
         Write-Host "    ERROR: File share not created. Exiting." -ForegroundColor Red
         Break script
