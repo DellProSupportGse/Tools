@@ -385,23 +385,38 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Write-Host "    Executing DSU..."
             Run-DSU
         }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
-        
-        # Resume Cluster
-        IF($IgnoreChecks -ne $True){
-            IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
-                Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
-                Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
-            }
-        }
+        $ExitSMM = Read-Host "Ready to Resume Cluster Node and exit Storage Maintenance Mode? [y/n]"
+            Switch ($ExitSMM){
+                "y"{
+                        # Resume Cluster
+                        IF($IgnoreChecks -ne $True){
+                            IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
+                                Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
+                                Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
+                            }
+                        }
 
-        # Disable Storage Maintenance Mode
-        IF($IgnoreChecks -ne $True){
-            IF($ASHCI -eq "YES"){
-                Write-Host "Exiting Storage Maintenance Mode..."
-                Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
-            }
-        }
-    }
-}Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
+                        # Disable Storage Maintenance Mode
+                        IF($IgnoreChecks -ne $True){
+                            IF($ASHCI -eq "YES"){
+                                Write-Host "Exiting Storage Maintenance Mode..."
+                                Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
+                            }
+
+                         }
+                    }
+                "n"{
+                        $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageScaleUnit -FriendlyName "$($Env:ComputerName)" | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
+                        IF(-not(Test-Path c:\dell)){
+                            New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
+                        }
+                        $Script | Out-File -FilePath c:\dell\exit-maintenancemode.ps1 -Force
+                        Write-Host "Creating Exit Maintenance Mode Scheduled Task to run at next logon...."
+                        Register-ScheduledTask -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
+                    }
+                }
+    }#$PSCmdlet.ShouldProcess($param)
+}Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}# Dell Server Check
 Stop-Transcript
 }               
+               
