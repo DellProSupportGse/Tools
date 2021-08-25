@@ -15,7 +15,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.1
+v1.2
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -83,7 +83,7 @@ Write-Host ""
                     Write-Host "    SUCCESS: Able to connect to cluster" -ForegroundColor Green
                     $CheckRSATClusteringPowerShell=IF((Get-WindowsFeature RSAT-Clustering-PowerShell).InstallState -eq 'Installed'){ 
                         Write-Host "Execute: Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom..."
-                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom
+                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters
                     }Else{
                         Write-Host "Remote SDDC requires RSAT-Clustering-PowerShell which requires a rebooted." -ForegroundColor Yellow
                         IF((Read-Host "Would you like to install RSAT-Clustering-PowerShell [y/n]") -imatch 'y'){
