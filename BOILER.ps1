@@ -140,6 +140,8 @@ ForEach($CBSLog in $LogsToProcess){
         Write-Host ""
         Write-Host "            Suggested Fix:"
         Write-host "                1. Download identified Language Tag(s) above"
+        Write-host "                       2016 - https://dell.app.box.com/folder/130829063120?s=qpcf9bramodp6z6mwgjj0ix8q75m0fac"
+        Write-host "                       2019 - https://dell.app.box.com/folder/130836135731?s=8nvy78yyp171tcywnas5wvn3tng9h85u"	
         Write-Host "                2. DISM install identified Language Tag(s)"
         Write-host "                       Example: DISM /online /add-package /packagepath:c:\dell\x64fre_Server_ro-ro_lp.cab"
         Write-Host ""
