@@ -11,7 +11,7 @@
 #>
 Function Invoke-BOILER{
 #region Opening Banner and menu
-$Ver="1.0"
+$Ver="1.1"
 Clear-Host
 $text = @"
 v$Ver
