@@ -1,4 +1,4 @@
-Function Invoke-BOILER {
+Function Invoke-BOILER{
 #region Opening Banner and menu
 $Ver="1.0"
 Clear-Host
@@ -204,4 +204,4 @@ ForEach($CBSLog in $LogsToProcess){
    
  # Cleanup expanded zips            
  IF($UnzipPath2Remove.Count -gt 0){Remove-Item $UnzipPath2Remove -Recurse}
-}
+ }
