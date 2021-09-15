@@ -5,6 +5,15 @@
   Please note this code is provided as-is and currently not supported by Dell EMC.
 
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## BOILER
+   Filters the CBS/DISM logs for Errors/Fails/Warnings. Quickly identifies failing KB's, Language Tags or
+   corruption and provides Suggested fixes.
+   
+```Powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="BOILER";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1'));Invoke-BOILER
+```   
+  
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## DART
    **D**ell **A**utomated se**R**ver upda**T**er is a Windows Failover Cluster and HCI/S2D aware tool that will automatically download and 
    install Windows Updates, Drivers/Firmware on Dell Servers.
