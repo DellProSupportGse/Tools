@@ -67,7 +67,7 @@ Function Get-FileName($initialDirectory){
 #Endregion end of unzip files
 
 Write-Host "Please Select CBS/DISM Log File(s) to use..."
-$CBSLogs=Get-FileName("$env:USERPROFILE\Documents\SRs")
+$CBSLogs=Get-FileName("C:\Windows\logs\CBS")
 $UnzipPath2Remove=@()
 $LogsToProcess=@()
 IF($CBSLogs -imatch '.zip'){
