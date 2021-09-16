@@ -6,9 +6,29 @@
 
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## BOILER
-   Filters the CBS/DISM logs for Errors/Fails/Warnings. Quickly identifies failing KB's, Language Tags or
-   corruption and provides Suggested fixes.
+   Filters the CBS/DISM logs for Errors/Fails/Warnings to quickly identify failing KB's, Language Tags or
+   corruption plus, it provides Suggested fixes.
    
+   ![alt text](readme/boiler.jpg)
+   
+   ### Documentation:
+    1. Copy/Paste PowerShell code below
+    2. Answer the Rady to run? Y/N
+    3. Provide the log to analize in the popup
+          - Supports running locally or remotly by feeding it a ZIP file of the logs or just log file.
+    4. Review the output for the finds and suggested fixes
+    
+   ### Supported Scenarios:
+    - Faling KBs
+        Shows any KBs that are failing to install, provides the link to download them if available and the how to DISM install it for best success.
+    - Faling Language Packs
+        Shows any language tag that is failing with the process to download and install to repair it
+    - Corruption identified by the log
+        Show any corruption identified in the log and the steps to restore health with eval ISO
+    - Display Errors, Fails and Warnings
+        If no other scenario is found but we still see Errors, Fails and Warnings then they are displayed
+    
+   ### PowerShell
 ```Powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="BOILER";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1'));Invoke-BOILER
 ```   
