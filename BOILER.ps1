@@ -111,6 +111,7 @@ ForEach($CBSLog in $LogsToProcess){
     Write-Host "Processing: $CBSLog"
     $CBSErrors=Get-Content $CBSLog | Select-String -SimpleMatch "failed",", Error",", Warning" | Select LineNumber,line
     # known list of language tags
+    # Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/language-strings?view=msvc-160#supported-language-strings
     $LangTags="ar-SA","bg-BG","ca-ES","cs-CZ","da-DK","de-DE","el-GR","en-GB","en-US","es-ES","es-MX","et-EE","eu-ES","fi-FI","fr-CA","fr-FR","gl-ES","he-IL","hr-HR","hu-HU","id-ID","it-IT","ja-JP","ko-KR","lt-LT","lv-LV","nb-NO","nl-NL","pl-PL","pt-BR","pt-PT","ro-RO","ru-RU","sk-SK","sl-SI","sr-Latn-CS","sr-Latn-RS","sv-SE","th-TH","tr-TR","uk-UA","vi-VN","zh-CN","zh-HK","zh-TW”
     $BadKBs=@()
     $BadLangPacks=@()
