@@ -10,7 +10,7 @@ Function Invoke-FLEP{
 
 #region Opening Banner and menu
 $FLEPVer="1.2"
-Clear-Host
+#Clear-Host
 $text = @"
 v$FLEPVer
   ___ _    ___ ___ 
