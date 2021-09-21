@@ -7,8 +7,6 @@
     Jim Gandy
 #>
 Function Invoke-FLEP{
-
-#region Opening Banner and menu
 $FLEPVer="1.2"
 Clear-Host
 $text = @"
@@ -64,9 +62,9 @@ Function ShowMenu{
         Write-Host "                 and output them in a CSV file in the folder where the log exists."
         Write-Host ""
         Pause
-        
+        ShowMenu
     }
-    ShowMenu
+    
     IF($selection -match 1){
         Write-Host "Filter System Event logs..."
         $Global:FilterSystem = "Y"
@@ -81,7 +79,7 @@ Function ShowMenu{
         break script
     }
 }#End of ShowMenu
-#endregion
+
 ShowMenu
 IF($FilterSystem -ieq "y" -or $Filter505 -ieq "y"){
     
@@ -142,7 +140,7 @@ IF($FilterSystem -ieq "y" -or $Filter505 -ieq "y"){
         }
         Unzip $Log2Extract $ExtracLoc
     }
-}
+}Else{break script}
 
 Measure-Command{
 # Filter SDDC system event logs for known IDs in parallel
