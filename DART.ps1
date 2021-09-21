@@ -10,7 +10,7 @@ Function Invoke-FLEP{
 
 #region Opening Banner and menu
 $FLEPVer="1.2"
-#Clear-Host
+Clear-Host
 $text = @"
 v$FLEPVer
   ___ _    ___ ___ 
@@ -64,8 +64,9 @@ Function ShowMenu{
         Write-Host "                 and output them in a CSV file in the folder where the log exists."
         Write-Host ""
         Pause
-        ShowMenu
+        
     }
+    ShowMenu
     IF($selection -match 1){
         Write-Host "Filter System Event logs..."
         $Global:FilterSystem = "Y"
