@@ -41,7 +41,8 @@ Function ShowMenu{
          Write-Host ""
          $selection = Read-Host "Please make a selection"
      }
-    until ($selection -match '[1-2,qQ,hH]')
+    #until ($selection -match '[1-2,qQ,hH]')
+    until ()
     $Global:FilterSystem  = "N"
     $Global:Filter505 = "N"
     IF($selection -imatch 'h'){
