@@ -19,9 +19,9 @@
     4. Review the output for the finds and suggested fixes
     
    ### Supported Scenarios:
-    - Faling KBs
+    - Failing KBs
         Shows any KBs that are failing to install, provides the link to download them if available and the how to DISM install it for best success.
-    - Faling Language Packs
+    - Failing Language Packs
         Shows any language tag that is failing with the process to download and install to repair it
     - Corruption identified by the log
         Show any corruption identified in the log and the steps to restore health with eval ISO
