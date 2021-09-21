@@ -7,6 +7,7 @@
     Jim Gandy
 #>
 Function Invoke-FLEP{
+Start-Transcript -NoClobber -Path "C:\programdata\Dell\flep.log"
 $FLEPVer="1.2"
 Clear-Host
 $text = @"
