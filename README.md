@@ -76,6 +76,25 @@
    Use -IgnoreChecks:$True to install updates without suspending cluster node or enabling storage maintenance mode for Azure Stack HCI
    
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## FLEP
+   
+   This tool is used to filter Windows event logs.
+ 
+ ![alt text](readme/flep.jpg)
+   
+  ### Supported Scenarios:
+    
+      1 Filter System Event logs
+        Filters the system event log for the 24 most common events 13,20,28,41,57,129,153,134,301,1001,1017,1018,1135,5120,6003-6009
+      2 Filter for 505 Events
+        Filters the Microsoft-Windows-Storage-Storport/Operational event logs for event id 505 to be able to see S2D/HCI storage latancy buckets
+    
+   ### PowerShell
+```Powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLEP";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLEP.ps1'));Invoke-BOILER
+```  
+   
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## LogCollector
    
    This tool is used to collect all the logs Switches, Servers and OS
