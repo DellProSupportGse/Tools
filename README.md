@@ -80,7 +80,7 @@
    
    This tool is used to filter Windows event logs.
  
- ![alt text](readme/flep.jpg)
+ ![alt text](readme/FLEP.jpg)
    
   ### Supported Scenarios:
     
