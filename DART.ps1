@@ -9,7 +9,7 @@
 Function Invoke-FLEP{
 $FLEPVer="1.2"
 Clear-Host
-$text = @"
+<#$text = @"
 v$FLEPVer
   ___ _    ___ ___ 
  | __| |  | __| _ \
@@ -18,6 +18,7 @@ v$FLEPVer
                      
          by: Jim Gandy 
 "@
+#>
 $Oops=@"
 Oops... Something went wrong. Please try again.
 "@
