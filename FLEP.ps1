@@ -6,7 +6,7 @@
 .CREATEDBY
     Jim Gandy
 #>
-Function Invoke-FLEP1{
+Function Invoke-FLEP{
 $FLEPVer="1.2"
 Clear-Host
 $text = @"
