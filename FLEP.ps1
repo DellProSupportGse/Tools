@@ -7,8 +7,6 @@
     Jim Gandy
 #>
 Function Invoke-FLEP{
-
-#region Opening Banner and menu
 $FLEPVer="1.2"
 Clear-Host
 $text = @"
@@ -41,7 +39,7 @@ Function ShowMenu{
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
-         $selection = Read-Host "Please make a selection"
+         $selection = Read-Host "Please make a selection"
      }
     until ($selection -match '[1-2,qQ,hH]')
     $Global:FilterSystem  = "N"
@@ -66,6 +64,7 @@ Function ShowMenu{
         Pause
         ShowMenu
     }
+    
     IF($selection -match 1){
         Write-Host "Filter System Event logs..."
         $Global:FilterSystem = "Y"
@@ -80,7 +79,7 @@ Function ShowMenu{
         break script
     }
 }#End of ShowMenu
-#endregion
+
 ShowMenu
 IF($FilterSystem -ieq "y" -or $Filter505 -ieq "y"){
     
@@ -141,17 +140,15 @@ IF($FilterSystem -ieq "y" -or $Filter505 -ieq "y"){
         }
         Unzip $Log2Extract $ExtracLoc
     }
-}
+}Else{break script}
 
 Measure-Command{
 # Filter SDDC system event logs for known IDs in parallel
 #$lpath = "C:\Users\jim_gandy\OneDrive - Dell Technologies\Documents\SRs\122393915\EMC-825BFF5F1E\HealthTest-wtghostvmcl-20210916-1034\"
 $lpath = $ExtracLoc
-If($FilterSystem -ieq "y"){
-    $logs = Get-ChildItem -Recurse –Path $lpath | ?{$_.Name -like "system.EVTX"}
-}
+If($FilterSystem -ieq "y"){$logs = Get-ChildItem -Recurse -Path $lpath | Where-Object{$_.Name -like "system.EVTX"}}
 If($Filter505 -ieq "y"){
-    $logs = Get-ChildItem -Recurse –Path $lpath | ?{$_.Name -like "Microsoft-Windows-Storage-Storport-Operational.EVTX"}
+    $logs = Get-ChildItem -Recurse -Path $lpath | Where-Object{$_.Name -like "Microsoft-Windows-Storage-Storport-Operational.EVTX"}
     $MSCS=(Get-Date).ToFileTime() - (Get-Date).adddays(-7).ToFileTime()
 }
 ForEach($log in $logs){
@@ -201,5 +198,6 @@ While (Get-Job -State "Running")
 }
 $DT="{0:yyyyMMddHHmmssfff}" -f (get-date)
 Get-Job | Receive-Job | Export-Csv $lpath"\EventLog$DT.csv" -NoTypeInformation
+Write-Host "Output file: $lpath\EventLog$DT.csv"
 } 
 }
