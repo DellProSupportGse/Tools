@@ -288,19 +288,19 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 }
 
         }
-   # Find latest DSU version on dl.dell.com
+   # Find latest DSU version on downloads.dell.com
        Try{
            # Use TLS 1.2
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
            Write-Host "Finding Latest Dell EMC System Update(DSU) version..."
-           $URL="https://dl.dell.com/omimswac/dsu/"
+           $URL="https://downloads.dell.com/omimswac/dsu/"
            $Results=Invoke-WebRequest $URL -UseDefaultCredentials
            ## Parse the href tag to find the links on the page
            $LatestDSU=@()
            $results.Links.href | Where-Object {$_ -match "\d"} | ForEach-Object {
                 ## build an object showing the link and version
                 $LatestDSU+=[PSCustomObject]@{
-                    Link = "https://dl.dell.com" + $_
+                    Link = "https://downloads.dell.com" + $_
                     Version = ((($_ -split "_A00.EXE") -split "WN64_") -match "\d")[1]
                 }
            }
