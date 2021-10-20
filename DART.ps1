@@ -1,6 +1,5 @@
     <#
     .Synopsis
-       DART.ps1
     .DESCRIPTION
        This script will install Windows updates and Dell Drivers and Firmware on a single node
     .EXAMPLES
@@ -341,13 +340,13 @@ if ($PSCmdlet.ShouldProcess($param)) {
             $Model=(Get-WmiObject -Class Win32_ComputerSystem).model
             IF($Model -imatch 'Storage Spaces Direct' -or $Model -imatch 'AX'){
                 $ASHCI="YES"
-                $URL="https://dl.dell.com/catalog/ASHCI-Catalog.xml.gz"
+                $URL="https://downloads.dell.com/catalog/ASHCI-Catalog.xml.gz"
                 $InFile="$MyTemp\ASHCI-Catalog.xml.gz"
             }Else{
                 $ASHCI="NO"
                 # Check if node is a Cluster memeber
                 IF(Get-Service clussvc -ErrorAction SilentlyContinue){$IsClusterMember = "YES"}Else{$IsClusterMember = "NO"}
-                $URL="https://dl.dell.com/catalog/Catalog.xml.gz"
+                $URL="https://downloads.dell.com/catalog/Catalog.xml.gz"
                 $InFile="$MyTemp\Catalog.xml.gz"
             }
         Write-Host "    SUCCESS: $Model" -ForegroundColor Green
