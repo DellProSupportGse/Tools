@@ -118,7 +118,8 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Use TLS 1.2
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             # Download file
-            Try{Invoke-WebRequest $URL -OutFile $OutFile -UseDefaultCredentials}
+            #Try{Invoke-WebRequest $URL -OutFile $OutFile -UseDefaultCredentials}
+            Try{Invoke-WebRequest $URL -OutFile $OutFile}
             Catch{
                 Write-Host "        ERROR: Downloading $URL" -ForegroundColor Red
                 EndScript
@@ -293,7 +294,8 @@ if ($PSCmdlet.ShouldProcess($param)) {
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
            Write-Host "Finding Latest Dell EMC System Update(DSU) version..."
            $URL="https://downloads.dell.com/omimswac/dsu/"
-           $Results=Invoke-WebRequest $URL -UseDefaultCredentials
+           #$Results=Invoke-WebRequest $URL -UseDefaultCredentials
+           $Results=Invoke-WebRequest $URL -UseBasicParsing
            ## Parse the href tag to find the links on the page
            $LatestDSU=@()
            $results.Links.href | Where-Object {$_ -match "\d"} | ForEach-Object {
