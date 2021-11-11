@@ -6,6 +6,11 @@
     .EXAMPLES
        Invoke-ToolBox
 #>
+Function EndScript{ 
+    Stop-Transcript
+    break
+}
+
 Function Invoke-ToolBox{
 Clear-Host
 $Ver=1.0
