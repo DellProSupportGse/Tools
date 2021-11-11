@@ -5,6 +5,17 @@
   Please note this code is provided as-is and currently not supported by Dell EMC.
 
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## Tool Box
+Tool Box is a menu of all the tools to run them from one place
+	 
+   ![alt text](readme/toolbox.jpg)
+   
+### Usage
+Copy the below powershell code and paste into PowerShell
+```Powershell
+Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/ToolBox.ps1'));Invoke-ToolBox
+``` 
+
 ## BOILER
    Filters the CBS/DISM logs for Errors/Fails/Warnings to quickly identify failing KB's, Language Tags or
    corruption plus, it provides Suggested fixes.
