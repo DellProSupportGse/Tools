@@ -7,7 +7,6 @@
        Invoke-ToolBox
 #>
 Function EndScript{ 
-    Stop-Transcript
     break
 }
 
