@@ -171,5 +171,15 @@ Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocol
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 
+## Convert-Etl2Pcap
+Convert ETL network traces to PCap for use with WireShark
+   
+### Usage
+Copy the below powershell code and paste into PowerShell
+```Powershell
+Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="Convert-Etl2Pcap";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Convert-Etl2Pcap.ps1'));Invoke-ETL2PCAP
+``` 
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
 ### Report problems or provide feedback
 If you run into any problems or would like to provide feedback, please open an issue here https://github.com/DellProSupportGse/Tools/issues
