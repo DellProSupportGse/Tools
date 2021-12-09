@@ -22,7 +22,7 @@ Function EndScript{
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 $text=@"
-v1.4
+v1.5
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -106,13 +106,14 @@ $credential = New-Object System.Management.Automation.PSCredential($user, $secpa
         Break script
     }
 # Gathers the iDRAC IP addresses from all nodes
-    If(Get-Service clussvc -ErrorAction SilentlyContinue){
-        Write-Host "Gathering the iDRAC IP Addresses from cluster nodes..."
-        $iDRACIPs=Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
-        (Get-PcsvDevice).IPv4Address
-        }
-    }Else{
-        # Get iDRAC IP addresses
+If(Get-Service clussvc -ErrorAction SilentlyContinue){
+    Write-Host "Gathering the iDRAC IP Addresses from cluster nodes..."
+    $iDRACIPs=Invoke-Command -ComputerName (Get-ClusterNode -Cluster (Get-Cluster).Name) -ScriptBlock {
+    (Get-PcsvDevice).IPv4Address
+    }
+}Else{
+    # Get iDRAC IP addresses
+    Function Get-iDRACIPaddresses{
         $iDIPs=Read-Host "Please enter comma delimited list of iDRAC IP addresse(s)"
         $i=0
         IF($iDIPs -imatch ','){$iDIPs=$iDIPs -split ','}
@@ -126,9 +127,21 @@ $credential = New-Object System.Management.Automation.PSCredential($user, $secpa
                 break script
             }
         }
-        $iDRACIPs=$iDIPs
+        #$iDRACIPs=$iDIPs
+        return $iDIPs
     }
-    Write-Host "    FOUND:$iDRACIPs"
+    $iDRACIPs = Get-iDRACIPaddresses
+}
+Do{
+    Write-Host "    iDRAC IP Address(s):"
+    Write-host "        $iDRACIPs"
+    $iDRACIPCheck = Read-Host "    Is the list above the correct list of iDRAC IP Addresses? (Y/N)"
+}
+until ($iDRACIPCheck -match '[yY,nN]')
+IF($iDRACIPCheck -imatch "n"){
+    $iDRACIPs = Get-iDRACIPaddresses
+}
+
 # Run TechSupportReport on each node
     ForEach($IP in $iDRACIPs){
         $result=@()
