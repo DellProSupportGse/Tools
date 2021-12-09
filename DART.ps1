@@ -1,6 +1,5 @@
     <#
     .Synopsis
-       DART.ps1
     .DESCRIPTION
        This script will install Windows updates and Dell Drivers and Firmware on a single node
     .EXAMPLES
@@ -15,25 +14,20 @@
     #>
     
 Function Invoke-DART {
-[CmdletBinding(
-    SupportsShouldProcess = $true,
-    ConfirmImpact = 'High')]
+
     param(
-    [Parameter(Mandatory=$True, Position=1, HelpMessage="Enter True if you want to install Windows Updates and False if you do not")]
-    [bool] $WindowsUpdates,
-    [Parameter(Mandatory=$True, Position=2, HelpMessage="Enter True if you want to install Drivers and Firmware and False if you do not")]
-    [bool] $DriverandFirmware,
-    [Parameter(Mandatory=$False, Position=3)]
+    [Parameter(Mandatory=$False, Position=1)]
     [bool] $IgnoreChecks,
     $param)
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
 
-# Dell Server Check
-IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
-# Fix 8.3 temp paths
-    $MyTemp=(Get-Item $env:temp).fullname
+Function EndScript{ 
+    Stop-Transcript
+    break
+}
+
 $text=@"
 v1.1
  __        __  ___ 
@@ -48,6 +42,7 @@ Function ShowMenu{
          Clear-Host
          Write-Host $text
          Write-Host ""
+<<<<<<< HEAD
          Write-Host "================== Please make a selection ==================="
          Write-Host ""
          Write-Host "Press '1' to Install Windows Updates"
@@ -59,6 +54,24 @@ Function ShowMenu{
          $selection = Read-Host "Please make a selection"
      }
     until ($selection -match '[1-4,qQ,hH]')
+=======
+         Write-Host "This code is provided as-is and is not supported by Dell Technologies"
+         Write-Host ""
+         Write-Host "==================== Please make a selection ====================="
+         Write-Host ""
+         Write-Host "Press '1' to Install Windows Updates"
+         Write-Host "Press '2' to Install Dell Drivers and Firmware"
+         Write-Host "Press '3' to Install Windows Updates and Dell Drivers and Firmware"
+         Write-Host "Press 'H' to Display Help"
+         Write-Host "Press 'Q' to Quit"
+         Write-Host ""
+         $selection = Read-Host "Please make a selection"
+     }
+    until ($selection -match '[1-3,qQ,hH]')
+    $Global:WindowsUpdates=$False
+    $Global:DriverandFirmware=$False
+    $Global:Confirm=$False
+>>>>>>> 948bcffa311ab3dd907e7b7e705ee27756e5dac8
     IF($selection -imatch 'h'){
         Clear-Host
         Write-Host ""
@@ -70,13 +83,18 @@ Function ShowMenu{
         Write-Host ""
         Write-Host "        Example: 1 will Install Windows Updates."
         Write-Host ""
+<<<<<<< HEAD
         Write-Host "        Example: 1,3 will Install Windows Updates and Install CPLD"
+=======
+        Write-Host "        Example: 2 will Install Dell Drivers and Firmware"
+>>>>>>> 948bcffa311ab3dd907e7b7e705ee27756e5dac8
         Write-Host ""
         Pause
         ShowMenu
     }
     IF($selection -match 1){
         Write-Host "Installing Windows Updates..."
+<<<<<<< HEAD
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$False -Confirm:$false
     }
 
@@ -100,11 +118,41 @@ Function ShowMenu{
 }#End of ShowMenu
 ShowMenu
 if ($PSCmdlet.ShouldProcess($param)) { 
+=======
+        $Global:WindowsUpdates=$True
+        $Global:DriverandFirmware=$False
+        $Global:Confirm=$false
+    }
+>>>>>>> 948bcffa311ab3dd907e7b7e705ee27756e5dac8
 
-        Function EndScript{
-            Write-Host "End"  
-            break script
-        }
+    IF($selection -match 2){
+        Write-Host "Installing Dell Drivers and Firmware..."
+        $Global:WindowsUpdates=$False
+        $Global:DriverandFirmware=$True
+        $Global:Confirm=$false
+    }
+    IF($selection -match 3){
+        Write-Host "Installing Windows Updates and Dell Drivers and Firmware..."
+        $Global:WindowsUpdates=$True
+        $Global:DriverandFirmware=$True
+        $Global:Confirm=$false
+    }
+
+    IF($selection -imatch 'q'){
+        Write-Host "Bye Bye..."
+        EndScript
+    }
+}#End of ShowMenu
+ShowMenu
+
+#Check for ignore checks
+If($IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}
+
+# Dell Server Check
+IF((Get-WmiObject -Class Win32_ComputerSystem).Manufacturer -imatch "Dell" -and (Get-WmiObject -Class Win32_ComputerSystem).PCSystemType -imatch "4"){
+    # Fix 8.3 temp paths
+        $MyTemp=(Get-Item $env:temp).fullname
+if ($PSCmdlet.ShouldProcess($param)) { 
 
         Function Download-File{
             Param($URL)
@@ -114,7 +162,8 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Use TLS 1.2
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             # Download file
-            Try{Invoke-WebRequest $URL -OutFile $OutFile -UseDefaultCredentials}
+            #Try{Invoke-WebRequest $URL -OutFile $OutFile -UseDefaultCredentials}
+            Try{Invoke-WebRequest $URL -OutFile $OutFile}
             Catch{
                 Write-Host "        ERROR: Downloading $URL" -ForegroundColor Red
                 EndScript
@@ -176,19 +225,22 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Enter Storage Maintenance Mode
                 Write-Host "    Enabling Storage Maintenance Mode on $env:COMPUTERNAME..."
                 try {
-                    Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Enable-StorageMaintenanceMode -ErrorAction Inquire
-                    $Maint="Success"
+                    $Maint=$Null
+                    Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Enable-StorageMaintenanceMode -ErrorAction Stop -ErrorVariable Maint
+                    IF($Maint -eq $Null){$Maint="Success"}
                 }
                 catch {
+                    Write-Host "        ERROR: Failed to enter storage maintenance mode." -ForegroundColor Red
+                    Write-Host "$Maint" -ForegroundColor Red
+                    Write-Host "    Resuming Node..."
+                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate
                     $Maint="Failed"
-                    Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback
-                    Write-Host "        ERROR: Failed to enter storage maintenance mode. Node resumed" -ForegroundColor Red
                     EndScript
                 }
                 IF($Maint -eq "Success"){
                     Write-Host "        SUCCESS: Storage Scale Unit entered Storage Maintenance Mode" -ForegroundColor Green
                 
-            }
+                }
         }
 
     Function Run-ClusterPre{
@@ -215,10 +267,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Check if HCI and run DSU install needed updates
                 IF($ASHCI -eq "YES"){
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --catalog-location=$MyTemp\ASHCI-Catalog.xml --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
+                        cmd /c "echo a>c:\ansd.txt&&echo c>>c:\ansd.txt&&DSU.exe --catalog-location=$MyTemp\ASHCI-Catalog.xml --apply-upgrades <c:\ansd.txt&&del c:\ansd.txt"
                 }Else{
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ans.txt&&echo c>>c:\ans.txt&&DSU.exe --apply-upgrades <c:\ans.txt&&del c:\ans.txt"
+                        cmd /c "echo a>c:\ansd.txt&&echo c>>c:\ansd.txt&&DSU.exe --apply-upgrades <c:\ansd.txt&&del c:\ansd.txt"
                 }
                 Do {  
                     $ProcessesFound = Get-Process -Name DSU -ErrorAction SilentlyContinue
@@ -255,7 +307,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                             $Reboot = Read-Host "Ready to reboot? [y/n]"
                             Switch ($Reboot){
                                 "y"{
-                                    $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript;Pause'
+                                    $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageScaleUnit -FriendlyName "$($Env:ComputerName)" | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
                                     IF(-not(Test-Path c:\dell)){
                                         New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
                                     }
@@ -280,18 +332,25 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 }
 
         }
-   # Find latest DSU version on dl.dell.com
+   # Find latest DSU version on downloads.dell.com
        Try{
            # Use TLS 1.2
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
            Write-Host "Finding Latest Dell EMC System Update(DSU) version..."
-           $URL="https://dl.dell.com/omimswac/dsu/"
-           $Results=Invoke-WebRequest $URL -UseDefaultCredentials
-           $DellDownloadsColumns=@()
-           $DellDownloadsColumns=(($Results.ParsedHtml.body.innerhtml -split '<br><br>')[-1] -split '<br>')|Select @{L='Date';E={($_ -split '\s{2}')[0]}},@{L='Time';E={($_ -split '\s{2}')[1]}},@{L='DTNum';E={((($_ -split '\s{5}')[1]) -split '\s\<')[0]}},@{L='Link';E={((($_ -split 'href\=\"')[1]) -split '\"\>')[0]}},@{L='Version';E={$DSUVer=(((($_ -split '\"\>')[1] -split 'WN64')[1]) -replace '\.EXE\<\/A\>',"");($DSUVer -split '_')[1]}}
-           $LatestDSULink="https://dl.dell.com"+($DellDownloadsColumns | Sort DTNum -Descending | Select -First 1).link
-           $LatestDSUVersion=($DellDownloadsColumns | Sort DTNum -Descending | Select -First 1).version
-           Write-Host "    Found:"$LatestDSUVersion -ForegroundColor Green
+           $URL="https://downloads.dell.com/omimswac/dsu/"
+           #$Results=Invoke-WebRequest $URL -UseDefaultCredentials
+           $Results=Invoke-WebRequest $URL -UseBasicParsing
+           ## Parse the href tag to find the links on the page
+           $LatestDSU=@()
+           $results.Links.href | Where-Object {$_ -match "\d"} | ForEach-Object {
+                ## build an object showing the link and version
+                $LatestDSU+=[PSCustomObject]@{
+                    Link = "https://downloads.dell.com" + $_
+                    Version = ((($_ -split "_A00.EXE") -split "WN64_") -match "\d")[1]
+                }
+           }
+           $LatestDSU=$LatestDSU|sort Version | select -Last 1
+           Write-Host "    Found: $($LatestDSU.Version) | $($LatestDSU.Link)" -ForegroundColor Green
        }
        Catch{
            Write-Host "    ERROR: Failed to find DSU version. Exiting..." -ForegroundColor Red
@@ -304,7 +363,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         ForEach($Key in $RegKeyPaths){
             IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
                 $DSUVer=(Get-ItemProperty -Path $Key.PSPath).DisplayVersion
-                IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSUVersion}){
+                IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSU.Version}){
                     Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
                     $IsDSUInstalled="YES"
                     Set-Location c:\
@@ -313,7 +372,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
         IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell EMC System Update(DSU)..."
-            $DSUInstallerLocation=Download-File $LatestDSULink
+            $DSUInstallerLocation=Download-File $LatestDSU.Link
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
             $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
@@ -327,13 +386,13 @@ if ($PSCmdlet.ShouldProcess($param)) {
             $Model=(Get-WmiObject -Class Win32_ComputerSystem).model
             IF($Model -imatch 'Storage Spaces Direct' -or $Model -imatch 'AX'){
                 $ASHCI="YES"
-                $URL="https://dl.dell.com/catalog/ASHCI-Catalog.xml.gz"
+                $URL="https://downloads.dell.com/catalog/ASHCI-Catalog.xml.gz"
                 $InFile="$MyTemp\ASHCI-Catalog.xml.gz"
             }Else{
                 $ASHCI="NO"
                 # Check if node is a Cluster memeber
                 IF(Get-Service clussvc -ErrorAction SilentlyContinue){$IsClusterMember = "YES"}Else{$IsClusterMember = "NO"}
-                $URL="https://dl.dell.com/catalog/Catalog.xml.gz"
+                $URL="https://downloads.dell.com/catalog/Catalog.xml.gz"
                 $InFile="$MyTemp\Catalog.xml.gz"
             }
         Write-Host "    SUCCESS: $Model" -ForegroundColor Green
@@ -371,23 +430,38 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Write-Host "    Executing DSU..."
             Run-DSU
         }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
-        
-        # Resume Cluster
-        IF($IgnoreChecks -ne $True){
-            IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
-                Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
-                Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
-            }
-        }
+        $ExitSMM = Read-Host "Ready to Resume Cluster Node and exit Storage Maintenance Mode? [y/n]"
+            Switch ($ExitSMM){
+                "y"{
+                        # Resume Cluster
+                        IF($IgnoreChecks -ne $True){
+                            IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
+                                Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
+                                Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
+                            }
+                        }
 
-        # Disable Storage Maintenance Mode
-        IF($IgnoreChecks -ne $True){
-            IF($ASHCI -eq "YES"){
-                Write-Host "Exiting Storage Maintenance Mode..."
-                Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
-            }
-        }
-    }
-}Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}
+                        # Disable Storage Maintenance Mode
+                        IF($IgnoreChecks -ne $True){
+                            IF($ASHCI -eq "YES"){
+                                Write-Host "Exiting Storage Maintenance Mode..."
+                                Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
+                            }
+
+                         }
+                    }
+                "n"{
+                        $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageScaleUnit -FriendlyName "$($Env:ComputerName)" | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
+                        IF(-not(Test-Path c:\dell)){
+                            New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
+                        }
+                        $Script | Out-File -FilePath c:\dell\exit-maintenancemode.ps1 -Force
+                        Write-Host "Creating Exit Maintenance Mode Scheduled Task to run at next logon...."
+                        Register-ScheduledTask -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
+                    }
+                }
+    }#$PSCmdlet.ShouldProcess($param)
+}Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}# Dell Server Check
 Stop-Transcript
 }               
+               

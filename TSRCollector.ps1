@@ -22,7 +22,7 @@ Function EndScript{
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 $text=@"
-v1.2
+v1.4
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -58,7 +58,14 @@ $user = "root"
 $pass= "calvin"
 $secpasswd = ConvertTo-SecureString $pass -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($user, $secpasswd)
-$ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | ?{$_.DefaultIPGateway.length -gt 0}).ipaddress[0]
+# IP address of the machine sharing
+    Write-Host "Gathering Host IP Address..."
+    $NSLookupOut=cmd /c "nslookup $env:COMPUTERNAME"
+    ForEach($item in $NSLookupOut){
+        $NSLookupAll+=$item
+    }
+    $ShareIP=(($NSLookupAll -split 'Name:    ')[-1] -split 'Address:  ')[-1]
+    Write-Host "    Host IP: $ShareIP"
 # Create a new folder and shares it
     Write-Host "Creating a new shared folder to save the TSRs..."
     $ShareName = "Logs"
@@ -69,15 +76,20 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
 # Gets the logged on creds
     Write-Host "Gathering the credentials to access the share..."
     $sus = $env:UserName
-    $sdom = (Get-WmiObject win32_computersystem).Domain
+    #$sdom = (Get-WmiObject win32_computersystem).Domain
+    $sdom = cmd /c "whoami"
+    $sdom = ($sdom -split "\\")[0]
     $ShareCreds=Get-Credential -Message "Enter credentials to access the share name to copy the TSR to the share." -UserName $sus
 # Test SBM share
     Write-Host "Checking SMB share exists..."
     IF(Get-SmbShare | Where-Object{$_.Name -imatch 'Logs'}){
         Write-Host "    SUCCESS: SMB share found." -ForegroundColor Green
         Write-Host "Connecting to SMB share with provdied creds..."
+        Remove-PSDrive -Name logs >$null 2>&1
+        sleep 3
         $s=0
-        While(-not(cmd /c "net use \\$ShareIP\$ShareName /user:$($ShareCreds.GetNetworkCredential().Username) $($ShareCreds.GetNetworkCredential().Password)")){
+        New-PSDrive -Credential $ShareCreds1 -Name Logs -Root "\\$ShareIP\$ShareName" -PSProvider FileSystem  >$null 2>&1
+        While(-not(Get-PSDrive -Name Logs)){
             $s++
             Write-Host "    WARNING: Failed to access share with provided creds. Please try again." -ForegroundColor Yellow
             Sleep 3
@@ -86,8 +98,9 @@ $ShareIP=((Get-wmiObject Win32_networkAdapterConfiguration | ?{$_.IPEnabled}) | 
                 Write-Host "    ERROR: Failed too many time. Exiting..." -ForegroundColor Red
                 Break script
             }
+            New-PSDrive -Credential $ShareCreds1 -Name Logs -Root "\\$ShareIP\$ShareName" -PSProvider FileSystem
         }Write-Host "    SUCCESS: Able to access SMB share with provided creds." -ForegroundColor Green
-            
+    Remove-PSDrive -Name logs >$null 2>&1
     }Else{
         Write-Host "    ERROR: File share not created. Exiting." -ForegroundColor Red
         Break script
