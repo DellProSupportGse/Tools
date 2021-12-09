@@ -20,7 +20,7 @@ Function Invoke-GetShowTech {
     Start-Transcript -NoClobber -Path "C:\programdata\Dell\GetShowTech\GetShowTech_$DateTime.log"
 
 $text=@"
-v1.0
+v1.1
    ___     _   ___ _               _____       _    
   / __|___| |_/ __| |_  _____ __ _|_   _|__ __| |_  
  | (_ / -_)  _\__ \ ' \/ _ \ V  V / | |/ -_) _| ' \ 
@@ -33,7 +33,15 @@ Write-Host ""
 Write-Host "    This tool is used to collect Dell switch logs"
 Write-Host ""
 if ($PSCmdlet.ShouldProcess($param)) {
-
+    # Check if OpenSSH.Client is avaliable in PowerShell
+        Try{$ChkIfSSHInstalled=Get-WindowsCapability -Online -Name OpenSSH.Client*}
+        Catch{
+            $ChkIfSSHInstalled ="FAILED"
+            Write-Host "    OpenSSH.Client NOT available for this OS. Please follow this link to manually collect Show Tech-Support" -BackgroundColor Red -ForegroundColor White
+            Write-Host "    https://www.dell.com/support/kbdoc/en-gy/000116043/dell-emc-networking-how-to-use-putty-exe-to-save-output-to-a-file"
+            Pause
+            }
+    IF($ChkIfSSHInstalled -ine "FAILED"){
     # Fix 8.3 temp paths
         $MyTemp=(Get-Item $ENV:Temp).fullname
 
@@ -100,8 +108,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($DT)"
             Write-Host "Logs can be found here: $MyTemp\logs\ShowTechs_$($DT).zip"
         }Else{
-            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\ShowTechs_$($DT)"
-            Write-Host "Logs can be found here: $MyTemp\ShowTechs_$($DT).zip"
+            $OutFolder=$MyTemp+"\Logs"
+            New-Item -ItemType Directory -Force -Path $OutFolder  >$null 2>&1
+            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($DT)"
+            Write-Host "Logs can be found here: $MyTemp\logs\ShowTechs_$($DT).zip"
         }
 
     # Clean up show techs
@@ -114,9 +124,11 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Remove-WindowsCapability -Online -Name $ChkIfSSHInstalled.name  > $null
         }
         
+        
     # Remove Function:\Invoke-GetShowTech
         Remove-Item -Path Function:\Invoke-GetShowTech > $null
 
         Stop-Transcript
+    }
 } #end if ShouldProcess
 }# end of Invoke-GetShowTech
