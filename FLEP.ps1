@@ -51,6 +51,7 @@ Function ShowMenu{
         Write-Host "What's New in"$CluChkVer":"
         Write-Host "    v1.3"
         Write-host "        1. New Feature: Added Export System Event logs to export the whole log" 
+        Write-host "        2. New Feature: Added UTC Time Created to output" 
         Write-Host ""
         Write-Host "Usage:"
         Write-Host "    Make a selection by entering a comma delimited string of numbers from the menu."
