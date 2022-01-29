@@ -350,6 +350,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 IF(Get-Service clussvc -ErrorAction SilentlyContinue){$IsClusterMember = "YES"}Else{$IsClusterMember = "NO"}
                 $URL="https://downloads.dell.com/catalog/Catalog.xml.gz"
                 $InFile="$MyTemp\Catalog.xml.gz"
+                If($IsClusterMember = "NO"){
+                    # Added to patch none cluster power edge server 
+                    $IgnoreChecks = $True
+                }
             }
         Write-Host "    SUCCESS: $Model" -ForegroundColor Green
         IF($ASHCI -eq "YES"){
