@@ -390,7 +390,8 @@ if ($PSCmdlet.ShouldProcess($param)) {
             Write-Host "    Executing DSU..."
             Run-DSU
         }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
-        $ExitSMM = Read-Host "Ready to Resume Cluster Node and exit Storage Maintenance Mode? [y/n]"
+        IF($IgnoreChecks -ne $True){
+            $ExitSMM = Read-Host "Ready to Resume Cluster Node and exit Storage Maintenance Mode? [y/n]"
             Switch ($ExitSMM){
                 "y"{
                         # Resume Cluster
@@ -419,7 +420,8 @@ if ($PSCmdlet.ShouldProcess($param)) {
                         Write-Host "Creating Exit Maintenance Mode Scheduled Task to run at next logon...."
                         Register-ScheduledTask -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
                     }
-                }
+            }
+        }
     }#$PSCmdlet.ShouldProcess($param)
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}# Dell Server Check
 Stop-Transcript
