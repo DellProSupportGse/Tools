@@ -88,7 +88,7 @@ $Wcl.Headers.Add("user-agent","PowerShell Script")
 $Wcl.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials 
 #gets the the list or known file system minifilter drivers
 #$URL="https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md"
-$KnownFltrs=Invoke-WebRequest -Uri $URL | Select-Object RawContent
+$KnownFltrs=Invoke-WebRequest -Uri $URL -UseBasicParsing | Select-Object RawContent
 $RawKnownFltrs=$KnownFltrs.RawContent.split("`n") 
 #Parse the output
 $FltCheck=@()
