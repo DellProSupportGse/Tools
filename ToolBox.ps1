@@ -38,7 +38,7 @@ Function ShowMenu{
          Write-Host "Press '2' to DART - Installs Dell/MS Updates"
          Write-Host "Press '3' to FLEP - Filters Event Logs"
          Write-Host "Press '4' to FLCkr - Looks up Mini Filter Drivers"
-         Write-Host "Press '5' to LogCollector - Make log collection easyer"
+         Write-Host "Press '5' to LogCollector - Make log collection easier"
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
