@@ -5,6 +5,17 @@
   Please note this code is provided as-is and currently not supported by Dell EMC.
 
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## Tool Box
+Tool Box is a menu of all the tools to run them from one place
+	 
+   ![alt text](readme/toolbox.jpg)
+   
+### Usage
+Copy the below powershell code and paste into PowerShell
+```Powershell
+Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/ToolBox.ps1'));Invoke-ToolBox
+``` 
+
 ## BOILER
    Filters the CBS/DISM logs for Errors/Fails/Warnings to quickly identify failing KB's, Language Tags or
    corruption plus, it provides Suggested fixes.
@@ -158,6 +169,16 @@
 ```Powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
 ```
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+## Convert-Etl2Pcap
+Convert ETL network traces to PCap for use with WireShark
+   
+### Usage
+Copy the below powershell code and paste into PowerShell
+```Powershell
+Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="Convert-Etl2Pcap";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Convert-Etl2Pcap.ps1'));Invoke-ETL2PCAP
+``` 
 -------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### Report problems or provide feedback

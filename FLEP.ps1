@@ -7,7 +7,7 @@
     Jim Gandy
 #>
 Function Invoke-FLEP{
-$FLEPVer="1.2"
+$FLEPVer="1.3"
 Clear-Host
 $text = @"
 v$FLEPVer
@@ -34,21 +34,24 @@ Function ShowMenu{
          Write-Host ""
          Write-Host "============ Please make a selection ==================="
          Write-Host ""
-         Write-Host "Press '1' to Filter System Event logs"
+         Write-Host "Press '1' to Export System Event logs"
          Write-Host "Press '2' to Filter for 505 Events"
+         Write-Host "Press '3' to Filter System Event logs for Usual Suspects"
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
          $selection = Read-Host "Please make a selection"
      }
-    until ($selection -match '[1-2,qQ,hH]')
+    until ($selection -match '[1-3,qQ,hH]')
     $Global:FilterSystem  = "N"
     $Global:Filter505 = "N"
     IF($selection -imatch 'h'){
         Clear-Host
         Write-Host ""
         Write-Host "What's New in"$CluChkVer":"
-        Write-Host "    Nothing to see here. Check back later. :)" 
+        Write-Host "    v1.3"
+        Write-host "        1. New Feature: Added Export System Event logs to export the whole log" 
+        Write-host "        2. New Feature: Added UTC Time Created to output" 
         Write-Host ""
         Write-Host "Usage:"
         Write-Host "    Make a selection by entering a comma delimited string of numbers from the menu."
@@ -64,16 +67,22 @@ Function ShowMenu{
         Pause
         ShowMenu
     }
-    
+
     IF($selection -match 1){
-        Write-Host "Filter System Event logs..."
-        $Global:FilterSystem = "Y"
+        Write-Host "Export System Event logs..."
+        $Global:ExportSystem  = "Y"
     }
 
     IF($selection -match 2){
         Write-Host "Filter for 505 Events for the last 7 days..."
         $Global:Filter505  = "Y"
     }
+    
+    IF($selection -match 3){
+        Write-Host "Filter System Event logs for Usual Suspects (13, 20, 28, 41, 57, 129, 153, 134, 301, 1001, 1017, 1018, 1135, 5120, 6003 - 6009)..."
+        $Global:FilterSystem = "Y"
+    }
+    
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
         break script
@@ -81,7 +90,7 @@ Function ShowMenu{
 }#End of ShowMenu
 
 ShowMenu
-IF($FilterSystem -ieq "y" -or $Filter505 -ieq "y"){
+IF($FilterSystem -ieq "y" -or $Filter505 -ieq "y"-or $ExportSystem -ieq "y"){
     
     # Added to Select-Object the extracted SDDC
     Do{$Extracted = Read-Host "Do you already have the logs extracted? [y/n]"}
@@ -146,6 +155,7 @@ Measure-Command{
 # Filter SDDC system event logs for known IDs in parallel
 #$lpath = "C:\Users\jim_gandy\OneDrive - Dell Technologies\Documents\SRs\122393915\EMC-825BFF5F1E\HealthTest-wtghostvmcl-20210916-1034\"
 $lpath = $ExtracLoc
+If($ExportSystem -ieq "y"){$logs = Get-ChildItem -Recurse -Path $lpath | Where-Object{$_.Name -like "system.EVTX"}}
 If($FilterSystem -ieq "y"){$logs = Get-ChildItem -Recurse -Path $lpath | Where-Object{$_.Name -like "system.EVTX"}}
 If($Filter505 -ieq "y"){
     $logs = Get-ChildItem -Recurse -Path $lpath | Where-Object{$_.Name -like "Microsoft-Windows-Storage-Storport-Operational.EVTX"}
@@ -175,18 +185,24 @@ IF($Filter505 -ieq "Y"){
         </QueryList>
 '@
 }
+IF($ExportSystem -ieq "Y"){
+    $EvntIDXML = @'
+        <QueryList>
+            <Query Id="0" Path="file://C:\">
+                <Select Path="file://XXXXX">*[System]</Select>
+            </Query>
+        </QueryList>
+'@
+}
 $ScriptBlock={
     param($FPath,$EvntIDXML,$MSCS)
-
-
-        
 
 $NewXML = $EvntIDXML -Replace "XXXXX",$Fpath -replace "43200000",$MSCS
 
                       Get-WinEvent -FilterXML $NewXML -ErrorAction SilentlyContinue `
-                      | Select TimeCreated,id,Logname,MachineName,ProviderName,Message,Properties `
-                      | foreach -Process {New-Object -TypeName PSObject -Property `
-                      ([Ordered]@{'TimeCreated'=$_.TimeCreated;'Id'=$_.Id;'LogName'=$_.LogName;`
+                      | Select-Object TimeCreated,@{L='UTCTimeCreated';E={$_.TimeCreated.ToUniversalTime()}},id,Logname,MachineName,ProviderName,Message,Properties `
+                      | ForEach-Object -Process {New-Object -TypeName PSObject -Property `
+                      ([Ordered]@{'UTCTimeCreated'=$_.UTCTimeCreated;'TimeCreated'=$_.TimeCreated;'Id'=$_.Id;'LogName'=$_.LogName;`
                       'ComputerName'=$_.MachineName;'ProviderName'=$_.ProviderName;'Message'=$_.Message;`
                       'EventData'=$_.properties.Value -Join ","})}
                       }
