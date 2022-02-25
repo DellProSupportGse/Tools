@@ -197,7 +197,7 @@ While (Get-Job -State "Running")
   Start-Sleep 1
 }
 $DT="{0:yyyyMMddHHmmssfff}" -f (get-date)
-Get-Job | Receive-Job | Export-Csv $lpath"\EventLog$DT.csv" -NoTypeInformation
+Get-Job | Receive-Job | Export-Csv $lpath"\EventLog$DT.csv" -NoTypeInformation -Append
 Write-Host "Output file: $lpath\EventLog$DT.csv"
 } 
 }
