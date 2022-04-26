@@ -1,7 +1,7 @@
 # Run Drift
 # Created By: Jim Gandy
 # v1.2
-
+Function Invoke-RunDriFT.exe{
 Write-Host "Set ExecutionPolicy Bypass..."
     Set-ExecutionPolicy Bypass -Scope Process -Force
 Write-Host "    ExecutionPolicy:"$env:PSExecutionPolicyPreference
@@ -50,3 +50,4 @@ Function Run-Drift{
         Run-Cleanup    
     }
     
+}
