@@ -46,7 +46,8 @@ Function Run-Drift{
             $params=@("$($_.Groups.Groups[1].Value)")
             Run-Drift $params
             Sleep 5
-            Run-Cleanup       
+            Run-Cleanup
+	    clear-host 
         }
     }
     #Run drift if no argument(s)
@@ -54,7 +55,8 @@ Function Run-Drift{
         Write-Host "    None found."
         Run-Drift
         Sleep 5
-        Run-Cleanup    
+        Run-Cleanup
+	clear-host 
     }
-  clear-host  
+   
 }
