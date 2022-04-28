@@ -1,5 +1,7 @@
+# Run CluChk
+# Created By: Jim Gandy
+# v1.2
 Function Invoke-RunCluChk{
-#v1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Write-Host "Downloading latest version..."
 $url = 'https://cluchk.gse.support/'
@@ -18,3 +20,4 @@ Finally{
 #Variable Cleanup
 Remove-Variable * -ErrorAction SilentlyContinue
 }
+Invoke-RunCluChk
