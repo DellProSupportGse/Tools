@@ -34,17 +34,19 @@ Function ShowMenu{
          Write-Host ""
          Write-Host "==================== Please make a selection ====================="
          Write-Host ""
-         Write-Host "Press '1' to BOILER - Finds Windows Update Errors"
-         Write-Host "Press '2' to DART - Installs Dell/MS Updates"
-         Write-Host "Press '3' to FLEP - Filters Event Logs"
-         Write-Host "Press '4' to FLCkr - Looks up Mini Filter Drivers"
+         Write-Host "Press '1' to BOILER       - Finds Windows Update Errors"
+         Write-Host "Press '2' to DART         - Installs Dell/MS Updates"
+         Write-Host "Press '3' to FLEP         - Filters Event Logs"
+         Write-Host "Press '4' to FLCkr        - Looks up Mini Filter Drivers"
          Write-Host "Press '5' to LogCollector - Make log collection easier"
+         Write-Host "Press '6' to DriFT        - Driver and Firmware Tool ***INTERNAL ONLY***"
+         Write-Host "Press '7' to CluChk       - Cluster Checker ***INTERNAL ONLY***"
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
          $selection = Read-Host "Please make a selection"
      }
-    until ($selection -match '[1-5,qQ,hH]')
+    until ($selection -match '[1-7,qQ,hH]')
     $Global:WindowsUpdates=$False
     $Global:DriverandFirmware=$False
     $Global:Confirm=$False
@@ -76,6 +78,12 @@ Function ShowMenu{
     }
     IF($selection -match 5){
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="LogCollector";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/LogCollector.ps1'));Invoke-LogCollector
+    }
+    IF($selection -match 6){
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunDriFT";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/rundrift.ps1'));Invoke-RunDriFT
+    }
+    IF($selection -match 7){
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunCluChk";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunCluChk.ps1'));Invoke-RunCluChk
     }
 
     IF($selection -imatch 'q'){
