@@ -22,10 +22,8 @@ Function Run-Drift{
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $CurrentLoc=$ENV:TEMP
     Write-Host "    Downloading latest version..."
-    #$url = 'https://bit.ly/3gCNm7A'
     $url = 'https://drift.gse.support/'
     $output = "$CurrentLoc\DriFT.ps1"
-#    $global:output = $output
     $start_time = Get-Date
     Try{Invoke-WebRequest -Uri $url -OutFile $output -UseDefaultCredentials
 	    Write-Output "    Time taken: $((Get-Date).Subtract($start_time).Seconds) second(s)"}
@@ -33,7 +31,7 @@ Function Run-Drift{
     Pause}
     Finally{
         #& $output @Tsr2Run
-        Start-Process -FilePath "C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $output
+        Start-Process -FilePath "C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $output -Wait -NoNewWindow
     }
 }
 
@@ -45,18 +43,13 @@ Function Run-Drift{
         Select-String "$pattern" -input "$args" -AllMatches | Foreach {$_.matches} | ForEach-Object { 
             $params=@("$($_.Groups.Groups[1].Value)")
             Run-Drift $params
-            Sleep 5
-            Run-Cleanup
-	    clear-host 
+            Run-Cleanup       
         }
     }
     #Run drift if no argument(s)
     If(!($args)){
         Write-Host "    None found."
         Run-Drift
-        Sleep 5
-        Run-Cleanup
-	clear-host 
+        Run-Cleanup    
     }
-   
 }
