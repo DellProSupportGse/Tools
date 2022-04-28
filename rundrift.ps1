@@ -56,5 +56,5 @@ Function Run-Drift{
         Sleep 5
         Run-Cleanup    
     }
-    
+  clear-host  
 }
