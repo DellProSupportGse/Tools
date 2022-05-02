@@ -1,6 +1,6 @@
 # Run Drift
 # Created By: Jim Gandy
-# v1.3
+# v1.4
 Function Invoke-RunDriFT{
 Write-Host "Set ExecutionPolicy Bypass..."
     Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -22,10 +22,11 @@ Function Run-Drift{
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $CurrentLoc=$ENV:TEMP
     Write-Host "    Downloading latest version..."
-    $url = 'https://drift.gse.support/'
+    $url = 'https://gsetools.blob.core.windows.net/drift/DriFT.ps1.remove?sv=2020-10-02&si=ReadAccess&sr=b&sig=O8lVf4Ye93FOJCWVYIANuMnz%2FZSZTEWv7IQuAbjr6iw%3D'
     $output = "$CurrentLoc\DriFT.ps1"
     $start_time = Get-Date
-    Try{Invoke-WebRequest -Uri $url -OutFile $output -UseDefaultCredentials
+    Try{
+        Invoke-WebRequest -Method GET -Uri $url -OutFile $output
 	    Write-Output "    Time taken: $((Get-Date).Subtract($start_time).Seconds) second(s)"}
     Catch{Write-Host "    ERROR: Source location NOT accessible. Please try again later"-foregroundcolor Red
     Pause}
