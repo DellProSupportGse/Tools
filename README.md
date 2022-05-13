@@ -18,7 +18,7 @@ Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocol
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## AzHCIUrlChecker
    This script checks the URLs that the Azure Stack HCI operating system may need to access as per Microsoft Doc: 
-	https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firewall-requirements?tabs=allow-json%2Cpublic-cloud
+	https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firewall-requirements
 	
 ### Usage
 Copy the below powershell code and paste into PowerShell
