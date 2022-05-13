@@ -15,7 +15,17 @@ Copy the below powershell code and paste into PowerShell
 ```Powershell
 Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/ToolBox.ps1'));Invoke-ToolBox
 ``` 
-
+-------------------------------------------------------------------------------------------------------------------------------------------------
+## AzHCIUrlChecker
+   This script checks the URLs that the Azure Stack HCI operating system may need to access as per Microsoft Doc: 
+	https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firewall-requirements?tabs=allow-json%2Cpublic-cloud
+	
+### Usage
+Copy the below powershell code and paste into PowerShell
+```Powershell
+Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="AzHCIUrlChecker";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/AzHCIUrlChecker.ps1'));Invoke-AzHCIUrlChecker
+``` 
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## BOILER
    Filters the CBS/DISM logs for Errors/Fails/Warnings to quickly identify failing KB's, Language Tags or
    corruption plus, it provides Suggested fixes.
