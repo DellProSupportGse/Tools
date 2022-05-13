@@ -50,6 +50,7 @@ Write-Host ""
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
     $Open='[';$Close=']'
+    $Open+$URLs+$Close
     $HCIURLs=$Open+$URLs+$Close | Out-String | ConvertFrom-Json
     $URLs2Check=$HCIURLs | sort URL -Unique
     
