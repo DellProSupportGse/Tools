@@ -25,7 +25,7 @@ Write-Host $text
 Write-Host ""
 Write-Host "This script checks the URLs that the Azure Stack HCI "
 Write-Host "operating system may need to access as per Microsoft"
-Write-Host "Doc: https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firewall-requirements?tabs=allow-json%2Cpublic-cloud"
+Write-Host "Doc: https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firewall-requirements"
 Write-Host ""
 # Scrape MS KB from URLs
     $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/hci/concepts/firewall-requirements.md'
