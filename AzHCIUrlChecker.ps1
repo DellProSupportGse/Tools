@@ -45,7 +45,7 @@ Write-Host ""
             IF($Line -imatch '```json'){$Add=$true}
             IF($Line -imatch '----'){$Add=$false}
             IF($Add -eq $true){
-                $URLs+=$Line -replace [char]148,'"' -replace [char]147,'"' -replace [char]162,'"' -replace '[\u2019\u2018]',"'" -replace '[\u201C\u201D]','"' -replace 'â€œ','"' -replace 'â€','"' -replace '“','"' -replace '”','"' -replace '`' -replace 'json' -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}'
+                $URLs+=$Line -replace [char]8220,'"' -replace [char]8221,'"' -replace '`' -replace 'json' -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}'
             }
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
