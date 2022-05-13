@@ -45,16 +45,7 @@ Write-Host ""
             IF($Line -imatch '```json'){$Add=$true}
             IF($Line -imatch '----'){$Add=$false}
             IF($Add -eq $true){
-                $URLs+=$Line
-                IF($Line -imatch 'http'){$URL=$Line}
-                IF($Line -imatch '"Port":'){$Port=$Line}
-                IF($Line -imatch '"Notes":'){$Notes=$Line}
-                $UrlList+=[PSCustomObject] @{
-                    'URL'= ($URL  -split ': "')[1] -replace '"' -replace '\/,' -replace ',' -replace 'https://' -replace 'http://' -replace '\*.'
-                    'Port'= ($Port -split ': "')[1] -replace '"' -replace ','
-                    'Notes'= ($Notes -split ': “')[1] -replace '“' -replace '”'
-
-                }
+                $URLs+=$Line -replace '“','"' -replace '”','"'
             }
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
