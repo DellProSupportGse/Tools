@@ -57,7 +57,6 @@ Write-Host ""
             }
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
-    #($URLs -split '```json\[`r`n]')
     $HCIURLs=@('\[')+($URLs -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace '\*\.' -replace '\`' -replace 'json' -replace '\[\{','\{' -replace '\}\]','\},' -replace '\}\s\]','}' -replace '\”','"' -replace '\“','"')+@('\]') | Out-String | Convertfrom-Json 
     $URLs2Check=$HCIURLs  | sort URL -Unique
 
