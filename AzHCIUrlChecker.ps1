@@ -58,7 +58,7 @@ Write-Host ""
                 $Url=$Url -replace '^\{','{'
             }
         }
-        $URLs2Convert2Json+=$Url
+        $URLs2Convert2Json+=$Url -replace 'â€œ','"' -replace 'â€','"' -replace 'â€ ','"'
     }
     $URLs2Convert2Json+=']'
     $HCIURLs=$URLs2Convert2Json | Out-String | ConvertFrom-Json
