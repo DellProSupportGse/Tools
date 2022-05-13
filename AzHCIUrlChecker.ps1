@@ -31,11 +31,12 @@ Write-Host ""
     $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/hci/concepts/firewall-requirements.md'
     $Webpage=Invoke-WebRequest -Uri $URL -UseBasicParsing -Method Get
     if ($Webpage.statuscode -eq '200') {
-        $Webpage.RawContent|Out-File $env:TEMP\temp1.txt -Force
-        $readfile=Get-Content $env:TEMP\temp1.txt 
+        $Webpage.RawContent|Out-File $env:TEMP\temp1.txt -encoding utf8 -Force
+        $readfile=Get-Content $env:TEMP\temp1.txt
         Remove-Item $env:TEMP\temp1.txt -Force
         $URLs=@()
         $UrlList=@()
+        $URLs2Check=@()
         $Add=""
         foreach($Line in $readfile){
             $URL=""
