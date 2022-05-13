@@ -63,7 +63,7 @@ Write-Host ""
     }
         Try{
     $HCIURLs=$URLs2Convert2Json+@(']') | ConvertFrom-Json
-    }Catch{Write-Host $URLs2Convert2Json+@(']')}
+    }Catch{Write-Host $URLs2Convert2Json}
     $URLs2Check=$HCIURLs | sort URL -Unique
     
 # Check for running on cluster
