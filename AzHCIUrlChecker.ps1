@@ -49,7 +49,8 @@ Write-Host ""
             }
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
-    $HCIURLs=@('[')+($URLs -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}')+@(']') | Out-String | ConvertFrom-Json
+    $HCIURLs=@('[')+($URLs -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}')+@(']') | Out-String 
+    $HCIURLs=$HCIURLs | ConvertFrom-Json
     $URLs2Check=$HCIURLs  | sort URL -Unique
 
 # Check for running on cluster
