@@ -56,14 +56,14 @@ Write-Host ""
             $i++
             IF($i -gt 1){
                 $Url=$Url -replace '^\{','{'
-                Write-Host $Url
             }
         }
         $URLs2Convert2Json+=$Url
     }
         Try{
-    $HCIURLs=$URLs2Convert2Json+@(']') | ConvertFrom-Json
-    }Catch{Write-Host $URLs2Convert2Json}
+    $HCIURLs0=$URLs2Convert2Json+@(']')
+     $HCIURLs=$HCIURLs0 | ConvertFrom-Json
+    }Catch{Write-Host $HCIURLs0}
     $URLs2Check=$HCIURLs | sort URL -Unique
     
 # Check for running on cluster
