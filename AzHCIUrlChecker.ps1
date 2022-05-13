@@ -51,7 +51,7 @@ Write-Host ""
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
     $Open='[';$Close=']'
     Write-Host $Open+$URLs+$Close
-    #$HCIURLs=$Open+$URLs+$Close | Out-String | ConvertFrom-Json
+    $HCIURLs=$Open+$URLs+$Close | Out-String | ConvertFrom-Json
     $URLs2Check=$HCIURLs | sort URL -Unique
     
 # Check for running on cluster
