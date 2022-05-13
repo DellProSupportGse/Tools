@@ -45,15 +45,14 @@ Write-Host ""
             IF($Line -imatch '```json'){$Add=$true}
             IF($Line -imatch '----'){$Add=$false}
             IF($Add -eq $true){
-                $URLs+=$Line -replace '“','"' -replace '”','"' -replace '`' -replace 'json'
+                $URLs+=$Line -replace '“','"' -replace '”','"' -replace '`' -replace 'json' -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}'
             }
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
     $Open='[';$Close=']'
-    $HCIURLs=$Open+($URLs -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}')+$Close | Out-String 
-    $HCIURLs=$HCIURLs | ConvertFrom-Json
-    $URLs2Check=$HCIURLs  | sort URL -Unique
-
+    $HCIURLs=$Open+$URLs+$Close | Out-String | ConvertFrom-Json
+    $URLs2Check=$HCIURLs | sort URL -Unique
+    
 # Check for running on cluster
 IF(Get-Command Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue){
     $ServerList = (Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue).Name
