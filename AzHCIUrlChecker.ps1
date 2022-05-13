@@ -57,11 +57,11 @@ Write-Host ""
             }
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
-    $HCIURLs=@('[')+($URLs -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace '\*\.' -replace '`' -replace 'json' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}' -replace '\”','"' -replace '\“','"')+@(']') | Out-String | Convertfrom-Json 
+    $HCIURLs=@('[')+($URLs -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\`' -replace 'json' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}' -replace '\”','"' -replace '\“','"')+@(']') | Out-String | ConvertFrom-Json
     $URLs2Check=$HCIURLs  | sort URL -Unique
 
 # Check for running on cluster
-IF(Get-Command Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue ){
+IF(Get-Command Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue){
     $ServerList = (Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue).Name
 }
 IF(-not($ServerList)){
@@ -80,7 +80,7 @@ IF(-not($ServerList)){
 # Test connections
     foreach($Url in $URLs2Check) {
         Invoke-Command -ComputerName $ServerList -WarningAction SilentlyContinue -ScriptBlock {
-            $Result = Test-NetConnection -ComputerName $($Using:Url.URL) -Port $($Using:Url.Port) -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+            $Result = Test-NetConnection -ComputerName ($Using:Url.URL) -Port ($Using:Url.Port) -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
             If($Result.TcpTestSucceeded -eq $true) {Write-Host "PASSED: From $($env:COMPUTERNAME) to $($Using:Url.URL)" -ForegroundColor Green}
             If($Result.TcpTestSucceeded -eq $false) {Write-Host "FAILED: From $($env:COMPUTERNAME) to $($Using:Url.URL) INFO:$($Using:Url.Notes)" -ForegroundColor Red}
         }
