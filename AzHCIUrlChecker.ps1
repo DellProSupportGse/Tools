@@ -29,7 +29,7 @@ Write-Host "Doc: https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firew
 Write-Host ""
 # Scrape MS KB from URLs
     $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/hci/concepts/firewall-requirements.md'
-    $Webpage=Invoke-WebRequest -Uri $URL -UseBasicParsing -Method Get
+    $Webpage=Invoke-WebRequest -Uri $URL -UseBasicParsing -Method Get -ContentType 'charset=utf-8'
     if ($Webpage.statuscode -eq '200') {
         $Webpage.RawContent|Out-File $env:TEMP\temp1.txt -encoding utf8 -Force
         $readfile=Get-Content $env:TEMP\temp1.txt
@@ -45,11 +45,11 @@ Write-Host ""
             IF($Line -imatch '```json'){$Add=$true}
             IF($Line -imatch '----'){$Add=$false}
             IF($Add -eq $true){
-                $URLs+=$Line -replace '“','"' -replace '”','"'
+                $URLs+=$Line -replace '“','"' -replace '”','"' -replace '`' -replace 'json'
             }
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
-    $HCIURLs=@('[')+($URLs -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\`' -replace 'json' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}')+@(']') | Out-String | ConvertFrom-Json
+    $HCIURLs=@('[')+($URLs -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}')+@(']') | Out-String | ConvertFrom-Json
     $URLs2Check=$HCIURLs  | sort URL -Unique
 
 # Check for running on cluster
