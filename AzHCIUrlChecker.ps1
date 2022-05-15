@@ -84,6 +84,7 @@ IF(-not($ServerList)){
 
 # Test connections
     foreach($Url in $URLs2Check) {
+        Write-Host "Checking $($Url.URL)..."
         Invoke-Command -ComputerName $ServerList -WarningAction SilentlyContinue -ScriptBlock {
             $Result = Test-NetConnection -ComputerName ($Using:Url.URL) -Port ($Using:Url.Port) -ErrorAction SilentlyContinue
             If($Result.TcpTestSucceeded -eq $true) {Write-Host "PASSED: From $($env:COMPUTERNAME) to $($Using:Url.URL)" -ForegroundColor Green}
