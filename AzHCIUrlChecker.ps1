@@ -61,8 +61,7 @@ Write-Host ""
         $URLs2Convert2Json+=$Url
     }
     $URLs2Convert2Json+=']'
-    $HCIURLs=$URLs2Convert2Json -replace '\x93','"' -replace '\x94','"' -replace '“','"' -replace '”','"'  | Out-String | ConvertFrom-Json
-    Write-Host $URLs2Convert2Json
+    $HCIURLs=$URLs2Convert2Json | Out-String | ConvertFrom-Json
     $URLs2Check=$HCIURLs | sort URL -Unique
     
 # Check for running on cluster
