@@ -1,7 +1,7 @@
 # Run CluChk Dev
 # Created By: Jim Gandy
 # v1.3
-Function Invoke-RunCluChk{
+Function Invoke-RunCluChkDev{
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Write-Host "Downloading latest version..."
 $url = 'https://gsetools.blob.core.windows.net/cluchk/CluChk_Dev.ps1.remove?SECRET REMOVED'
