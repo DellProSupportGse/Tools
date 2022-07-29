@@ -22,7 +22,7 @@ Function EndScript{
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 $text=@"
-v1.6
+v1.7
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -174,8 +174,8 @@ IF($iDRACIPCheck -imatch "n"){
     Write-Host "Please wait while TSRs are collected. Ussually this takes 2-5 minutes per node."
     IF(!($LeaveShare -eq $True)){
         # Creating Scheduled Job to remove SMB share in 10 mins
-            Write-Host "Creating Scheduled Job to remove SMB share in 10 mins..."
-            $dateTime = (Get-Date).AddSeconds(600)
+            Write-Host "Creating Scheduled Job to remove SMB share in 15 mins..."
+            $dateTime = (Get-Date).AddSeconds(900)
             $T = New-JobTrigger -Once -At "$($dateTime.ToString("MM/dd/yyyy HH:mm"))" 
             IF(Get-ScheduledJob | Where-Object{$_.Name -eq "TSRCollector"}){Unregister-ScheduledJob -Name "TSRCollector"}
             Register-ScheduledJob -Name "TSRCollector" -Trigger $T -ScriptBlock {
