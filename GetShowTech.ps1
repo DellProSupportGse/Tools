@@ -47,7 +47,9 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
     # Collect Show Techs
         Write-Host "Gathering Show Tech-Support(s)..."
-
+    # Get Case #
+    $CaseNumber=Read-Host "Please enter relevant case number or Service tag"
+    
     # Get switch IP addresses
         $SwIPs=Read-Host "Please enter comma delimited list of switch IP addresse(s)"
         $i=0
@@ -101,19 +103,34 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 $Switchout | Out-File -FilePath "$MyTemp\ShowTechs\$($SwIp)_ShowTech.log" -Force
          }
 
-    # Zip up show techs
+   # Zip up show techs
         Write-Host "Compressing show techs..."
         $DT=Get-Date -Format "yyyyMMddHHmm"
         IF(Test-Path -Path "$MyTemp\logs"){
-            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($DT)"
+            $ZipPath="$MyTemp\logs\ShowTechs_$($CaseNumber)_$($DT).zip"
+            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($CaseNumber)_$($DT)"
             Write-Host "Logs can be found here: $MyTemp\logs\ShowTechs_$($DT).zip"
         }Else{
             $OutFolder=$MyTemp+"\Logs"
+            $ZipPath="$MyTemp\logs\ShowTechs_$($CaseNumber)_$($DT).zip"
             New-Item -ItemType Directory -Force -Path $OutFolder  >$null 2>&1
-            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($DT)"
-            Write-Host "Logs can be found here: $MyTemp\logs\ShowTechs_$($DT).zip"
+            Compress-Archive -Path "$MyTemp\ShowTechs\*.*" -DestinationPath "$MyTemp\logs\ShowTechs_$($CaseNumber)_$($DT)"
+            Write-Host "Logs can be found here: ShowTechs_$($CaseNumber)_$($DT).zip"
         }
+#Get the File-Name without path
+$name = (Get-Item $ZipPath).Name
 
+#The target URL wit SAS Token
+$uri = "https://gsetools.blob.core.windows.net/showtech/$($name)?sp=acw&st=2022-08-14T20:19:23Z&se=2032-08-15T04:19:23Z&spr=https&sv=2021-06-08&sr=c&sig=XfWDMd2y4sQrXm1gxA6up6VRGV5XPrwPkxEINpKTKCs%3D"
+
+#Define required Headers
+$headers = @{
+    'x-ms-blob-type' = 'BlockBlob'
+            }
+
+#Upload File...
+Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue
+}
     # Clean up show techs
         Write-Host "Clean up..."
         Remove-Item "$MyTemp\ShowTechs" -Recurse -Confirm:$false -Force
