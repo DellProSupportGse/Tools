@@ -13,7 +13,9 @@ Function Invoke-TSRCollector{
         param(
             [Parameter(Mandatory=$False, Position=1)]
             [bool] $LeaveShare,
-            $param)
+            $param,
+	    [Parameter(Mandatory=$False, Position=2)]
+         [string] $CaseNumber)
 ## Gather Tech Support Report Collector for all nodes in a cluster
     CLS
 Function EndScript{  
@@ -54,7 +56,7 @@ add-type @"
     }
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
-$CaseNumber = Read-Host -Prompt "Please Provide the case number TSR's are being collected for"
+if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the case number TSR's are being collected for"}
 $user = "root"
 $pass= "calvin"
 $secpasswd = ConvertTo-SecureString $pass -AsPlainText -Force
@@ -74,7 +76,8 @@ $credential = New-Object System.Management.Automation.PSCredential($user, $secpa
 # Create a new folder and shares it
     Write-Host "Creating a new shared folder to save the TSRs..."
     $ShareName = "Logs"
-    $ShareFolder=$MyTemp+"\"+$ShareName
+    $ShareFolder=$MyTemp+"\"+$ShareName+"\TSRCollector\"
+   IF(Test-Path $ShareFolder){Remove-Item -Path $ShareFolder -Force}
     New-Item -ItemType Directory -Force -Path $ShareFolder  >$null 2>&1
     New-SmbShare -Name "Logs" -Path "$ShareFolder" -Temporary -FullAccess (([System.Security.Principal.SecurityIdentifier]("S-1-1-0")).Translate([System.Security.Principal.NTAccount])) >$null 2>&1
     Write-Host "    Share location is $ShareFolder"
