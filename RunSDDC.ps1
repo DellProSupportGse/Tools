@@ -11,7 +11,9 @@ Function Invoke-RunSDDC {
     [CmdletBinding(
         SupportsShouldProcess = $true,
         ConfirmImpact = 'High')]
-        param($param)
+        param(
+        [Parameter(Mandatory=$False)]
+         [string] $CaseNumber)
     CLS
     CLS
 $text=@"
@@ -26,6 +28,10 @@ Write-Host $text
 Write-Host ""
 Write-Host "This tool is used to collect SDDC logs"
 Write-Host "" 
+$MyTemp=(Get-Item $env:temp).fullname
+$Logs = $MyTemp + "\Logs\"
+New-Item -ItemType Directory -Force -Path $Logs
+if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the case number SDDC is being collected for"}
 # Fix 8.3 temp paths
     $MyTemp=(Get-Item $env:temp).fullname
 # Clean old PrivateCloud.DiagnosticInfo
@@ -58,8 +64,8 @@ Write-Host ""
     Import-Module $ModulePath -Force
 
 # Clean up old SDDC's
-    IF(Test-Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip"){Remove-Item $env:USERPROFILE\HealthTest-S2DCluster-*.zip -Force}    
-
+    IF(Test-Path "$env:USERPROFILE\HealthTest-*.zip"){Remove-Item $env:USERPROFILE\HealthTest-*.zip -Force}    
+    IF(Test-Path "$Logs\HealthTest-*.zip"){Remove-Item $Logs\HealthTest-*.zip -Force}
 # Run SDDC
     # Run SDDC if cluster service found on node
     IF(Get-Service clussvc -ErrorAction SilentlyContinue){
@@ -99,8 +105,25 @@ Write-Host ""
                     Write-Error "    ERROR: Failed to connect to cluster $ClusterToCollectLogsFrom. Please check the cluster name and run again."
                 }
             }
-# Move to Logs if exists
+# Move to Logs 
 IF(Test-Path -Path "$MyTemp\logs"){
-        Copy-Item -Path "$env:USERPROFILE\HealthTest-S2DCluster-*.zip" -Destination "$MyTemp\logs\"
-        }
-}# End of Invoke-RunSDDC
+        Copy-Item -Path "$env:USERPROFILE\HealthTest-*.zip" -Destination "$MyTemp\logs\"
+        $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*.zip
+        $HealthZipNew = $HealthZip.BaseName + "-" + $CaseNumber + ".zip"
+        Rename-Item -Path $HealthZip -NewName $HealthZipNew
+        $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*.zip
+        #Get the File-Name without path
+$name = (Get-Item $HealthZip).Name
+
+#The target URL wit SAS Token
+$uri = "https://gsetools.blob.core.windows.net/sddcdata/$($name)?sp=acw&st=2022-06-28T17:26:35Z&se=2032-06-29T01:26:35Z&spr=https&sv=2021-06-08&sr=c&sig=4gtvKkicwS%2BcD6BSBgapTziNrfar11CL%2B6hsVHWzJXI%3D"
+
+#Define required Headers
+$headers = @{
+    'x-ms-blob-type' = 'BlockBlob'
+            }
+
+#Upload File...
+Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue
+}
+} # End of Invoke-RunSDDC
