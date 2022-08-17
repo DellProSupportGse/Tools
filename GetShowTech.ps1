@@ -10,7 +10,9 @@ Function Invoke-GetShowTech {
     [CmdletBinding(
         SupportsShouldProcess = $true,
         ConfirmImpact = 'High')]
-        param($param)
+        param($param),
+          [Parameter(Mandatory=$False)]
+         [string] $CaseNumber
 
     
     Remove-Variable * -ErrorAction SilentlyContinue
@@ -48,7 +50,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
     # Collect Show Techs
         Write-Host "Gathering Show Tech-Support(s)..."
     # Get Case #
-    $CaseNumber=Read-Host "Please enter relevant case number or Service tag"
+   if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please enter relevant case number or Service tag"}
     
     # Get switch IP addresses
         $SwIPs=Read-Host "Please enter comma delimited list of switch IP addresse(s)"
