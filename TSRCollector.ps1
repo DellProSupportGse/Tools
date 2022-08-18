@@ -1,4 +1,4 @@
-    <#
+ <#
     .Synopsis
        Invoke-TSRCollector
     .DESCRIPTION
@@ -13,7 +13,9 @@ Function Invoke-TSRCollector{
         param(
             [Parameter(Mandatory=$False, Position=1)]
             [bool] $LeaveShare,
-            $param)
+            $param,
+	    [Parameter(Mandatory=$False, Position=2)]
+         [string] $CaseNumber)
 ## Gather Tech Support Report Collector for all nodes in a cluster
     CLS
 Function EndScript{  
@@ -54,6 +56,7 @@ add-type @"
     }
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the case number TSR's are being collected for"}
 $user = "root"
 $pass= "calvin"
 $secpasswd = ConvertTo-SecureString $pass -AsPlainText -Force
@@ -73,7 +76,8 @@ $credential = New-Object System.Management.Automation.PSCredential($user, $secpa
 # Create a new folder and shares it
     Write-Host "Creating a new shared folder to save the TSRs..."
     $ShareName = "Logs"
-    $ShareFolder=$MyTemp+"\"+$ShareName
+    $ShareFolder=$MyTemp+"\"+$ShareName+"\TSRCollector\"
+   IF(Test-Path $ShareFolder){Remove-Item -Path $ShareFolder -Force}
     New-Item -ItemType Directory -Force -Path $ShareFolder  >$null 2>&1
     New-SmbShare -Name "Logs" -Path "$ShareFolder" -Temporary -FullAccess (([System.Security.Principal.SecurityIdentifier]("S-1-1-0")).Translate([System.Security.Principal.NTAccount])) >$null 2>&1
     Write-Host "    Share location is $ShareFolder"
@@ -202,6 +206,28 @@ IF($iDRACIPCheck -imatch "n"){
 			try {explorer "$ShareFolder" } catch {
 			Start-Process -FilePath "cmd.exe" -ArgumentList("/K","cd","/d","$ShareFolder","&","echo TSRs will show up in this directory when finished") }
     }
+
 } #End ShouldProcess
+do {
+$TSRsCollected = (Get-ChildItem -Path $ShareFolder)
+$totalTSRsCollected = $TSRsCollected.Count
+Sleep -Seconds 60
+$i++
+Write-Host "$totalTSRsCollected / $($idracIPs.count) TSR's collected so far, and waited $i / 15 minutes"
+}
+while ($totalTSRsCollected -lt $iDRACIPs.count -and $i -le 15)
+ Compress-Archive -Path "$ShareFolder\*.*" -DestinationPath "$ShareFolder\TSRReports_$($CaseNumber)"
+$ZipPath="$ShareFolder\TSRReports_$($CaseNumber).zip"
+$ZipName=(Get-Item $ZipPath).Name
+#The target URL wit SAS Token
+$uri = "https://gsetools.blob.core.windows.net/tsrcollect/$($ZipName)?sp=acw&st=2022-08-14T21:28:03Z&se=2032-08-15T05:28:03Z&spr=https&sv=2021-06-08&sr=c&sig=dhqj1OR7bWRkRp4D3HXwnLT%2Ba%2Br4J6ANF80LhKcafAw%3D"
+
+#Define required Headers
+$headers = @{
+    'x-ms-blob-type' = 'BlockBlob'
+            }
+
+#Upload File...
+Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue
 Stop-Transcript
 }# End Invoke-TSRCollector
