@@ -10,10 +10,8 @@ Function Invoke-GetShowTech {
     [CmdletBinding(
         SupportsShouldProcess = $true,
         ConfirmImpact = 'High')]
-        param($param),
-          [Parameter(Mandatory=$False)]
-         [string] $CaseNumber
-
+        param([Parameter(Mandatory=$False)]
+         [string] $CaseNumber)
     
     Remove-Variable * -ErrorAction SilentlyContinue
     Clear-Host
@@ -150,4 +148,4 @@ Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -Erro
         Stop-Transcript
     }
 } #end if ShouldProcess
-}# end of Invoke-GetShowTech
+# end of Invoke-GetShowTech
