@@ -216,8 +216,8 @@ $i++
 Write-Host "$totalTSRsCollected / $($idracIPs.count) TSR's collected so far, and waited $i / 15 minutes"
 }
 while ($totalTSRsCollected -lt $iDRACIPs.count -and $i -le 15)
- Compress-Archive -Path "$ShareFolder\*.*" -DestinationPath "$ShareFolder\TSRReports_$($CaseNumber)"
-$ZipPath="$ShareFolder\TSRReports_$($CaseNumber).zip"
+ Compress-Archive -Path "$ShareFolder\*.*" -DestinationPath "$ShareFolder\..\TSRReports_$($CaseNumber)"
+$ZipPath="$ShareFolder\..\TSRReports_$($CaseNumber).zip"
 $ZipName=(Get-Item $ZipPath).Name
 #The target URL wit SAS Token
 $uri = "https://gsetools.blob.core.windows.net/tsrcollect/$($ZipName)?sp=acw&st=2022-08-14T21:28:03Z&se=2032-08-15T05:28:03Z&spr=https&sv=2021-06-08&sr=c&sig=dhqj1OR7bWRkRp4D3HXwnLT%2Ba%2Br4J6ANF80LhKcafAw%3D"
