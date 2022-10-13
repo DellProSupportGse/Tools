@@ -292,7 +292,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
        Try{
            # Use TLS 1.2
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-           Write-Host "Finding Latest Dell EMC System Update(DSU) version..."
+           Write-Host "Finding Latest Dell System Update(DSU) version..."
            $URL="https://downloads.dell.com/omimswac/dsu/"
            #$Results=Invoke-WebRequest $URL -UseDefaultCredentials
            $Results=Invoke-WebRequest $URL -UseBasicParsing
@@ -327,7 +327,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
             }
         }
         IF(-not ($IsDSUInstalled -eq "YES")){
-            Write-Host "Downloading Dell EMC System Update(DSU)..."
+            Write-Host "Downloading Dell System Update(DSU)..."
             $DSUInstallerLocation=Download-File $LatestDSU.Link
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
