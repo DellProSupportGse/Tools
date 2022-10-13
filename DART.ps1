@@ -219,7 +219,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
         Function Run-DSU{
             # CD to DSU dir
-                cd 'C:\Program Files\Dell\DELL EMC System Update'
+                cd $((Get-ChildItem -Path "C:\Program Files\Dell\" -Filter DSU.EXE -Recurse).FullName -replace 'dsu.exe')
             # Check if HCI and run DSU install needed updates
                 IF($ASHCI -eq "YES"){
                     # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
@@ -236,7 +236,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     }
                 } Until (!$ProcessesFound)
             # Check Status
-                $DupsStatus=Get-Content 'C:\ProgramData\Dell\DELL EMC System Update\dell_dup\DSU_STATUS.json'| ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus 
+                $DupsStatus=Get-Content $((Get-ChildItem -Path "C:\ProgramData\Dell\" -Filter DSU_STATUS.JSON -Recurse).FullName)| ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus 
                 Switch($DupsStatus){
                     {$DupsStatus.InvokerInfo.statusMessage -imatch 'No Applicable Update'}{
                         Write-Host "`n`n"
@@ -317,7 +317,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
         ForEach($Key in $RegKeyPaths){
-            IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
+            IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -ilike 'DELL * System Update'}){
                 $DSUVer=(Get-ItemProperty -Path $Key.PSPath).DisplayVersion
                 IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSU.Version}){
                     Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
