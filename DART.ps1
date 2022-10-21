@@ -29,7 +29,7 @@ Function EndScript{
 }
 
 $text=@"
-v1.1
+v1.2
  __        __  ___ 
 |  \  /\  |__)  |  
 |__/ /~~\ |  \  |  
@@ -151,7 +151,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
         Function Run-ASHCIPre{
             # Check for any outstanding Storage Jobs
-            Write-Host "Executing Azure Stack HCI Pre-Checks..."
+            Write-Host "Executing S2D/Azure Stack HCI Pre-Checks..."
             IF(Get-VirtualDisk | Where-Object{$_.OperationalStatus -ine "OK"}){
                 Write-Host "    ERROR: Virtual Disk(s) UnHealth Please remediate before continuing" -ForegroundColor Red
                 EndScript}
@@ -183,7 +183,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 try {
                     $Maint=$Null
                     Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Enable-StorageMaintenanceMode -ErrorAction Stop -ErrorVariable Maint
-                    IF($Maint -eq $Null){$Maint="Success"}
+                    IF($Maint.count -eq 0){$Maint="Success"}
                 }
                 catch {
                     Write-Host "        ERROR: Failed to enter storage maintenance mode." -ForegroundColor Red
@@ -218,15 +218,15 @@ if ($PSCmdlet.ShouldProcess($param)) {
     }
 
         Function Run-DSU{
+			$DSUReboot=$False
             # CD to DSU dir
-                cd 'C:\Program Files\Dell\DELL EMC System Update'
+                cd $((Get-ChildItem -Path "C:\Program Files\Dell\" -Filter DSU.EXE -Recurse | Sort LastWriteTime | Select -Last 1).FullName -replace 'dsu.exe')
             # Check if HCI and run DSU install needed updates
-                IF($ASHCI -eq "YES"){
-                    # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ansd.txt&&echo c>>c:\ansd.txt&&DSU.exe --catalog-location=$MyTemp\ASHCI-Catalog.xml --apply-upgrades <c:\ansd.txt&&del c:\ansd.txt"
+				#Out-File -FilePath c:\ansd.txt -InputObject @('a','c')
+                IF($ASHCI -eq "YES" ){
+						./DSU.exe --catalog-location="$MyTemp\ASHCI-Catalog.xml" /u /q | Out-Default
                 }Else{
-                    # We create an ans.txt with a and c on seperate lines to answer DSU (a - Select All, c to Commit) and then pipe into dsu.exe the ans.txt when it runs
-                        cmd /c "echo a>c:\ansd.txt&&echo c>>c:\ansd.txt&&DSU.exe --apply-upgrades <c:\ansd.txt&&del c:\ansd.txt"
+						./DSU.exe /u /q | Out-Default
                 }
                 Do {  
                     $ProcessesFound = Get-Process -Name DSU -ErrorAction SilentlyContinue
@@ -236,9 +236,9 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     }
                 } Until (!$ProcessesFound)
             # Check Status
-                $DupsStatus=Get-Content 'C:\ProgramData\Dell\DELL EMC System Update\dell_dup\DSU_STATUS.json'| ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus 
+                $DupsStatus=(Get-Content $((Get-ChildItem -Path "C:\ProgramData\Dell\" -Filter DSU_STATUS.JSON -Recurse | Sort LastWriteTIme | Select -Last 1).FullName)) | ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus 
                 Switch($DupsStatus){
-                    {$DupsStatus.InvokerInfo.statusMessage -imatch 'No Applicable Update'}{
+                    {$DupsStatus.InvokerInfo.exitStatus -eq 34}{
                         Write-Host "`n`n"
                         Write-Host "Installation Report"
                         "-"*100
@@ -249,50 +249,28 @@ if ($PSCmdlet.ShouldProcess($param)) {
                             Write-Host "`n`n"
                             Write-Host "Installation Report"
                             "-"*100
+                            $DupsStatus | FL *
                             Switch($DupsStatus){
                                 {$DupsStatus | Where-Object{$_.updateStatus -ne "SUCCESS"}}
                                     {
-                                        $DupsStatus | FL *
                                         Write-Host "ERROR: Some updates failed to install. Please review logs for further information. C:\ProgramData\Dell\UpdatePackage\log" -ForegroundColor Red
                                         EndScript
                                     }
                                 {$DupsStatus | Where-Object{$_.rebootRequired -eq "True"}}
-                                                                                                                                                                                                                                                                                    {
-                            $DupsStatus | FL *
-                            Write-Host "Please reboot to complete installation" -ForegroundColor Yellow
-                            $Reboot = Read-Host "Ready to reboot? [y/n]"
-                            Switch ($Reboot){
-                                "y"{
-                                    $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageScaleUnit -FriendlyName "$($Env:ComputerName)" | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
-                                    IF(-not(Test-Path c:\dell)){
-                                        New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
-                                    }
-                                    $Script | Out-File -FilePath c:\dell\exit-maintenancemode.ps1 -Force
-                                    Register-ScheduledTask -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
-                                    Restart-Computer -Force
-                                    EndScript
-                                    }
-                                "n"{
-                                    EndScript
-                                    }
-                            }
-                            EndScript
-                        }
-                                Default{
-                                    Write-Host "No reboot required"
-                                    $DupsStatus | FL *
-                                    EndScript
-                                }
+                                    {
+										$DSUReboot=$True
+									}
                             }
                     }
                 }
+				Return $DSUReboot
 
         }
    # Find latest DSU version on downloads.dell.com
        Try{
            # Use TLS 1.2
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-           Write-Host "Finding Latest Dell EMC System Update(DSU) version..."
+           Write-Host "Finding Latest Dell System Update(DSU) version..."
            $URL="https://downloads.dell.com/omimswac/dsu/"
            #$Results=Invoke-WebRequest $URL -UseDefaultCredentials
            $Results=Invoke-WebRequest $URL -UseBasicParsing
@@ -317,7 +295,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
         ForEach($Key in $RegKeyPaths){
-            IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -imatch 'DELL EMC System Update'}){
+            IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -ilike 'DELL *System Update'}){
                 $DSUVer=(Get-ItemProperty -Path $Key.PSPath).DisplayVersion
                 IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSU.Version}){
                     Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
@@ -327,7 +305,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
             }
         }
         IF(-not ($IsDSUInstalled -eq "YES")){
-            Write-Host "Downloading Dell EMC System Update(DSU)..."
+            Write-Host "Downloading Dell System Update(DSU)..."
             $DSUInstallerLocation=Download-File $LatestDSU.Link
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
@@ -340,6 +318,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Write-Host "Gather Server Model Info..."
         # Find Storage Spaces Direct RN or AX info
             $Model=(Get-WmiObject -Class Win32_ComputerSystem).model
+			$IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} catch {}
             IF($Model -imatch 'Storage Spaces Direct' -or $Model -imatch 'AX'){
                 $ASHCI="YES"
                 $URL="https://downloads.dell.com/catalog/ASHCI-Catalog.xml.gz"
@@ -350,7 +329,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                 IF(Get-Service clussvc -ErrorAction SilentlyContinue){$IsClusterMember = "YES"}Else{$IsClusterMember = "NO"}
                 $URL="https://downloads.dell.com/catalog/Catalog.xml.gz"
                 $InFile="$MyTemp\Catalog.xml.gz"
-                If($IsClusterMember = "NO"){
+                If($IsClusterMember -eq "NO"){
                     # Added to patch none cluster power edge server 
                     $IgnoreChecks = $True
                 }
@@ -374,22 +353,69 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
         IF($NoClusterPre -ne $True){
             If($IgnoreChecks -ne $True){
-                Run-ClusterPre
+				If ($IsS2d) {Run-ASHCIPre} else {Run-ClusterPre}
             }
         }
         If($IgnoreChecks -eq $True){Write-Host "Ignoring ASHCI/Cluster Prechecks" -ForegroundColor Yellow}
         # Check if Windows
+		$WinReboot=$False
         IF([System.Environment]::OSVersion.VersionString -imatch 'Windows'){
             IF($WindowsUpdates -eq $True){ 
                 Write-Host "    Executing Windows Updates..."
-                #cmd /c "echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt"
-                Start-Process -WindowStyle Normal -FilePath "$env:comspec" -ArgumentList '/C echo A>c:\ans.txt&&echo A>>c:\ans.txt&&cscript C:\Windows\System32\en-US\WUA_SearchDownloadInstall.vbs <c:\ans.txt&&del c:\ans.txt'
-            }ElseIF($WindowsUpdates -eq $False){Write-Host "    Skipping Windows Updates" -ForegroundColor Yellow}
+                (new-object -Comobject Microsoft.Update.AutoUpdate).detectnow()
+                #((New-Object -ComObject Microsoft.Update.Searcher).Search("IsInstalled=0 and Type='Software' and isHidden=0").Updates | ? Title -match '2022-10 Update for Azure Stack HCI, version 22H2').IsHidden=1
+                $Updates=(New-Object -ComObject Microsoft.Update.Searcher).Search("IsInstalled=0 and Type='Software' and isHidden=0").Updates
+                if($Updates.count -ge 1){
+                    Write-Host "The following updates have been found"
+                    $Updates | % {Write-Host "$($_.IsDownloaded) $($_.Title)"}
+                    Write-Host "Downloading Updates"
+                    $djob=Start-Job -Name "djob" -scriptblock {
+                        $UpdateDownloader=New-Object -ComObject Microsoft.Update.Downloader
+                        $UpdateDownloader.Updates=(New-Object -ComObject Microsoft.Update.Searcher).Search("IsInstalled=0 and Type='Software' and isHidden=0").Updates
+                        $UpdateDownloader.Download()
+                        } 
+                    Do {sleep 9;$e=get-EventLog -LogName System -After ((Get-Date).addseconds(-10)) | ? Source -match "update" | sort timegenerated;if ($e) {Write-Host "$($e.timegenerated) $($e.message)"}} while(!$djob.PSEndTime)
+                    Receive-Job -Job $djob
+                    write-host "Installing $($Updates.count) Updates"
+                    $ujob=Start-Job -Name "ujob" -scriptblock {
+                        $UpdateInstaller=New-Object -ComObject Microsoft.Update.Installer
+                        $UpdateInstaller.Updates=(New-Object -ComObject Microsoft.Update.Searcher).Search("IsInstalled=0 and Type='Software' and isHidden=0").Updates
+                        $UpdateInstaller.Install().RebootRequired
+                        }
+                    Do {sleep 59;$e=get-EventLog -LogName System -After ((Get-Date).addminutes(-1)) | ? Source -match "update" | sort timegenerated;if ($e) {Write-Host "$($e.timegenerated) $($e.message)"}} while(!$ujob.PSEndTime)
+                    $WinReboot=Receive-Job -Job $ujob
+					if ($WinReboot -ne $True) {
+							$WinReboot
+							$WinReboot=$False
+					}
+                } else { write-host "No updates detected" }
+			}ElseIF($WindowsUpdates -eq $False){Write-Host "    Skipping Windows Updates" -ForegroundColor Yellow}
         }
+		$DSUReboot=$False
         IF($DriverandFirmware -eq $True){
             Write-Host "    Executing DSU..."
-            Run-DSU
+            $DSUReboot=Run-DSU
         }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
+		If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
+		    Write-Host "Please reboot to complete installation" -ForegroundColor Yellow
+            $Reboot = Read-Host "Ready to reboot? [y/n]"
+            Switch ($Reboot){
+                "y"{
+                    $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageScaleUnit -FriendlyName "$($Env:ComputerName)" | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
+                    IF(-not(Test-Path c:\dell)){
+                        New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
+                    }
+                    $Script | Out-File -FilePath c:\dell\exit-maintenancemode.ps1 -Force
+                    Register-ScheduledTask -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
+                    Restart-Computer -Force
+                    EndScript
+                    }
+                "n"{
+                    EndScript
+                    }
+                }
+                EndScript
+		}
         IF($IgnoreChecks -ne $True){
             $ExitSMM = Read-Host "Ready to Resume Cluster Node and exit Storage Maintenance Mode? [y/n]"
             Switch ($ExitSMM){
@@ -404,7 +430,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
                         # Disable Storage Maintenance Mode
                         IF($IgnoreChecks -ne $True){
-                            IF($ASHCI -eq "YES"){
+                            IF($ASHCI -eq "YES" -or (Get-ClusterStorageSpacesDirect).state -eq "Enabled"){
                                 Write-Host "Exiting Storage Maintenance Mode..."
                                 Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
                             }
