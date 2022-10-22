@@ -220,7 +220,9 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Function Run-DSU{
 			$DSUReboot=$False
             # CD to DSU dir
+
                 cd $((Get-ChildItem -Path "C:\Program Files\Dell\" -Filter DSU.EXE -Recurse | Sort LastWriteTime | Select -Last 1).FullName -replace 'dsu.exe')
+
             # Check if HCI and run DSU install needed updates
 				#Out-File -FilePath c:\ansd.txt -InputObject @('a','c')
                 IF($ASHCI -eq "YES" ){
@@ -236,7 +238,9 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     }
                 } Until (!$ProcessesFound)
             # Check Status
+
                 $DupsStatus=(Get-Content $((Get-ChildItem -Path "C:\ProgramData\Dell\" -Filter DSU_STATUS.JSON -Recurse | Sort LastWriteTIme | Select -Last 1).FullName)) | ConvertFrom-Json | select -ExpandProperty SystemUpdateStatus 
+
                 Switch($DupsStatus){
                     {$DupsStatus.InvokerInfo.exitStatus -eq 34}{
                         Write-Host "`n`n"
@@ -257,7 +261,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                                         EndScript
                                     }
                                 {$DupsStatus | Where-Object{$_.rebootRequired -eq "True"}}
-                                    {
+                               {
 										$DSUReboot=$True
 									}
                             }
@@ -295,7 +299,9 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
         ForEach($Key in $RegKeyPaths){
+        
             IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -ilike 'DELL *System Update'}){
+
                 $DSUVer=(Get-ItemProperty -Path $Key.PSPath).DisplayVersion
                 IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSU.Version}){
                     Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
@@ -438,7 +444,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                          }
                     }
                 "n"{
-                        $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageScaleUnit -FriendlyName "$($Env:ComputerName)" | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
+                        $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
                         IF(-not(Test-Path c:\dell)){
                             New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
                         }
