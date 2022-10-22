@@ -436,7 +436,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
                         # Disable Storage Maintenance Mode
                         IF($IgnoreChecks -ne $True){
-                            IF($ASHCI -eq "YES" -or (Get-ClusterStorageSpacesDirect).state -eq "Enabled"){
+                            IF($ASHCI -eq "YES" -or $isS2d){
                                 Write-Host "Exiting Storage Maintenance Mode..."
                                 Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
                             }
