@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker{
-$Ver="1.0"
+$Ver="1.1"
 Clear-Host
 $text = @"
 v$Ver
@@ -28,41 +28,37 @@ Write-Host "operating system may need to access as per Microsoft"
 Write-Host "Doc: https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firewall-requirements"
 Write-Host ""
 # Scrape MS KB from URLs
-    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/hci/concepts/firewall-requirements.md'
+    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/includes/required-urls-table.md'
     $Webpage=Invoke-WebRequest -Uri $URL -UseBasicParsing -Method Get -ContentType 'charset=utf-8'
     if ($Webpage.statuscode -eq '200') {
         $Webpage.RawContent|Out-File $env:TEMP\temp1.txt -encoding utf8 -Force
         $readfile=Get-Content $env:TEMP\temp1.txt
         Remove-Item $env:TEMP\temp1.txt -Force
-        $URLs=@()
         $UrlList=@()
         $URLs2Check=@()
         $Add=""
+        $resultObject=@()
         foreach($Line in $readfile){
             $URL=""
             $Port=""
             $Notes=""
-            IF($Line -imatch '```json'){$Add=$true}
-            IF($Line -imatch '----'){$Add=$false}
+            IF($Line -imatch '\|   \:---\|'){$Add=$true;continue}
+            #IF($Line -imatch '----'){$Add=$false}
             IF($Add -eq $true){
-                $URLs+=$Line -replace [char]8220,'"' -replace [char]8221,'"' -replace '`' -replace 'json' -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}'
+                #$URLs+=$Line -replace [char]8220,'"' -replace [char]8221,'"' -replace '`' -replace 'json' -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}'
+                $URLs+=$Line -split '\|'
+                $resultObject = [PSCustomObject] @{
+                    Service = ($Line -split '\|')[1] -replace '[^\x20-\x7F]','' -replace '^\s+',''
+                    URL     = ($Line -split '\|')[2] -replace '[^\x20-\x7F]','' -replace '^\s+','' -replace '\s','' -replace '\*\.',''
+                    Port    = ($Line -split '\|')[3] -replace '[^\x20-\x7F]','' -replace '^\s+',''
+                    Notes   = ($Line -split '\|')[4] -replace '[^\x20-\x7F]','' -replace '^\s+',''
+                }
+                #Pause
+                $UrlList+=$resultObject
             }
         }
     }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
-    $URLs2Convert2Json=@('[')
-    $i=0
-    foreach($Url in $URLs){
-        IF($Url -imatch '^\{'){
-            $i++
-            IF($i -gt 1){
-                $Url=$Url -replace '^\{','{'
-            }
-        }
-        $URLs2Convert2Json+=$Url
-    }
-    $URLs2Convert2Json+=']'
-    $HCIURLs=$URLs2Convert2Json | Out-String | ConvertFrom-Json
-    $URLs2Check=$HCIURLs | sort URL -Unique
+$URLs2Check= $UrlList | sort URL -Unique
     
 # Check for running on cluster
 IF(Get-Command Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue){
