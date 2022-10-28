@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker{
-$Ver="1.4"
+$Ver="1.5"
 Clear-Host
 $text = @"
 v$Ver
@@ -212,4 +212,7 @@ Function Invoke-URLChecker{
     }
 }
 Invoke-URLChecker
+IF($URLs2Check -match '\*\.'){
+Write-Host "Please Note that wildcard (*) Urls where not tested but should also be accessable." -ForegroundColor Yellow
+}
 }
