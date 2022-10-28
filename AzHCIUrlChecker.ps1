@@ -39,16 +39,18 @@ Function ShowMenu{
          Write-Host "Press '1' to Check Azure Stack HCI"
          Write-Host "Press '2' to Check Arc For Servers"
          Write-Host "Press '3' to Check Arc Resource Bridge"
-         Write-Host "Press '4' to Check All the above"
+         Write-Host "Press '4' to Check Recommended Urls"
+         Write-Host "Press '5' to Check All the above"
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
 		 $selection = Read-Host "Please make a selection"
      }
-    until ($selection -match '[1-4,qQ,hH]')
+    until ($selection -match '[1-5,qQ,hH]')
     $Global:AzureStackHCI  = "N"
     $Global:ArcForServers  = "N"
     $Global:ArcResourceBridge  = "N"
+    $Global:recommendedurls = "N"
     $Global:CheckALL = "N"
     IF($selection -imatch 'h'){
         Clear-Host
@@ -80,8 +82,13 @@ Function ShowMenu{
         Write-Host "Checking Arc Resource Bridge..."
         $Global:ArcResourceBridge = "Y"
     }
-    ElseIF($selection -eq 4){
+    IF($selection -match 4){
+        Write-Host "Checking Recommended Urls..."
+        $Global:recommendedurls = "Y"
+    }
+    ElseIF($selection -eq 5){
         Write-Host "Checking all..."
+        $Global:recommendedurls = "Y"
         $Global:CheckALL = "Y"
     }
     IF($selection -imatch 'q'){
@@ -102,14 +109,13 @@ ShowMenu
         $URLs2Check=@()
         $Add=""
         $resultObject=@()
+        # Make webtable into PS Object
         foreach($Line in $readfile){
             $URL=""
             $Port=""
             $Notes=""
             IF($Line -imatch '\|   \:---\|'){$Add=$true;continue}
-            #IF($Line -imatch '----'){$Add=$false}
             IF($Add -eq $true){
-                #$URLs+=$Line -replace [char]8220,'"' -replace [char]8221,'"' -replace '`' -replace 'json' -replace 'http\:\/\/' -replace 'https\:\/\/' -replace '\/' -replace'\*\.' -replace '\[\{','{' -replace '\}\]','},' -replace '\}\s\]','}'
                 $URLs+=$Line -split '\|'
                 $resultObject = [PSCustomObject] @{
                     Service = ($Line -split '\|')[1] -replace '[^\x20-\x7F]','' -replace '^\s+',''
@@ -117,7 +123,6 @@ ShowMenu
                     Port    = ($Line -split '\|')[3] -replace '[^\x20-\x7F]','' -replace '^\s+',''
                     Notes   = ($Line -split '\|')[4] -replace '[^\x20-\x7F]','' -replace '^\s+',''
                 }
-                #Pause
                 $UrlList+=$resultObject
             }
         }
@@ -138,18 +143,53 @@ IF($ArcResourceBridge -eq "Y"){
     $URLs2Check
     $CheckALL="N"
     }
+IF($recommendedurls -eq "Y"){
+    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/includes/recommended-urls-table.md'
+    $Webpage=Invoke-WebRequest -Uri $URL -UseBasicParsing -Method Get -ContentType 'charset=utf-8'
+    if ($Webpage.statuscode -eq '200') {
+        $Webpage.RawContent|Out-File $env:TEMP\temp1.txt -encoding utf8 -Force
+        $readfile=Get-Content $env:TEMP\temp1.txt
+        Remove-Item $env:TEMP\temp1.txt -Force
+        $RecUrlList=@()
+        $URLs2Check=@()
+        $Add=""
+        $resultObject=@()
+        # Make webtable into PS Object
+        foreach($Line in $readfile){
+            $URL=""
+            $Port=""
+            $Notes=""
+            IF($Line -imatch '\|   \:---\|'){$Add=$true;continue}
+            IF($Add -eq $true){
+#                $URLs+=$Line -split '\|'
+                $resultObject = [PSCustomObject] @{
+                    Service = ($Line -split '\|')[1] -replace '[^\x20-\x7F]','' -replace '^\s+',''
+                    URL     = ($Line -split '\|')[2] -replace '[^\x20-\x7F]','' -replace '^\s+','' -replace '\s',''
+                    Port    = ($Line -split '\|')[3] -replace '[^\x20-\x7F]','' -replace '^\s+',''
+                    Notes   = ($Line -split '\|')[4] -replace '[^\x20-\x7F]','' -replace '^\s+',''
+                }
+                $RecUrlList+=$resultObject
+            }
+        }
+    }Else{Write-Host "ERROR: Failed to get URL list from: $URL" -ForegroundColor Red }
+    $URLs2Check+= $RecUrlList | sort URL -Unique
+    $URLs2Check
+    $CheckALL="N"
+    }
+
 IF($CheckALL -eq "Y"){
-    $URLs2Check= $UrlList| sort URL -Unique | sort Service
+    $URLs2Check+= $UrlList| sort URL -Unique | sort Service
     $URLs2Check
     }
-    
+
+Function Invoke-URLChecker{    
 # Check for running on cluster
-IF(Get-Command Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue){
-    $ServerList = (Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue).Name
-}
-IF(-not($ServerList)){
-    $ServerList=$env:COMPUTERNAME
-}
+    IF(Get-Command Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue){
+        $ServerList = (Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue).Name
+    }
+    IF(-not($ServerList)){
+        $ServerList=$env:COMPUTERNAME
+    }
 
 #Change buffer width to make reader frindly
     $pshost = get-host
@@ -169,4 +209,6 @@ IF(-not($ServerList)){
             If($Result.TcpTestSucceeded -eq $false) {Write-Host "FAILED: From $($env:COMPUTERNAME) to $($Using:Url.URL) INFO:$($Using:Url.Notes)" -ForegroundColor Red}
         }
     }
+}
+Invoke-URLChecker
 }
