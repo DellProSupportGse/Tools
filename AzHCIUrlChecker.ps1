@@ -119,7 +119,7 @@ ShowMenu
                 $URLs+=$Line -split '\|'
                 $resultObject = [PSCustomObject] @{
                     Service = ($Line -split '\|')[1] -replace '[^\x20-\x7F]','' -replace '^\s+',''
-                    URL     = ($Line -split '\|')[2] -replace '[^\x20-\x7F]','' -replace '^\s+','' -replace '\s',''
+                    URL     = ($Line -split '\|')[2] -replace '[^\x20-\x7F]','' -replace '^\s+','' -replace '\s','' -replace 'www\\','www'
                     Port    = ($Line -split '\|')[3] -replace '[^\x20-\x7F]','' -replace '^\s+',''
                     Notes   = ($Line -split '\|')[4] -replace '[^\x20-\x7F]','' -replace '^\s+',''
                 }
@@ -164,7 +164,7 @@ IF($recommendedurls -eq "Y"){
 #                $URLs+=$Line -split '\|'
                 $resultObject = [PSCustomObject] @{
                     Service = ($Line -split '\|')[1] -replace '[^\x20-\x7F]','' -replace '^\s+',''
-                    URL     = ($Line -split '\|')[2] -replace '[^\x20-\x7F]','' -replace '^\s+','' -replace '\s',''
+                    URL     = ($Line -split '\|')[2] -replace '[^\x20-\x7F]','' -replace '^\s+','' -replace '\s','' -replace 'www\\','www'
                     Port    = ($Line -split '\|')[3] -replace '[^\x20-\x7F]','' -replace '^\s+',''
                     Notes   = ($Line -split '\|')[4] -replace '[^\x20-\x7F]','' -replace '^\s+',''
                 }
