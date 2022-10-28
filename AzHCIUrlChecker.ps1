@@ -9,7 +9,7 @@
        Jim Gandy
 #>
 
-#Function Invoke-AzHCIUrlChecker{
+Function Invoke-AzHCIUrlChecker{
 $Ver="1.3"
 Clear-Host
 $text = @"
@@ -169,3 +169,4 @@ IF(-not($ServerList)){
             If($Result.TcpTestSucceeded -eq $false) {Write-Host "FAILED: From $($env:COMPUTERNAME) to $($Using:Url.URL) INFO:$($Using:Url.Notes)" -ForegroundColor Red}
         }
     }
+}
