@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker{
-$Ver="1.3"
+$Ver="1.4"
 Clear-Host
 $text = @"
 v$Ver
@@ -202,12 +202,13 @@ Function Invoke-URLChecker{
 
 # Test connections
     foreach($Url in $URLs2Check) {
+        IF($Url.URL -notmatch '\*\.'){
         Write-Host "Checking $($Url.URL)..."
         Invoke-Command -ComputerName $ServerList -WarningAction SilentlyContinue -ScriptBlock {
             $Result = Test-NetConnection -ComputerName ($Using:Url.URL) -Port ($Using:Url.Port) -ErrorAction SilentlyContinue
             If($Result.TcpTestSucceeded -eq $true) {Write-Host "PASSED: From $($env:COMPUTERNAME) to $($Using:Url.URL)" -ForegroundColor Green}
             If($Result.TcpTestSucceeded -eq $false) {Write-Host "FAILED: From $($env:COMPUTERNAME) to $($Using:Url.URL) INFO:$($Using:Url.Notes)" -ForegroundColor Red}
-        }
+        }}
     }
 }
 Invoke-URLChecker
