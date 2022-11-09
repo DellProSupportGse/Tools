@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker{
-$Ver="1.5"
+$Ver="1.6"
 Clear-Host
 $text = @"
 v$Ver
@@ -188,7 +188,10 @@ Function Invoke-URLChecker{
         $ServerList = (Get-ClusterNode -ErrorAction SilentlyContinue -WarningAction SilentlyContinue).Name
     }
     IF(-not($ServerList)){
+        Write-Host " Unable to discover cluster nodes." -ForegroundColor Yellow
         $ServerList=$env:COMPUTERNAME
+        $ServerList = Read-Host " Please provide a list of servers to check in comma delimited form"
+        $ServerList = $ServerList -split ',' -replace '\s+'
     }
 
 #Change buffer width to make reader frindly
