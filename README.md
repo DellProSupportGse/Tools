@@ -144,12 +144,10 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
 ```Powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC
 ```
-
----
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## SDDC Offline
  
- How To Use:
+### How To Use with Desktop Experience:
  
     1. Download the SDDC from this link <https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip>
     2. Copy to the node where you will run it
@@ -157,6 +155,16 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
     4. Run the copied code
     5. It will ask you for the location of the downloaded SDDC from step 1 ans 2
     6. The rest will run as normal
+    
+ ### How to use with Server Core/HCI OS:
+     1. Download the SDDC from this link <https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip>
+     2. Right click and copy the downloaded master.zip
+     3. RDP into the node and open Notepad
+     4. Click Open and browse to the folder you wish to paste the master.zip and then paste it
+     5. Open SDDCOffline <https://raw.githubusercontent.com/DellProSupportGse/Tools/main/SDDCOffline.ps1> from a machine with a web brower and copy the code
+     6. Switch back to the Server Core/HCI node and paste it into a PowerShell session
+     7. It will ask you for the location of the downloaded SDDC from step 1 ans 2
+     8. The rest will run as normal
    
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## TSR Collector
