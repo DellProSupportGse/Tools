@@ -99,7 +99,7 @@ Function ShowMenu{
 #endregion
 ShowMenu
 # Scrape MS KB from URLs
-    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/hci/concepts/firewall-requirements.md'
+    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/includes/hci-required-urls-table.md'
     $Webpage=Invoke-WebRequest -Uri $URL -UseBasicParsing -Method Get -ContentType 'charset=utf-8'
     if ($Webpage.statuscode -eq '200') {
         $Webpage.RawContent|Out-File $env:TEMP\temp1.txt -encoding utf8 -Force
@@ -114,7 +114,8 @@ ShowMenu
             $URL=""
             $Port=""
             $Notes=""
-            IF($Line -imatch '\|   \:---\|'){$Add=$true;continue}
+
+            IF($Line -imatch '\|\s+\:---\|'){$Add=$true;continue}
             IF($Add -eq $true){
                 $URLs+=$Line -split '\|'
                 $resultObject = [PSCustomObject] @{
@@ -144,7 +145,7 @@ IF($ArcResourceBridge -eq "Y"){
     $CheckALL="N"
     }
 IF($recommendedurls -eq "Y"){
-    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/includes/recommended-urls-table.md'
+    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/includes/hci-recommended-urls-table.md'
     $Webpage=Invoke-WebRequest -Uri $URL -UseBasicParsing -Method Get -ContentType 'charset=utf-8'
     if ($Webpage.statuscode -eq '200') {
         $Webpage.RawContent|Out-File $env:TEMP\temp1.txt -encoding utf8 -Force
