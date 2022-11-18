@@ -22,6 +22,10 @@ v$Ver
                                  
                       by: Jim Gandy 
 "@
+
+#IE Fix
+Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Internet Explorer\Main" -Name "DisableFirstRunCustomize" -Value 2
+
 Function ShowMenu{
     do
      {
