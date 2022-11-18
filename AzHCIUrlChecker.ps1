@@ -136,6 +136,12 @@ IF($AzureStackHCI -eq "Y"){
     }
 IF($ArcForServers -eq "Y"){
     $URLs2Check+= $UrlList | Where-Object{$_.Service -imatch 'Arc For Servers'} | sort URL -Unique
+    $AddMissing+= [PSCustomObject]@{
+				Service = "Arc For Servers"
+                URL     = "onegetcdn.azureedge.net"
+                Port    = "443"
+                Notes   = "Dell Added: ARC Agent installation needs to access this location for nuget packages"}
+    $URLs2Check+=$AddMissing    
     $URLs2Check
     $CheckALL="N"
     }
