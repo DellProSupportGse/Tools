@@ -99,7 +99,7 @@ Function ShowMenu{
 #endregion
 ShowMenu
 # Scrape MS KB from URLs
-    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/includes/required-urls-table.md'
+    $URL='https://raw.githubusercontent.com/MicrosoftDocs/azure-stack-docs/main/azure-stack/hci/concepts/firewall-requirements.md'
     $Webpage=Invoke-WebRequest -Uri $URL -UseBasicParsing -Method Get -ContentType 'charset=utf-8'
     if ($Webpage.statuscode -eq '200') {
         $Webpage.RawContent|Out-File $env:TEMP\temp1.txt -encoding utf8 -Force
