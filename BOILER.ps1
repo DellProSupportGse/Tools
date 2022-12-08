@@ -10,6 +10,8 @@
        Invoke-BOILER
 #>
 Function Invoke-BOILER{
+$DateTime=Get-Date -Format yyyyMMdd_HHmmss
+Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
 #region Opening Banner and menu
 $Ver="1.1"
 Clear-Host
@@ -224,4 +226,5 @@ ForEach($CBSLog in $LogsToProcess){
    
  # Cleanup expanded zips            
  IF($UnzipPath2Remove.Count -gt 0){Remove-Item $UnzipPath2Remove -Recurse}
+ Stop-Transcript
  }
