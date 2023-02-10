@@ -34,7 +34,7 @@ Function ShowMenu{
          Clear-Host
          Write-Host $text
          Write-Host ""
-         Write-Host "This code is provided as-is and is not supported by Dell Technologies"
+         Write-Host "This code is provided as-is and is intended to be run by Dell Support"
          Write-Host ""
          Write-Host "==================== Please make a selection ====================="
          Write-Host ""
