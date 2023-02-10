@@ -2,7 +2,8 @@
   NOTE: All tools should be run from ISE as administorator unless otherwise noted. 
 
 ### Support
-  Please note this code is provided as-is and no support for utilizing these tools will be provided by Dell.
+    Kindly be advised that this code is being offered as-is and Dell will not provide any support in using these tools. However, if you encounter any issues, we would appreciate it if you could submit them under the "Issues" section.
+  
 
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## Tool Box
