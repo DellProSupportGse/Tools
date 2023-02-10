@@ -22,14 +22,78 @@ Function Invoke-DART {
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
+#region Telemetry Information
+Write-Host "Logging Telemetry Information..."
+function add-TableData1 {
+    [CmdletBinding()] 
+        param(
+            [Parameter(Mandatory = $true)]
+            [string] $tableName,
+
+            [Parameter(Mandatory = $true)]
+            [string] $PartitionKey,
+
+            [Parameter(Mandatory = $true)]
+            [string] $RowKey,
+
+            [Parameter(Mandatory = $true)]
+            [array] $data,
+            
+            [Parameter(Mandatory = $false)]
+            [array] $SasToken
+        )
+        $storageAccount = "gsetools"
+
+        # Allow only add and update access via the "Update" Access Policy on the CluChkTelemetryData table
+        # Ref: az storage table generate-sas --connection-string 'USE YOUR KEY' -n "CluChkTelemetryData" --policy-name "Update" 
+        If(-not($SasToken)){
+            $sasWriteToken = "?sv=2019-02-02&si=DARTTelemetryData-18639860967&sig=L%2BGfTGIZYhIiR3PxHO%2BQvnpYaAR9VAusu3g3Zb%2BPkqw%3D&tn=DARTTelemetryData"
+        }Else{$sasWriteToken=$SasToken}
+
+        $resource = "$tableName(PartitionKey='$PartitionKey',RowKey='$Rowkey')"
+
+        # should use $resource, not $tableNmae
+        $tableUri = "https://$storageAccount.table.core.windows.net/$resource$sasWriteToken"
+       # Write-Host   $tableUri 
+
+        # should be headers, because you use headers in Invoke-RestMethod
+        $headers = @{
+            Accept = 'application/json;odata=nometadata'
+        }
+
+        $body = $data | ConvertTo-Json
+        #This will write to the table
+        #write-host "Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json"
+		try {
+			$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
+		} catch {
+			#write-warning ("table $tableUri")
+			#write-warning ("headers $headers")
+		}
+		
+}# End function add-TableData
+    
 
 Function EndScript{ 
     Stop-Transcript
     break
 }
+$ver="1.3"
+# Generating a unique report id to link telemetry data to report data
+    $CReportID=""
+    $CReportID=(new-guid).guid
 
+$data = @{
+    Region=$env:UserDomain
+    Version=$Ver
+    ReportID=$CReportID
+}
+$RowKey=(new-guid).guid
+$PartitionKey="DART"
+add-TableData1 -TableName "DARTTelemetryData" -PartitionKey $PartitionKey -RowKey $RowKey -data $data
+#endregion End of Telemetry data
 $text=@"
-v1.2
+$ver
  __        __  ___ 
 |  \  /\  |__)  |  
 |__/ /~~\ |  \  |  
@@ -458,4 +522,4 @@ if ($PSCmdlet.ShouldProcess($param)) {
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}# Dell Server Check
 Stop-Transcript
 }               
-               
+               Invoke-DART
