@@ -286,4 +286,3 @@ ForEach($CBSLog in $LogsToProcess){
  IF($UnzipPath2Remove.Count -gt 0){Remove-Item $UnzipPath2Remove -Recurse}
  Stop-Transcript
  }
- Invoke-BOILER
