@@ -1,4 +1,4 @@
-﻿  
+  
 <#
     .Synopsis
        BOILER.ps1
@@ -10,10 +10,68 @@
        Invoke-BOILER
 #>
 Function Invoke-BOILER{
+Write-Host "Logging Telemetry Information..."
+function add-TableData1 {
+    [CmdletBinding()] 
+        param(
+            [Parameter(Mandatory = $true)]
+            [string] $tableName,
+
+            [Parameter(Mandatory = $true)]
+            [string] $PartitionKey,
+
+            [Parameter(Mandatory = $true)]
+            [string] $RowKey,
+
+            [Parameter(Mandatory = $true)]
+            [array] $data,
+            
+            [Parameter(Mandatory = $false)]
+            [array] $SasToken
+        )
+        $storageAccount = "gsetools"
+
+        # Allow only add and update access via the "Update" Access Policy on the CluChkTelemetryData table
+        # Ref: az storage table generate-sas --connection-string 'USE YOUR KEY' -n "CluChkTelemetryData" --policy-name "Update" 
+        If(-not($SasToken)){
+            $sasWriteToken = "?sv=2019-02-02&si=BOILERTelemetryData-1863C024043&sig=R7x%2B%2BHEeiBpcvp6hnjCH5CJjotOT1qzgcW8c8Qcr7sY%3D&tn=BOILERTelemetryData"
+        }Else{$sasWriteToken=$SasToken}
+
+        $resource = "$tableName(PartitionKey='$PartitionKey',RowKey='$Rowkey')"
+
+        # should use $resource, not $tableNmae
+        $tableUri = "https://$storageAccount.table.core.windows.net/$resource$sasWriteToken"
+       # Write-Host   $tableUri 
+
+        # should be headers, because you use headers in Invoke-RestMethod
+        $headers = @{
+            Accept = 'application/json;odata=nometadata'
+        }
+
+        $body = $data | ConvertTo-Json
+        #This will write to the table
+        #write-host "Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json"
+		try {
+			$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
+		} catch {
+			#write-warning ("table $tableUri")
+			#write-warning ("headers $headers")
+		}
+		
+}# End function add-TableData
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
 #region Opening Banner and menu
-$Ver="1.1"
+$Ver="1.2"
+$data = @{
+    Region=$env:UserDomain
+    Version=$Ver
+    ReportID=$CReportID
+}
+$RowKey=(new-guid).guid
+$PartitionKey="BOILER"
+add-TableData1 -TableName "BOILERTelemetryData" -PartitionKey $PartitionKey -RowKey $RowKey -data $data
+#endregion End of Telemetry data
 Clear-Host
 $text = @"
 v$Ver
@@ -228,3 +286,4 @@ ForEach($CBSLog in $LogsToProcess){
  IF($UnzipPath2Remove.Count -gt 0){Remove-Item $UnzipPath2Remove -Recurse}
  Stop-Transcript
  }
+ Invoke-BOILER
