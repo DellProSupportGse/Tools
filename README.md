@@ -8,7 +8,7 @@
 ## Tool Box
 Tool Box is a menu of all the tools to run them from one place
 	 
-   ![alt text](readme/toolbox.jpg)
+   ![alt text](readme/ToolBox.jpg)
    
 ### Usage
 Copy the below powershell code and paste into PowerShell
