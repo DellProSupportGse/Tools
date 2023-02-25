@@ -82,11 +82,29 @@ $ver="1.3"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
+    
+# Get the internet connection IP address by querying a public API
+    $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
+
+# Define the API endpoint URL
+    $geourl = "http://ip-api.com/json/$internetIp"
+
+# Invoke the API to determine Geolocation
+    $response = Invoke-RestMethod $geourl
 
 $data = @{
     Region=$env:UserDomain
     Version=$Ver
-    ReportID=$CReportID
+    ReportID=$CReportID  
+    country=$response.country
+    counrtyCode=$response.countryCode
+    georegion=$response.region
+    regionName=$response.regionName
+    city=$response.city
+    zip=$response.zip
+    lat=$response.lat
+    lon=$response.lon
+    timezone=$response.timezone
 }
 $RowKey=(new-guid).guid
 $PartitionKey="DART"
