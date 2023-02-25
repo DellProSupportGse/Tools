@@ -78,7 +78,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.3"
+$ver="1.4"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
