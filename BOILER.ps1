@@ -62,11 +62,29 @@ function add-TableData1 {
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
 #region Opening Banner and menu
-$Ver="1.2"
+$Ver="1.3"
+# Get the internet connection IP address by querying a public API
+    $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
+
+# Define the API endpoint URL
+    $geourl = "http://ip-api.com/json/$internetIp"
+
+# Invoke the API to determine Geolocation
+    $response = Invoke-RestMethod $geourl
+
 $data = @{
     Region=$env:UserDomain
     Version=$Ver
-    ReportID=$CReportID
+    ReportID=$CReportID  
+    country=$response.country
+    counrtyCode=$response.countryCode
+    georegion=$response.region
+    regionName=$response.regionName
+    city=$response.city
+    zip=$response.zip
+    lat=$response.lat
+    lon=$response.lon
+    timezone=$response.timezone
 }
 $RowKey=(new-guid).guid
 $PartitionKey="BOILER"
