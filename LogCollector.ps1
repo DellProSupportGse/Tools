@@ -73,7 +73,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector_$DateTime.log"
 # Clean up
 IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
-$Ver="1.2"
+$Ver="1.21"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -114,6 +114,18 @@ v$Ver
            |___/                                   
 "@
 Write-Host $text
+Write-Host ""
+Write-Host "We are committed to providing the best possible customer experience. To do so, we would like to collect some information about your usage of our service."
+$consent = (Read-Host "Do you consent to provide environment information (such as hostnames, IP Addresses, etc.) to improve the customer experience? (Y/[N]) ").ToUpper()
+if ($consent -eq "Y") {
+  # Collect data to improve customer experience
+  Write-Host "Thank you for participating in our program. Your input is valuable to us!"
+} else {
+  $consent = "N"
+  # Do not collect data
+  Write-Host "We respect your decision. Your privacy is important to us."
+}
+#only collect personal data when $consent eq 'Y'
 Write-Host ""
 $CaseNumber =""
 $CaseNumber = Read-Host -Prompt "Please enter the relevant technical support case number"
