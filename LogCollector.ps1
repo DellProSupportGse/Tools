@@ -115,17 +115,6 @@ v$Ver
 "@
 Write-Host $text
 Write-Host ""
-Write-Host "We are committed to providing the best possible customer experience. To do so, we would like to collect some information about your usage of our service."
-$consent = (Read-Host "Do you consent to provide environment information (such as hostnames, IP Addresses, etc.) to improve the customer experience? (Y/[N]) ").ToUpper()
-if ($consent -eq "Y") {
-  # Collect data to improve customer experience
-  Write-Host "Thank you for participating in our program. Your input is valuable to us!"
-} else {
-  $consent = "N"
-  # Do not collect data
-  Write-Host "We respect your decision. Your privacy is important to us."
-}
-#only collect personal data when $consent eq 'Y'
 $CaseNumber =""
 $CaseNumber = Read-Host -Prompt "Please enter the relevant technical support case number"
 # Run Menu
