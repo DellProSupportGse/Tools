@@ -120,10 +120,13 @@ $consent = (Read-Host "Do you consent to provide environment information (such a
 if ($consent -eq "Y") {
   # Collect data to improve customer experience
   Write-Host "Thank you for participating in our program. Your input is valuable to us!"
+  New-Item "$((Get-Item $env:temp).fullname)\logs\ConsentGranted" -Force
+  
 } else {
   $consent = "N"
   # Do not collect data
   Write-Host "We respect your decision. Your privacy is important to us."
+  New-Item "$((Get-Item $env:temp).fullname)\logs\ConsentDenied" -Force
 }
 #only collect personal data when $consent eq 'Y'
 Write-Host ""
