@@ -134,6 +134,7 @@ if ($consent -eq "Y") {
 }
 #only collect personal data when $consent eq 'Y'
 Write-Host ""
+$MyTemp=(Get-Item $env:temp).fullname
 $CaseNumber =""
 $CaseNumber = Read-Host -Prompt "Please enter the relevant technical support case number"
 # Run Menu
@@ -177,23 +178,27 @@ Function ShowMenu{
         Pause
         ShowMenu
     }
-    IF($selection -match 1){
-        Write-Host "Gathering Show Tech-Support(s)..."
-        $Global:CollectSTS = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech -confirm:$False -CaseNumber $Casenumber
-
-    }
-
     IF($selection -match 2){
         Write-Host "Collect Support Assist Collection(s)..."
         $Global:CollectTSR  = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber
+        If(Get-Service clussvc -ErrorAction SilentlyContinue){$credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials"}
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'))
+        $iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
 
     }
+    IF($selection -match 1){
+        Write-Host "Gathering Show Tech-Support(s)..."
+        $Global:CollectSTS = "Y"
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'))
+        Invoke-GetShowTech -confirm:$False -CaseNumber $Casenumber
+
+    }
+
     IF($selection -match 3){
         Write-Host "Collect PrivateCloud.DiagnosticInfo (SDDC)..."
         $Global:CollectSDDC = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC -confirm:$False -CaseNumber $CaseNumber
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'))
+        Invoke-RunSDDC -confirm:$False -CaseNumber $CaseNumber
 
     }
     ElseIF($selection -eq 4){
@@ -202,19 +207,40 @@ Function ShowMenu{
         $Global:CollectSTS  = "Y"
         $Global:CollectSDDC = "Y"
         $Global:CollectTSR  = "Y"
+        If(Get-Service clussvc -ErrorAction SilentlyContinue){$credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials"}
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech -confirm:$False -CaseNumber $Casenumber
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector -LeaveShare:$True -confirm:$False -CaseNumber $Casenumber
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));$iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC -confirm:$False -CaseNumber $Casenumber
-        # Remove share
-            Write-Host "Removing SMB share called Logs..."
-            Remove-SmbShare -Name "Logs" -Force
-        ZipNClean
     }
-    IF($consent -eq "Y") {UploadLogs}
+    IF($Global:CollectTSR -eq "Y") {
+    $i=0
+    #Write-Host "iDrac IPs $iDRACIPs and count is $($iDRACIPs.count)"
+    if ($iDRACIPs.count) {
+        New-Item "$MyTemp\logs\TSRCollector" -ItemType "directory" -ErrorAction SilentlyContinue | Out-Null
+        do {
+            foreach ($idrac_ip in $iDRACIPs) {
+                    $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
+                    $result = Invoke-WebRequest -Uri $uri -Credential $credential -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers @{"Accept"="application/json"}
+                    $servicetag = ($result.Content | ConvertFrom-Json).Oem.Dell.DellSystem.ChassisServiceTag
+                    if (!(test-path "$MyTemp\logs\TSRCollector\TSR*_$($servicetag).zip")) {
+                        try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Credential $credential -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr } catch {}
+                    }
+            }
+            $TSRsCollected = (Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse)
+            $totalTSRsCollected = $TSRsCollected.Count
+            $i++
+            Write-Host "$totalTSRsCollected / $($idracIPs.count) TSR's collected so far, and waited $i / 20 minutes"
+            if ($totalTSRsCollected -lt $iDRACIPs.count) {Sleep -Seconds 60}
+        }
+        while ($totalTSRsCollected -lt $iDRACIPs.count -and $i -le 20)
+        Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse | Compress-Archive -DestinationPath "$MyTemp\logs\TSRReports_$($CaseNumber)"
+    }
+    }
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
         EndScript
     }
+    IF($consent -eq "Y") {UploadLogs}
 }#End of ShowMenu
 Function ZipNClean{
     # Zip up
@@ -241,6 +267,8 @@ Function ZipNClean{
 
 }
 Function UploadLogs {
+    $MyTemp=(Get-Item $env:temp).fullname
+    Write-Host "Uploading files. Please wait...."
     #Upload SDDC
     IF(Test-Path -Path "$MyTemp\logs\Healthtest*$CaseNumber*"){
         $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*$CaseNumber* | sort lastwritetime | select -last 1 
@@ -256,7 +284,8 @@ Function UploadLogs {
                 }
 
         #Upload File...
-        Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue
+        $resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
+        if ($resp.count -gt 2) {Write-Host "SDDC uploaded"}
     }
     #Upload ShowTech
     IF(Test-Path -Path "$MyTemp\logs\ShowTechs_$CaseNumber*"){
@@ -273,13 +302,14 @@ Function UploadLogs {
             }
 
         #Upload File...
-        Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue
+        $resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
+        if ($resp2.count -gt 2) {Write-Host "Showtech uploaded"}
     }
     #Upload TSR
     IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_$CaseNumber* -Recurse).count){
         $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
         #Get the File-Name without path
-        $name = (Get-Item $ZipPath).Name
+        $name = $ZipPath.Name
 
         #The target URL wit SAS Token
         $uri = "https://gsetools.blob.core.windows.net/tsrcollect/$($name)?sp=acw&st=2022-08-14T21:28:03Z&se=2032-08-15T05:28:03Z&spr=https&sv=2021-06-08&sr=c&sig=dhqj1OR7bWRkRp4D3HXwnLT%2Ba%2Br4J6ANF80LhKcafAw%3D"
@@ -290,7 +320,8 @@ Function UploadLogs {
             }
 
         #Upload File...
-        Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue
+        $resp3=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath.FullName -ErrorAction Continue -Verbose 4>&1
+        if ($resp3.count -gt 2) {Write-Host "TSRs uploaded"}
     }
 }
 ShowMenu
