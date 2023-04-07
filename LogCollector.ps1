@@ -73,7 +73,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector_$DateTime.log"
 # Clean up
 IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
-$Ver="1.21"
+$Ver="1.25"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -115,8 +115,14 @@ v$Ver
 "@
 Write-Host $text
 Write-Host ""
-Write-Host "We are committed to providing the best possible customer experience. To do so, we would like to collect some information about your usage of our service."
-$consent = (Read-Host "Do you consent to provide environment information (such as hostnames, IP Addresses, etc.) to improve the customer experience? (Y/[N]) ").ToUpper()
+Write-Host "We are committed to providing the best possible customer"
+Write-Host "experience. To do so, we would like to collect some "
+Write-Host "information about your usage of our service."
+Write-Host ""
+Write-Host "Do you consent to provide environment information "
+Write-Host "(such as hostnames, IP Addresses, etc.) to improve the "
+Write-Host "customer experience?"
+$consent = (Read-Host "(Y/[N]) ").ToUpper()
 if ($consent -eq "Y") {
   # Collect data to improve customer experience
   Write-Host "Thank you for participating in our program. Your input is valuable to us!"
@@ -204,6 +210,7 @@ Function ShowMenu{
             Remove-SmbShare -Name "Logs" -Force
         ZipNClean
     }
+    IF($consent -eq "Y") {UploadLogs}
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
         EndScript
@@ -232,6 +239,59 @@ Function ZipNClean{
 
         }
 
+}
+Function UploadLogs {
+    #Upload SDDC
+    IF(Test-Path -Path "$MyTemp\logs\Healthtest*$CaseNumber*"){
+        $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*$CaseNumber* | sort lastwritetime | select -last 1 
+        #Get the File-Name without path
+        $name = (Get-Item $HealthZip).Name
+
+        #The target URL wit SAS Token
+        $uri = "https://gsetools.blob.core.windows.net/sddcdata/$($name)?sp=acw&st=2022-06-28T17:26:35Z&se=2032-06-29T01:26:35Z&spr=https&sv=2021-06-08&sr=c&sig=4gtvKkicwS%2BcD6BSBgapTziNrfar11CL%2B6hsVHWzJXI%3D"
+
+        #Define required Headers
+        $headers = @{
+            'x-ms-blob-type' = 'BlockBlob'
+                }
+
+        #Upload File...
+        Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue
+    }
+    #Upload ShowTech
+    IF(Test-Path -Path "$MyTemp\logs\ShowTechs_$CaseNumber*"){
+        $ZipPath=Get-ChildItem $MyTemp\logs\ShowTechs_$CaseNumber* | sort lastwritetime | select -last 1 
+        #Get the File-Name without path
+        $name = (Get-Item $ZipPath).Name
+
+        #The target URL wit SAS Token
+        $uri = "https://gsetools.blob.core.windows.net/showtech/$($name)?sp=acw&st=2022-08-14T20:19:23Z&se=2032-08-15T04:19:23Z&spr=https&sv=2021-06-08&sr=c&sig=XfWDMd2y4sQrXm1gxA6up6VRGV5XPrwPkxEINpKTKCs%3D"
+
+        #Define required Headers
+        $headers = @{
+            'x-ms-blob-type' = 'BlockBlob'
+            }
+
+        #Upload File...
+        Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue
+    }
+    #Upload TSR
+    IF(Test-Path -Path $MyTemp\logs -Filter TSRReports_$CaseNumber*){
+        $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
+        #Get the File-Name without path
+        $name = (Get-Item $ZipPath).Name
+
+        #The target URL wit SAS Token
+        $uri = "https://gsetools.blob.core.windows.net/tsrcollect/$($name)?sp=acw&st=2022-08-14T21:28:03Z&se=2032-08-15T05:28:03Z&spr=https&sv=2021-06-08&sr=c&sig=dhqj1OR7bWRkRp4D3HXwnLT%2Ba%2Br4J6ANF80LhKcafAw%3D"
+
+        #Define required Headers
+        $headers = @{
+            'x-ms-blob-type' = 'BlockBlob'
+            }
+
+        #Upload File...
+        Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue
+    }
 }
 ShowMenu
 Stop-Transcript
