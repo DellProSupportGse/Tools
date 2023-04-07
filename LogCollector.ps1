@@ -276,7 +276,7 @@ Function UploadLogs {
         Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue
     }
     #Upload TSR
-    IF(Test-Path -Path $MyTemp\logs -Filter TSRReports_$CaseNumber*){
+    IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_$CaseNumber* -Recurse).count){
         $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
         #Get the File-Name without path
         $name = (Get-Item $ZipPath).Name
