@@ -20,7 +20,7 @@ Function Invoke-GetShowTech {
     Start-Transcript -NoClobber -Path "C:\programdata\Dell\GetShowTech\GetShowTech_$DateTime.log"
 
 $text=@"
-v1.1
+v1.11
    ___     _   ___ _               _____       _    
   / __|___| |_/ __| |_  _____ __ _|_   _|__ __| |_  
  | (_ / -_)  _\__ \ ' \/ _ \ V  V / | |/ -_) _| ' \ 
@@ -120,16 +120,6 @@ if ($PSCmdlet.ShouldProcess($param)) {
 #Get the File-Name without path
 $name = (Get-Item $ZipPath).Name
 
-#The target URL wit SAS Token
-$uri = "https://gsetools.blob.core.windows.net/showtech/$($name)?sp=acw&st=2022-08-14T20:19:23Z&se=2032-08-15T04:19:23Z&spr=https&sv=2021-06-08&sr=c&sig=XfWDMd2y4sQrXm1gxA6up6VRGV5XPrwPkxEINpKTKCs%3D"
-
-#Define required Headers
-$headers = @{
-    'x-ms-blob-type' = 'BlockBlob'
-            }
-
-#Upload File...
-Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue
 }
     # Clean up show techs
         Write-Host "Clean up..."
