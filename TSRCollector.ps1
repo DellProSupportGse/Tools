@@ -42,7 +42,8 @@ Function EndScript{
     }
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
-Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
+#Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
+write-host "$(Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log")"
 $text=@"
 v1.80
   _____ ___ ___    ___     _ _        _           
