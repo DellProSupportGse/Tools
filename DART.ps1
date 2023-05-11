@@ -78,7 +78,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.4"
+$ver="1.45"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -494,7 +494,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                         New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
                     }
                     $Script | Out-File -FilePath c:\dell\exit-maintenancemode.ps1 -Force
-                    Register-ScheduledTask -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
+                    Register-ScheduledTask -User "system" -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
                     Restart-Computer -Force
                     EndScript
                     }
@@ -532,7 +532,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                         }
                         $Script | Out-File -FilePath c:\dell\exit-maintenancemode.ps1 -Force
                         Write-Host "Creating Exit Maintenance Mode Scheduled Task to run at next logon...."
-                        Register-ScheduledTask -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
+                        Register-ScheduledTask -User "system" -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
                     }
             }
         }
