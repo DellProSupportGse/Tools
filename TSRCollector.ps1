@@ -42,9 +42,10 @@ Function EndScript{
     }
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
+#Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 write-host "$(Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log")"
 $text=@"
-v1.81
+v1.80
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
