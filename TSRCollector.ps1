@@ -45,7 +45,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 #Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 write-host "$(Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log")"
 $text=@"
-v1.80
+v1.81
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -138,6 +138,7 @@ if ($debugCheck -eq "Y") {
             IF($RespErrMessage -match 'already running'){
                 Write-Host "    ERROR: A SupportAssist job is already running on the server. Please try again later." -ForegroundColor Red
             } ElseIF($RespErrMessage -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
+                $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="!$idrac_ip"
                 $credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials for $idrac_ip"
                 $result= Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $credential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr
                 Write-Host "$(($result.Content| ConvertFrom-Json).'@Message.ExtendedInfo')"
@@ -151,7 +152,11 @@ if ($debugCheck -eq "Y") {
             $result = @([pscustomobject]@{statuscode=202})
         } catch {Write-host -ForegroundColor Red "ERROR: Racadm failed. racadm may be missing"}
     }
-    IF($result.StatusCode -eq 202){Write-Host "    StatusCode:"$result.StatusCode "Successfully scheduled TSR" }Else{Write-Host "    ERROR: StatusCode:" $result.StatusCode "Failed to scheduled TSR" -ForegroundColor Red}
+    IF($result.StatusCode -eq 202){Write-Host "    StatusCode:"$result.StatusCode "Successfully scheduled TSR" }
+    Else{
+        $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="#$idrac_ip"
+        Write-Host "    ERROR: StatusCode:" $result.StatusCode "Failed to scheduled TSR" -ForegroundColor Red
+        }
     }
 
 
@@ -161,6 +166,7 @@ if ($debugCheck -eq "Y") {
 if ($dowait) {
     do {
         foreach ($idrac_ip in $iDRACIPs) {
+           $idrac_ip=$idrac_ip.replace("!","").replace("#","")
            $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
            $result = Invoke-WebRequest -Uri $uri -Credential $credential -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers @{"Accept"="application/json"}
            $servicetag = ($result.Content | ConvertFrom-Json).Oem.Dell.DellSystem.ChassisServiceTag
