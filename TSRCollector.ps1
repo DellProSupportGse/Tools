@@ -59,7 +59,7 @@ $Title=@()
     Write-host $Title
 #    Write-host " "
     Write-host "   This tool is used to collect TSRs from"
-    Write-host "   all nodes in a cluster into a single share"
+    Write-host "   all nodes in a cluster into a single zip file"
     Write-host " "
     if ($PSCmdlet.ShouldProcess($param)) {
 # Fix 8.3 temp paths
@@ -118,6 +118,7 @@ if ($debugCheck -eq "Y") {
 } else {
     $DataSelector =  @("HWData","TTYLogs","OSAppData")
 }
+$draccreds=@{}
 # Run TechSupportReport on each node
     ForEach($IP in $iDRACIPs){
         $result=@()
@@ -141,8 +142,10 @@ if ($debugCheck -eq "Y") {
             } ElseIF($RespErrMessage -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
                 $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="!$idrac_ip"
                 $credfail="!"
-                $credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials for $idrac_ip"
-                $result= Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $credential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr
+                $dowait=$true
+                $newcredential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials for $idrac_ip"
+                $draccreds.add("!$idrac_ip",$newcredential)
+                $result= Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $newcredential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr
                 Write-Host "$(($result.Content| ConvertFrom-Json).'@Message.ExtendedInfo')"
             }
         }
@@ -166,25 +169,33 @@ if ($debugCheck -eq "Y") {
     Write-Host "TSRs will be saved at $MyTemp\logs" -ForegroundColor Green
 } #End ShouldProcess
 if ($dowait) {
+    New-Item "$MyTemp\logs\TSRCollector" -ItemType "directory" -ErrorAction SilentlyContinue | Out-Null
     do {
+        $drac_Cred=$credential
+        $idracCount=$iDRACIPs.count
         foreach ($idrac_ip in $iDRACIPs) {
-           $idrac_ip=$idrac_ip.replace("!","").replace("#","")
-           $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
-           $result = Invoke-WebRequest -Uri $uri -Credential $credential -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers @{"Accept"="application/json"}
-           $servicetag = ($result.Content | ConvertFrom-Json).Oem.Dell.DellSystem.ChassisServiceTag
-           if (!(test-path "$MyTemp\logs\TSRCollector\TSR*_$($servicetag).zip")) {
-               try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Credential $credential -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr } catch {}
-           }
+           if ($idrac_ip.contains("!") -and -not $idrac_ip.Contains("#")) {$drac_Cred=$draccreds[$idrac_ip]}
+           $idrac_ip=$idrac_ip.replace("!","")
+           if (!($idrac_ip.Contains("#"))) {
+                $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
+                $result = Invoke-WebRequest -Uri $uri -Credential $drac_Cred -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers @{"Accept"="application/json"}
+                $servicetag = ($result.Content | ConvertFrom-Json).Oem.Dell.DellSystem.ChassisServiceTag
+                if (!(test-path "$MyTemp\logs\TSRCollector\TSR*_$($servicetag).zip")) {
+                    try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Credential $drac_Cred -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr} catch {}
+                } 
+           } else {$idracCount--}
+
         }
     $TSRsCollected = (Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse)
     $totalTSRsCollected = $TSRsCollected.Count
     $i++
-    Write-Host "$totalTSRsCollected / $($idracIPs.count) TSR's collected so far, and waited $i / 20 minutes"
-    if ($totalTSRsCollected -lt $iDRACIPs.count) {Sleep -Seconds 60}
+    Write-Host "$totalTSRsCollected / $($idracCount) TSR's collected so far, and waited $i / 20 minutes"
+    if ($totalTSRsCollected -lt $idracCount) {Sleep -Seconds 60}
     }
-    while ($totalTSRsCollected -lt $iDRACIPs.count -and $i -le 20)
+    while ($totalTSRsCollected -lt $idracCount -and $i -le 20)
     Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse | Compress-Archive -DestinationPath "$MyTemp\logs\TSRReports_$($CaseNumber)"
-
+    foreach ($idrac_ip in $iDRACIPs) {if (($idrac_ip -match "#")) {Write-Host "ERROR: Failed to capture TSR from $idrac_ip" -ForegroundColor Red}}
+    $iDRACIPs=""
 }
 return $iDRACIPs
 Stop-Transcript
