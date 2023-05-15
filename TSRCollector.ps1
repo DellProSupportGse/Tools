@@ -134,11 +134,13 @@ if ($debugCheck -eq "Y") {
         }
         Catch{
             $RespErrMessage=$null
+            $credfail=""
             Try {$RespErrMessage=($RespErr.message| ConvertFrom-Json).error.'@Message.ExtendedInfo'.message} catch {}
             IF($RespErrMessage -match 'already running'){
                 Write-Host "    ERROR: A SupportAssist job is already running on the server. Please try again later." -ForegroundColor Red
             } ElseIF($RespErrMessage -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
                 $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="!$idrac_ip"
+                $credfail="!"
                 $credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials for $idrac_ip"
                 $result= Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $credential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr
                 Write-Host "$(($result.Content| ConvertFrom-Json).'@Message.ExtendedInfo')"
@@ -154,7 +156,7 @@ if ($debugCheck -eq "Y") {
     }
     IF($result.StatusCode -eq 202){Write-Host "    StatusCode:"$result.StatusCode "Successfully scheduled TSR" }
     Else{
-        $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="#$idrac_ip"
+        $iDRACIPs[$iDRACIPs.IndexOf("$credfail$idrac_ip")]="#$idrac_ip"
         Write-Host "    ERROR: StatusCode:" $result.StatusCode "Failed to scheduled TSR" -ForegroundColor Red
         }
     }
