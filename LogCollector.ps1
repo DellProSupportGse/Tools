@@ -73,7 +73,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector_$DateTime.log"
 # Clean up
 IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
-$Ver="1.25"
+$Ver="1.26"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -215,25 +215,29 @@ Function ShowMenu{
     IF($Global:CollectTSR -eq "Y") {
     $i=0
     #Write-Host "iDrac IPs $iDRACIPs and count is $($iDRACIPs.count)"
-    if ($iDRACIPs.count) {
+    if (($iDRACIPs -match ".").count) {
         New-Item "$MyTemp\logs\TSRCollector" -ItemType "directory" -ErrorAction SilentlyContinue | Out-Null
         do {
+            $idracCount=$iDRACIPs.count
             foreach ($idrac_ip in $iDRACIPs) {
+               if (!($idrac_ip -match "!|#")) {
                     $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
                     $result = Invoke-WebRequest -Uri $uri -Credential $credential -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers @{"Accept"="application/json"}
                     $servicetag = ($result.Content | ConvertFrom-Json).Oem.Dell.DellSystem.ChassisServiceTag
                     if (!(test-path "$MyTemp\logs\TSRCollector\TSR*_$($servicetag).zip")) {
-                        try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Credential $credential -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr } catch {}
+                        try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Credential $credential -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr} catch {}
                     }
+               } else {$idracCount--}
             }
             $TSRsCollected = (Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse)
             $totalTSRsCollected = $TSRsCollected.Count
             $i++
-            Write-Host "$totalTSRsCollected / $($idracIPs.count) TSR's collected so far, and waited $i / 20 minutes"
-            if ($totalTSRsCollected -lt $iDRACIPs.count) {Sleep -Seconds 60}
+            Write-Host "$totalTSRsCollected / $($idracCount) TSR's collected so far, and waited $i / 20 minutes"
+            if ($totalTSRsCollected -lt $idracCount) {Sleep -Seconds 60}
         }
-        while ($totalTSRsCollected -lt $iDRACIPs.count -and $i -le 20)
+        while ($totalTSRsCollected -lt $idracCount -and $i -le 20)
         Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse | Compress-Archive -DestinationPath "$MyTemp\logs\TSRReports_$($CaseNumber)"
+         foreach ($idrac_ip in $iDRACIPs) {if (($idrac_ip -match "!|#")) {Write-Host "ERROR: Failed to capture TSR from $idrac_ip" -ForegroundColor Red}}
     }
     }
     IF($selection -imatch 'q'){
