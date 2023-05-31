@@ -45,12 +45,18 @@ IF($SDDCFileCheck -ine "y"){Write-Host "Please download from https://github.com/
     Expand-Archive -Path $ProvidedSDDC -DestinationPath $MyTemp -Force
     $md = "$env:ProgramFiles\WindowsPowerShell\Modules"
     cp -Recurse $MyTemp\$module-$branch\$module $md -Force -ErrorAction Stop
-    rm -Recurse $MyTemp\$module-$branch,$ProvidedSDDC
+    rm -Recurse $MyTemp\$module-$branch
     $ModulePath=$md+"\"+$module
-    Import-Module $ModulePath -Force -Verbose
-
+    Import-Module $ModulePath -Force -Verbose   
     
 # Run SDDC
     Get-SddcDiagnosticInfo
+
+#Check if user wants to remove the Master.zip file from host
+    $MASTERREMCHECK = Read-Host "Do you want to remove the Master.zip file that you downloaded? [y/n]"
+        IF($MASTERREMCHECK -ine "n")
+        {
+            rm -Recurse $ProvidedSDDC
+        } 
 }
 Invoke-SDDCOffline 
