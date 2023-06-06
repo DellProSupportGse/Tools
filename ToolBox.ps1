@@ -12,7 +12,7 @@ Function EndScript{
 
 Function Invoke-ToolBox{
 Clear-Host
-$Ver=1.0
+$Ver=1.1
 $text = @"
 v$Ver
   _____         _   ___          
@@ -38,17 +38,16 @@ Function ShowMenu{
          Write-Host ""
          Write-Host "==================== Please make a selection ====================="
          Write-Host ""
-         Write-Host "Press '1' to BOILER       - Finds Windows Update Errors"
-         Write-Host "Press '2' to DART         - Installs Dell/MS Updates"
-         Write-Host "Press '3' to FLEP         - Filters Event Logs"
-         Write-Host "Press '4' to FLCkr        - Looks up Mini Filter Drivers"
-         Write-Host "Press '5' to LogCollector - Make log collection easier"
-         Write-Host "Press '6' to DriFT        - Driver and Firmware Tool ***INTERNAL ONLY***"
-         Write-Host "Press '7' to CluChk       - Cluster Checker ***INTERNAL ONLY***"
-         Write-Host "Press 'H' to Display Help"
-         Write-Host "Press 'Q' to Quit"
+         Write-Host "1)  BOILER       - Finds Windows Update Errors"
+         Write-Host "2)  DART         - Installs Dell/MS Updates"
+         Write-Host "3)  FLEP         - Filters Event Logs"
+         Write-Host "4)  FLCkr        - Looks up Mini Filter Drivers"
+         Write-Host "5)  LogCollector - Make log collection easier"
+         Write-Host "6)  DriFT        - Driver and Firmware Tool ***INTERNAL ONLY***"
+         Write-Host "7)  CluChk       - Cluster Checker ***INTERNAL ONLY***"
+         Write-Host "Q to Quit"
          Write-Host ""
-         $selection = Read-Host "Please make a selection"
+         $selection = Read-Host "Type a number and press [Enter]"
      }
     until ($selection -match '[1-7,qQ,hH]')
     $Global:WindowsUpdates=$False
