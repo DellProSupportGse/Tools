@@ -12,6 +12,9 @@ Function Invoke-LogCollector{
         ConfirmImpact = 'High')]
         param($param)
 
+# Version
+$Ver="1.28"
+
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
 function add-TableData1 {
@@ -73,7 +76,6 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector_$DateTime.log"
 # Clean up
 IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
-$Ver="1.27"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -124,19 +126,19 @@ Write-Host "(such as hostnames, IP Addresses, etc.) to improve the "
 Write-Host "customer experience?"
 $consent = (Read-Host "(Y/[N]) ").ToUpper()
 if ($consent -eq "Y") {
-  # Collect data to improve customer experience
-  Write-Host "Thank you for participating in our program. Your input is valuable to us!"
+# Collect data to improve customer experience
+ Write-Host "Thank you for participating in our program. Your input is valuable to us!"
   
 } else {
   $consent = "N"
-  # Do not collect data
-  Write-Host "We respect your decision. Your privacy is important to us."
+ # Do not collect data
+ Write-Host "We respect your decision. Your privacy is important to us."
 }
 #only collect personal data when $consent eq 'Y'
 Write-Host ""
 $MyTemp=(Get-Item $env:temp).fullname
-$CaseNumber =""
-$CaseNumber = Read-Host -Prompt "Please enter the relevant technical support case number"
+$Global:CaseNumber =""
+$Global:CaseNumber = Read-Host -Prompt "Please enter the relevant technical support case number"
 # Run Menu
 Function ShowMenu{
     do
@@ -147,19 +149,19 @@ Function ShowMenu{
          Write-Host ""
          Write-Host "============ Please make a selection ==================="
          Write-Host ""
-         Write-Host "Press '1' to Collect Show Tech-Support(s)"
-         Write-Host "Press '2' to Collect Support Assist Collection(s)"
-         Write-Host "Press '3' to Collect PrivateCloud.DiagnosticInfo (SDDC)"
-         Write-Host "Press '4' to Collect All"
-         Write-Host "Press 'H' to Display Help"
-         Write-Host "Press 'Q' to Quit"
+         Write-Host "1)  Azure Stack HCI/S2D logs (SDDC)"
+         Write-Host "2)  PowerEdge logs (TSR)"
+         Write-Host "3)  Switch logs (Show Tech)"
+         Write-Host "4)  Windows Failover Clustering, Hyper-v and Server (TSS)"
+         Write-Host "Q to Quit"
          Write-Host ""
-         $selection = Read-Host "Please make a selection"
+         $selection = Read-Host "Type a number(s) and press [Enter]"
      }
     until ($selection -match '[1-4,qQ,hH]')
     $Global:CollectSTS  = "N"
     $Global:CollectSDDC = "N"
     $Global:CollectTSR  = "N"
+    $Global:CollectTSS  = "N"
     IF($selection -imatch 'h'){
         Clear-Host
         Write-Host ""
@@ -178,8 +180,15 @@ Function ShowMenu{
         Pause
         ShowMenu
     }
+    IF($selection -match 3){
+        Write-Host "Gathering Switch logs (Show Tech)..."
+        $Global:CollectSTS = "Y"
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'))
+        Invoke-GetShowTech -confirm:$False -CaseNumber $Casenumber
+
+    }
     IF($selection -match 2){
-        Write-Host "Collect Support Assist Collection(s)..."
+        Write-Host "Collecting PowerEdge logs (TSR)..."
         $Global:CollectTSR  = "Y"
         If(Get-Service clussvc -ErrorAction SilentlyContinue){$credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials"}
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'))
@@ -187,30 +196,17 @@ Function ShowMenu{
 
     }
     IF($selection -match 1){
-        Write-Host "Gathering Show Tech-Support(s)..."
-        $Global:CollectSTS = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'))
-        Invoke-GetShowTech -confirm:$False -CaseNumber $Casenumber
-
-    }
-
-    IF($selection -match 3){
-        Write-Host "Collect PrivateCloud.DiagnosticInfo (SDDC)..."
+        Write-Host "Collecting Azure Stack HCI logs (SDDC)..."
         $Global:CollectSDDC = "Y"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'))
         Invoke-RunSDDC -confirm:$False -CaseNumber $CaseNumber
 
     }
-    ElseIF($selection -eq 4){
-        IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
-        Write-Host "Collect Show Tech-Support(s) + Support Assist Collection(s) + PrivateCloud.DiagnosticInfo (SDDC)..."
-        $Global:CollectSTS  = "Y"
-        $Global:CollectSDDC = "Y"
-        $Global:CollectTSR  = "Y"
-        If(Get-Service clussvc -ErrorAction SilentlyContinue){$credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials"}
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));$iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech -confirm:$False -CaseNumber $Casenumber
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC -confirm:$False -CaseNumber $Casenumber
+    IF($selection -match 4){
+        Write-Host "Collecting Windows Server (TSS)..."
+        $Global:CollectTSS = "Y"
+        Echo TSSv2Collect;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSSv2Collect"; $repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/fginacio/MS/main/TSSv2Collect.ps1'))
+        Invoke-TSSv2Collect -confirm:$False -CaseNumber $CaseNumber
     }
     IF($Global:CollectTSR -eq "Y") {
     $i=0
