@@ -152,7 +152,7 @@ Function ShowMenu{
          Write-Host "1)  Azure Stack HCI/S2D logs (SDDC)"
          Write-Host "2)  PowerEdge logs (TSR)"
          Write-Host "3)  Switch logs (Show Tech)"
-         Write-Host "4)  Windows Failover Clustering, Hyper-v and Server (TSS)"
+         Write-Host "4)  Windows Failover Clustering, Hyper-v and Standalone Server (TSS)"
          Write-Host "Q to Quit"
          Write-Host ""
          $selection = Read-Host "Type a number(s) and press [Enter]"
