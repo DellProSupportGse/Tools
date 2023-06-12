@@ -9,7 +9,7 @@ Kindly be advised that this code is being offered as-is and Dell will not provid
 ## Tool Box
 Tool Box is a menu of all the tools to run them from one place
 	 
-   ![alt text](readme/ToolBox.jpg)
+   ![alt text](readme/toolbox_v1.1.jpg)
    
 ### Usage
 Copy the below powershell code and paste into PowerShell
@@ -121,7 +121,7 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
    
    This tool is used to collect all the logs Switches, Servers and OS
    
-   ![alt text](readme/LogCollector.jpg)
+   ![alt text](readme/logcollector_v1.28.jpg)
    
    How To Use: 
       From PowerShell as admin execute the following and follow the prompts:
