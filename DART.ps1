@@ -78,16 +78,13 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.45"
+$ver="1.46"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
     
-# Get the internet connection IP address by querying a public API
-    $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
-
 # Define the API endpoint URL
-    $geourl = "http://ip-api.com/json/$internetIp"
+    $geourl = "http://ip-api.com/json"
 
 # Invoke the API to determine Geolocation
     $response = Invoke-RestMethod $geourl
@@ -201,11 +198,13 @@ if ($PSCmdlet.ShouldProcess($param)) {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             # Download file
             #Try{Invoke-WebRequest $URL -OutFile $OutFile -UseDefaultCredentials}
-            Try{Invoke-WebRequest $URL -OutFile $OutFile}
+            Try{$webClient = [System.Net.WebClient]::new()
+                $webClient.DownloadFile($URL, $OutFile)}
             Catch{
+                Try {Invoke-WebRequest $URL -OutFile $OutFile} Catch {
                 Write-Host "        ERROR: Downloading $URL" -ForegroundColor Red
                 EndScript
-            }
+            }}
             #Finally{
                 IF([System.IO.File]::Exists($OutFile)){
                     Write-Host "        SUCCESS: File downloaded successfully" -ForegroundColor Green
@@ -486,7 +485,10 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
 		If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
 		    Write-Host "Please reboot to complete installation" -ForegroundColor Yellow
-            $Reboot = Read-Host "Ready to reboot? [y/n]"
+            try {$Host.UI.RawUI.FlushInputBuffer() } catch {while ($Host.UI.RawUI.KeyAvailable) {
+                    $Host.UI.RawUI.ReadKey() | Out-Null
+                }}
+            try {$Reboot = (Read-Host "Ready to reboot? [y/n]").ToLower()} catch {}
             Switch ($Reboot){
                 "y"{
                     $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageScaleUnit -FriendlyName "$($Env:ComputerName)" | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
@@ -498,16 +500,19 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     Restart-Computer -Force
                     EndScript
                     }
-                "n"{
+                Default {
                     EndScript
                     }
                 }
                 EndScript
 		}
         IF($IgnoreChecks -ne $True){
-            $ExitSMM = Read-Host "Ready to Resume Cluster Node and exit Storage Maintenance Mode? [y/n]"
+            try {$Host.UI.RawUI.FlushInputBuffer() } catch {while ($Host.UI.RawUI.KeyAvailable) {
+                    $Host.UI.RawUI.ReadKey() | Out-Null
+                }}
+            try {$ExitSMM = (Read-Host "Ready to Resume Cluster Node and exit Storage Maintenance Mode? [y/n]").ToLower()} catch {}
             Switch ($ExitSMM){
-                "y"{
+                  "y"{
                         # Resume Cluster
                         IF($IgnoreChecks -ne $True){
                             IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
@@ -525,7 +530,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
 
                          }
                     }
-                "n"{
+                Default {
                         $Script='CLS;$DateTime=Get-Date -Format yyyyMMdd_HHmmss;Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log";Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME...";Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue;Get-ClusterNode;Write-Host "Exiting Storage Maintenance Mode...";Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue;Get-PhysicalDisk|Sort DeviceID;Unregister-ScheduledTask -TaskName "Exit Maintenance Mode" -Confirm:$false;Remove-Item -Path c:\dell\exit-maintenancemode.ps1 -Force;stop-Transcript'
                         IF(-not(Test-Path c:\dell)){
                             New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
