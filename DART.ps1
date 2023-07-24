@@ -15,8 +15,7 @@
     
     param(
     [Parameter(Mandatory=$False, Position=1)]
-    [bool] $IgnoreChecks,
-    $param)
+    [bool] $IgnoreChecks)
 
 Function Invoke-DART {
 
@@ -550,5 +549,4 @@ if ($PSCmdlet.ShouldProcess($param)) {
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}# Dell Server Check
 Stop-Transcript
 }               
-               if ($param) {Invoke-DART -IgnoreChecks $IgnoreChecks $param}
-               else {Invoke-DART -IgnoreChecks $IgnoreChecks}
+               Invoke-DART -IgnoreChecks $IgnoreChecks
