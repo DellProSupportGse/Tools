@@ -13,6 +13,11 @@
             Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$True -Confirm:$false
     #>
     
+    param(
+    [Parameter(Mandatory=$False, Position=1)]
+    [bool] $IgnoreChecks,
+    $param)
+
 Function Invoke-DART {
 
     param(
@@ -78,7 +83,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.46"
+$ver="1.47"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -545,4 +550,5 @@ if ($PSCmdlet.ShouldProcess($param)) {
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}# Dell Server Check
 Stop-Transcript
 }               
-               Invoke-DART
+               if ($param) {Invoke-DART -IgnoreChecks $IgnoreChecks $param}
+               else {Invoke-DART -IgnoreChecks $IgnoreChecks}
