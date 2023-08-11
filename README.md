@@ -224,6 +224,15 @@ Copy the below powershell code and paste into PowerShell
 Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="Convert-Etl2Pcap";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Convert-Etl2Pcap.ps1'));Invoke-ETL2PCAP
 ``` 
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## Make ISO
+Convert a folder to ISO
+   
+### Usage
+Copy the below powershell code and paste into PowerShell
+```Powershell
+Echo MakeIso;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="MakeIso";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/isomaker.ps1'));Invoke-MakeISO
+``` 
+-------------------------------------------------------------------------------------------------------------------------------------------------
 
 ### Report problems or provide feedback
 If you run into any problems or would like to provide feedback, please open an issue here https://github.com/DellProSupportGse/Tools/issues
