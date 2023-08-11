@@ -83,8 +83,10 @@ public class ISOFile
   } 
 } 
 
+Function Invoke-MakeISO {
 #Ask for folder to make into ISO
 $Folder2Iso=Read-Host "Type the path to the folder to make into an ISO"
 IF(!(Test-Path $Folder2Iso)){$Folder2Iso=Read-Host "    Try again"}
 Write-Host "Creating ISO of $Folder2Iso..." -ForegroundColor Green
 Invoke-IsoMaker $Folder2Iso
+}
