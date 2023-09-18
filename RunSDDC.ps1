@@ -13,11 +13,19 @@ Function Invoke-RunSDDC {
         ConfirmImpact = 'High')]
         param(
         [Parameter(Mandatory=$False)]
-         [string] $CaseNumber)
+         [string] $CaseNumber,
+        [Parameter(Mandatory=$False)]
+         [string] $ClusterName=(Get-Cluster).Name,
+        [Parameter(Mandatory=$False)]
+         [string] $HoursOnEvent=168,
+        [Parameter(Mandatory=$False)]
+         [string] $PerfSamples=30
+
+         )
     CLS
     CLS
 $text=@"
-v1.21
+v1.24
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -55,13 +63,43 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
     # If this is not set, the Invoke-WebRequest fails with "The request was aborted: Could not create SSL/TLS secure channel."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls11
     $module = 'PrivateCloud.DiagnosticInfo'; $branch = 'master'
-    Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $MyTemp\$branch.zip
-    Expand-Archive -Path $MyTemp\$branch.zip -DestinationPath $MyTemp -Force
-    $md = "$env:ProgramFiles\WindowsPowerShell\Modules"
-    cp -Recurse $MyTemp\$module-$branch\$module $md -Force -ErrorAction Stop
-    rm -Recurse $MyTemp\$module-$branch,$MyTemp\$branch.zip
-    $ModulePath=$md+"\"+$module
-    Import-Module $ModulePath -Force
+    try {
+        $DellGSEPSRepository="C:\ProgramData\Dell\DellGSEPSRepository"
+        New-Item -ItemType Directory -Path $DellGSEPSRepository -ErrorAction SilentlyContinue
+        If (-not (Get-PSRepository | ? Name -eq "DellGSEPSRepository")) {
+            $registerPSRepositorySplat = @{
+                Name = 'DellGSEPSRepository'
+                SourceLocation = '\\localhost\c$\ProgramData\Dell\DellGSEPSRepository'
+                ScriptSourceLocation = '\\localhost\c$\ProgramData\Dell\DellGSEPSRepository'
+                InstallationPolicy = 'Trusted'
+            }
+            Register-PSRepository @registerPSRepositorySplat
+        }
+        Remove-Item $DellGSEPSRepository\$module-$branch.zip -Force
+        Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $DellGSEPSRepository\$module-$branch.zip
+        Expand-Archive -Path $DellGSEPSRepository\$module-$branch.zip -DestinationPath $DellGSEPSRepository\DellSDDCSource -Force
+        $publishModuleSplat = @{
+            Path = "$DellGSEPSRepository\DellSDDCsource\$module-$branch\$module"
+            Repository = 'DellGSEPSRepository'
+            NuGetApiKey = 'ProsupportGSE'
+        }
+        try {Publish-Module @publishModuleSplat} catch {}
+        $DellSDDCInstalledVerson=try {(Get-InstalledModule $module -ErrorAction SilentlyContinue).Version} catch {}
+        if ($DellSDDCInstalledVerson -eq $Null) {$DellSDDCInstalledVerson=[Version]'0.0.1.0'}
+        if ($DellSDDCInstalledVerson -lt ((Find-Module $module -Repository DellGSEPSRepository).version)) {
+            if ($DellSDDCInstalledVerson -gt [version]'0.9') {Update-Module $module -Verbose}
+            else {Install-Module $module -Repository DellGSEPSRepository -Verbose -Force}
+        }
+    } catch {
+        Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $MyTemp\$branch.zip
+        Expand-Archive -Path $MyTemp\$branch.zip -DestinationPath $MyTemp -Force
+        $md = "$env:ProgramFiles\WindowsPowerShell\Modules"
+        cp -Recurse $MyTemp\$module-$branch\$module $md -Force -ErrorAction Stop
+        rm -Recurse $MyTemp\$module-$branch,$MyTemp\$branch.zip
+        $ModulePath=$md+"\"+$module
+        Import-Module $ModulePath -Force
+    }
+ 
 
 # Clean up old SDDC's
     IF(Test-Path "$env:USERPROFILE\HealthTest-*.zip"){Remove-Item $env:USERPROFILE\HealthTest-*.zip -Force}    
@@ -69,7 +107,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
 # Run SDDC
     # Run SDDC if cluster service found on node
     IF(Get-Service clussvc -ErrorAction SilentlyContinue){
-        Get-SddcDiagnosticInfo
+        Get-SddcDiagnosticInfo -ClusterName $ClusterName -HoursOfEvents $HoursOnEvent -PerfSamples $PerfSamples
     }Else{
         $ClusterToCollectLogsFrom=Read-Host "Please enter the name of the cluster to collect logs from"
         # Check if we can connect to the cluster
@@ -89,7 +127,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
                     Write-Host "    SUCCESS: Able to connect to cluster" -ForegroundColor Green
                     $CheckRSATClusteringPowerShell=IF((Get-WindowsFeature RSAT-Clustering-PowerShell).InstallState -eq 'Installed'){ 
                         Write-Host "Execute: Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom..."
-                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters
+                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters -HoursOfEvents $HoursOnEvent -PerfSamples $PerfSamples
                     }Else{
                         Write-Host "Remote SDDC requires RSAT-Clustering-PowerShell which requires a rebooted." -ForegroundColor Yellow
                         IF((Read-Host "Would you like to install RSAT-Clustering-PowerShell [y/n]") -imatch 'y'){
@@ -117,3 +155,4 @@ $name = (Get-Item $HealthZip).Name
 
 }
 } # End of Invoke-RunSDDC
+Invoke-RunSDDC -HoursOnEvent $HoursOnEvent -PerfSamples $PerfSamples
