@@ -107,7 +107,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
 # Run SDDC
     # Run SDDC if cluster service found on node
     IF(Get-Service clussvc -ErrorAction SilentlyContinue){
-        Get-SddcDiagnosticInfo -ClusterName $ClusterName -HoursOfEvents $HoursOnEvent -PerfSamples $PerfSamples
+        Get-SddcDiagnosticInfo -HoursOfEvents $HoursOnEvent -PerfSamples $PerfSamples
     }Else{
         $ClusterToCollectLogsFrom=Read-Host "Please enter the name of the cluster to collect logs from"
         # Check if we can connect to the cluster
