@@ -74,7 +74,15 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
     try {
         $DellGSEPSRepository="C:\ProgramData\Dell\DellGSEPSRepository"
         New-Item -ItemType Directory -Path $DellGSEPSRepository -ErrorAction SilentlyContinue
-        Install-PackageProvider -Name 'Nuget' -ForceBootstrap -Force -IncludeDependencies -ErrorAction SilentlyContinue
+        Install-PackageProvider -Name 'Nuget' -ForceBootstrap -Force -ErrorAction SilentlyContinue | Out-Null
+	If (-not (Test-Path "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe")) {
+		New-Item -ItemType Directory -Path "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet" -ErrorAction SilentlyContinue
+		$sourceNugetExe = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+		$targetNugetExe = "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe"
+		Invoke-WebRequest $sourceNugetExe -OutFile $targetNugetExe
+		Set-Alias nuget $targetNugetExe -Scope Global -Verbose
+	}
+	Install-Module PowerShellGet -AllowClobber -Force -ErrorAction SilentlyContinue
         If (-not (Get-PSRepository | ? Name -eq "DellGSEPSRepository")) {
             $registerPSRepositorySplat = @{
                 Name = 'DellGSEPSRepository'
@@ -92,9 +100,10 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
             Repository = 'DellGSEPSRepository'
             NuGetApiKey = 'ProsupportGSE'
         }
-        try {Publish-Module @publishModuleSplat} catch {}
-        $DellSDDCInstalledVerson=try {(Get-InstalledModule $module -ErrorAction SilentlyContinue).Version} catch {}
+        try {Publish-Module @publishModuleSplat -Verbose} catch {}
+        $DellSDDCInstalledVerson=try {(Get-Module $module -ErrorAction SilentlyContinue).Version} catch {(Get-InstalledModule $module -ErrorAction SilentlyContinue).Version}
         if ($DellSDDCInstalledVerson -eq $Null) {$DellSDDCInstalledVerson=[Version]'0.0.1.0'}
+	Write-Host "Currently Installed Dell Cluster Log Collector: $($DellSDDCInstalledVerson.tostring())"
         if ($DellSDDCInstalledVerson -lt ((Find-Module $module -Repository DellGSEPSRepository).version)) {
             if ($DellSDDCInstalledVerson -gt [version]'0.9') {Update-Module $module -Verbose}
             else {Install-Module $module -Repository DellGSEPSRepository -Verbose -Force}
