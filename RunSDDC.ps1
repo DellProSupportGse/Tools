@@ -101,7 +101,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
             NuGetApiKey = 'ProsupportGSE'
         }
         try {Publish-Module @publishModuleSplat -Verbose} catch {}
-        $DellSDDCInstalledVerson=try {(Get-Module $module -ErrorAction SilentlyContinue).Version} catch {(Get-InstalledModule $module -ErrorAction SilentlyContinue).Version}
+        $DellSDDCInstalledVerson=try {(Get-InstalledModule $module -ErrorAction SilentlyContinue).Version} catch {}
         if ($DellSDDCInstalledVerson -eq $Null) {$DellSDDCInstalledVerson=[Version]'0.0.1.0'}
 	Write-Host "Currently Installed Dell Cluster Log Collector: $($DellSDDCInstalledVerson.tostring())"
         if ($DellSDDCInstalledVerson -lt ((Find-Module $module -Repository DellGSEPSRepository).version)) {
