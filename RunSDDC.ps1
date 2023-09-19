@@ -9,7 +9,7 @@
 
         param(
         [Parameter(Mandatory=$False)]
-         [string] $HoursOnEvent=168,
+         [string] $HoursOfEvents=168,
         [Parameter(Mandatory=$False)]
          [string] $PerfSamples=30
 
@@ -25,7 +25,7 @@ Function Invoke-RunSDDC {
         [Parameter(Mandatory=$False)]
          [string] $ClusterName=(Get-Cluster).Name,
         [Parameter(Mandatory=$False)]
-         [string] $HoursOnEvent=168,
+         [string] $HoursOfEvents=168,
         [Parameter(Mandatory=$False)]
          [string] $PerfSamples=30
 
@@ -125,7 +125,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
 # Run SDDC
     # Run SDDC if cluster service found on node
     IF(Get-Service clussvc -ErrorAction SilentlyContinue){
-        Get-SddcDiagnosticInfo -HoursOfEvents $HoursOnEvent -PerfSamples $PerfSamples
+        Get-SddcDiagnosticInfo -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples
     }Else{
         $ClusterToCollectLogsFrom=Read-Host "Please enter the name of the cluster to collect logs from"
         # Check if we can connect to the cluster
@@ -145,7 +145,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
                     Write-Host "    SUCCESS: Able to connect to cluster" -ForegroundColor Green
                     $CheckRSATClusteringPowerShell=IF((Get-WindowsFeature RSAT-Clustering-PowerShell).InstallState -eq 'Installed'){ 
                         Write-Host "Execute: Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom..."
-                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters -HoursOfEvents $HoursOnEvent -PerfSamples $PerfSamples
+                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples
                     }Else{
                         Write-Host "Remote SDDC requires RSAT-Clustering-PowerShell which requires a rebooted." -ForegroundColor Yellow
                         IF((Read-Host "Would you like to install RSAT-Clustering-PowerShell [y/n]") -imatch 'y'){
@@ -173,4 +173,4 @@ $name = (Get-Item $HealthZip).Name
 
 }
 } # End of Invoke-RunSDDC
-Invoke-RunSDDC -HoursOnEvent $HoursOnEvent -PerfSamples $PerfSamples
+Invoke-RunSDDC -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples
