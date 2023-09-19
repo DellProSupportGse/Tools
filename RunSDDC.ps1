@@ -74,6 +74,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
     try {
         $DellGSEPSRepository="C:\ProgramData\Dell\DellGSEPSRepository"
         New-Item -ItemType Directory -Path $DellGSEPSRepository -ErrorAction SilentlyContinue
+        Install-PackageProvider -Name 'Nuget' -ForceBootstrap -Force -IncludeDependencies -ErrorAction SilentlyContinue
         If (-not (Get-PSRepository | ? Name -eq "DellGSEPSRepository")) {
             $registerPSRepositorySplat = @{
                 Name = 'DellGSEPSRepository'
@@ -83,7 +84,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
             }
             Register-PSRepository @registerPSRepositorySplat
         }
-        Remove-Item $DellGSEPSRepository\$module-$branch.zip -Force
+        Remove-Item $DellGSEPSRepository\$module-$branch.zip -Force -ErrorAction SilentlyContinue
         Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $DellGSEPSRepository\$module-$branch.zip
         Expand-Archive -Path $DellGSEPSRepository\$module-$branch.zip -DestinationPath $DellGSEPSRepository\DellSDDCSource -Force
         $publishModuleSplat = @{
