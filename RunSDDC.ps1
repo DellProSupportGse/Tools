@@ -9,9 +9,9 @@
 
         param(
         [Parameter(Mandatory=$False)]
-         [string] $HoursOfEvents=168,
+          [int] $HoursOfEvents=168,
         [Parameter(Mandatory=$False)]
-         [string] $PerfSamples=30
+          [int] $PerfSamples=30
 
          )
     
@@ -25,15 +25,15 @@ Function Invoke-RunSDDC {
         [Parameter(Mandatory=$False)]
          [string] $ClusterName=(Get-Cluster).Name,
         [Parameter(Mandatory=$False)]
-         [string] $HoursOfEvents=168,
+          [int] $HoursOfEvents=168,
         [Parameter(Mandatory=$False)]
-         [string] $PerfSamples=30
+          [int] $PerfSamples=30
 
          )
     CLS
     CLS
 $text=@"
-v1.24
+v1.25
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
