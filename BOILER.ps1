@@ -62,7 +62,7 @@ function add-TableData1 {
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
 #region Opening Banner and menu
-$Ver="1.3"
+$Ver="1.31"
 # Get the internet connection IP address by querying a public API
     $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
 
@@ -285,12 +285,13 @@ ForEach($CBSLog in $LogsToProcess){
 		        Write-host "                1. Download eval ISO"
                 Write-host "                2. Mount ISO"
                 Write-host "                3. Copy the install.wim to C:\dell"
+                Write-host "                NOTE: Subtract one from the number after index.wim if running Core"
 		Write-host "                4. Online while booted into Windows Server"
-		Write-host "                       Standard: DISM /online /cleanup-image /restorehealth /source:WIM:C:\Dell\install.wim:1 /limitaccess"
-                Write-host "                       Datacenter: DISM /online /cleanup-image /restorehealth /source:WIM:C:\Dell\install.wim:2 /limitaccess"
+		Write-host "                       Standard: DISM /online /cleanup-image /restorehealth /source:WIM:C:\Dell\install.wim:2 /limitaccess"
+                Write-host "                       Datacenter: DISM /online /cleanup-image /restorehealth /source:WIM:C:\Dell\install.wim:4 /limitaccess"
 		Write-host "                   Offline booted into Windows PE or Recovery Console: "
-		Write-host "                       Standard: Dism /Image:C:\ /Cleanup-Image /RestoreHealth /scratchdir:c:\windows\temp /Source:WIM:C:\Dell\install:1.wim"
-		Write-host "                       Datacenter: Dism /Image:C:\ /Cleanup-Image /RestoreHealth /scratchdir:c:\windows\temp /Source:WIM:C:\Dell\install:2.wim"
+		Write-host "                       Standard: Dism /Image:C:\ /Cleanup-Image /RestoreHealth /scratchdir:c:\windows\temp /Source:WIM:C:\Dell\install.wim:2"
+		Write-host "                       Datacenter: Dism /Image:C:\ /Cleanup-Image /RestoreHealth /scratchdir:c:\windows\temp /Source:WIM:C:\Dell\install.wim:4"
 		Write-host "                       NOTE: Command above Assumes C: for OS to fix - G: for Source wim"
                 Write-host "                5. SFC /Scannow"
                 Write-host ""
