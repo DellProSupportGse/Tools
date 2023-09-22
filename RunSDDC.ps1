@@ -6,15 +6,7 @@
     .EXAMPLE
        Invoke-SDDC
     #>
-
-        param(
-        [Parameter(Mandatory=$False)]
-          [int] $HoursOfEvents=168,
-        [Parameter(Mandatory=$False)]
-          [int] $PerfSamples=30
-
-         )
-    
+   
 Function Invoke-RunSDDC {
     [CmdletBinding(
         SupportsShouldProcess = $true,
