@@ -6,26 +6,22 @@
     .EXAMPLE
        Invoke-SDDC
     #>
-   
+    
 Function Invoke-RunSDDC {
     [CmdletBinding(
         SupportsShouldProcess = $true,
         ConfirmImpact = 'High')]
         param(
         [Parameter(Mandatory=$False)]
-         [string] $CaseNumber,
-        [Parameter(Mandatory=$False)]
-         [string] $ClusterName=(Get-Cluster).Name,
-        [Parameter(Mandatory=$False)]
           [int] $HoursOfEvents=168,
         [Parameter(Mandatory=$False)]
-          [int] $PerfSamples=30
-
-         )
+          [int] $PerfSamples=30,
+        [Parameter(Mandatory=$False)]
+         [string] $CaseNumber)
     CLS
     CLS
 $text=@"
-v1.26
+v1.27
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -165,4 +161,3 @@ $name = (Get-Item $HealthZip).Name
 
 }
 } # End of Invoke-RunSDDC
-Invoke-RunSDDC -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples
