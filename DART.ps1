@@ -68,13 +68,13 @@ function add-TableData1 {
         $body = $data | ConvertTo-Json
         #This will write to the table
         #write-host "Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json"
-		try {
-			$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
-		} catch {
-			#write-warning ("table $tableUri")
-			#write-warning ("headers $headers")
-		}
-		
+try {
+$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
+} catch {
+#write-warning ("table $tableUri")
+#write-warning ("headers $headers")
+}
+
 }# End function add-TableData
     
 
@@ -303,17 +303,17 @@ if ($PSCmdlet.ShouldProcess($param)) {
     }
 
         Function Run-DSU{
-			$DSUReboot=$False
+$DSUReboot=$False
             # CD to DSU dir
 
                 cd $((Get-ChildItem -Path "C:\Program Files\Dell\" -Filter DSU.EXE -Recurse | Sort LastWriteTime | Select -Last 1).FullName -replace 'dsu.exe')
 
             # Check if HCI and run DSU install needed updates
-				#Out-File -FilePath c:\ansd.txt -InputObject @('a','c')
+#Out-File -FilePath c:\ansd.txt -InputObject @('a','c')
                 IF($ASHCI -eq "YES" ){
-						./DSU.exe --catalog-location="$MyTemp\ASHCI-Catalog.xml" /u /q | Out-Default
+./DSU.exe --catalog-location="$MyTemp\ASHCI-Catalog.xml" /u /q | Out-Default
                 }Else{
-						./DSU.exe /u /q | Out-Default
+./DSU.exe /u /q | Out-Default
                 }
                 Do {  
                     $ProcessesFound = Get-Process -Name DSU -ErrorAction SilentlyContinue
@@ -347,12 +347,12 @@ if ($PSCmdlet.ShouldProcess($param)) {
                                     }
                                 {$DupsStatus | Where-Object{$_.rebootRequired -eq "True"}}
                                {
-										$DSUReboot=$True
-									}
+$DSUReboot=$True
+}
                             }
                     }
                 }
-				Return $DSUReboot
+Return $DSUReboot
 
         }
    # Find latest DSU version on downloads.dell.com
@@ -409,7 +409,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
         Write-Host "Gather Server Model Info..."
         # Find Storage Spaces Direct RN or AX info
             $Model=(Get-WmiObject -Class Win32_ComputerSystem).model
-			$IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} catch {}
+$IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} catch {}
             IF($Model -imatch 'Storage Spaces Direct' -or $Model -imatch 'AX'){
                 $ASHCI="YES"
                 $URL="https://downloads.dell.com/catalog/ASHCI-Catalog.xml.gz"
@@ -444,12 +444,12 @@ if ($PSCmdlet.ShouldProcess($param)) {
         }
         IF($NoClusterPre -ne $True){
             If($IgnoreChecks -ne $True){
-				If ($IsS2d) {Run-ASHCIPre} else {Run-ClusterPre}
+If ($IsS2d) {Run-ASHCIPre} else {Run-ClusterPre}
             }
         }
         If($IgnoreChecks -eq $True){Write-Host "Ignoring ASHCI/Cluster Prechecks" -ForegroundColor Yellow}
         # Check if Windows
-		$WinReboot=$False
+$WinReboot=$False
         IF([System.Environment]::OSVersion.VersionString -imatch 'Windows'){
             IF($WindowsUpdates -eq $True){ 
                 Write-Host "    Executing Windows Updates..."
@@ -475,20 +475,20 @@ if ($PSCmdlet.ShouldProcess($param)) {
                         }
                     Do {sleep 59;$e=get-EventLog -LogName System -After ((Get-Date).addminutes(-1)) | ? Source -match "update" | sort timegenerated;if ($e) {Write-Host "$($e.timegenerated) $($e.message)"}} while(!$ujob.PSEndTime)
                     $WinReboot=Receive-Job -Job $ujob
-					if ($WinReboot -ne $True) {
-							$WinReboot
-							$WinReboot=$False
-					}
+if ($WinReboot -ne $True) {
+$WinReboot
+$WinReboot=$False
+}
                 } else { write-host "No updates detected" }
-			}ElseIF($WindowsUpdates -eq $False){Write-Host "    Skipping Windows Updates" -ForegroundColor Yellow}
+}ElseIF($WindowsUpdates -eq $False){Write-Host "    Skipping Windows Updates" -ForegroundColor Yellow}
         }
-		$DSUReboot=$False
+$DSUReboot=$False
         IF($DriverandFirmware -eq $True){
             Write-Host "    Executing DSU..."
             $DSUReboot=Run-DSU
         }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
-		If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
-		    Write-Host "Please reboot to complete installation" -ForegroundColor Yellow
+If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
+    Write-Host "Please reboot to complete installation" -ForegroundColor Yellow
             try {$Host.UI.RawUI.FlushInputBuffer() } catch {while ($Host.UI.RawUI.KeyAvailable) {
                     $Host.UI.RawUI.ReadKey() | Out-Null
                 }}
@@ -509,7 +509,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
                     }
                 }
                 EndScript
-		}
+}
         IF($IgnoreChecks -ne $True){
             try {$Host.UI.RawUI.FlushInputBuffer() } catch {while ($Host.UI.RawUI.KeyAvailable) {
                     $Host.UI.RawUI.ReadKey() | Out-Null

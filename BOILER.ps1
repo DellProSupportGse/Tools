@@ -51,13 +51,13 @@ function add-TableData1 {
         $body = $data | ConvertTo-Json
         #This will write to the table
         #write-host "Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json"
-		try {
-			$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
-		} catch {
-			#write-warning ("table $tableUri")
-			#write-warning ("headers $headers")
-		}
-		
+try {
+$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
+} catch {
+#write-warning ("table $tableUri")
+#write-warning ("headers $headers")
+}
+
 }# End function add-TableData
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
@@ -220,7 +220,7 @@ ForEach($CBSLog in $LogsToProcess){
         Write-Host "            Suggested Fix:"
         Write-host "                1. Download identified Language Tag(s)"
         Write-host "                       2016 - https://dell.app.box.com/folder/130829063120?s=qpcf9bramodp6z6mwgjj0ix8q75m0fac"
-        Write-host "                       2019 - https://dell.app.box.com/folder/130836135731?s=8nvy78yyp171tcywnas5wvn3tng9h85u"	
+        Write-host "                       2019 - https://dell.app.box.com/folder/130836135731?s=8nvy78yyp171tcywnas5wvn3tng9h85u"
         Write-Host "                2. DISM install identified Language Tag(s)"
         Write-host "                       Example: DISM /online /add-package /packagepath:c:\dell\x64fre_Server_ro-ro_lp.cab"
         Write-Host ""
@@ -282,17 +282,17 @@ ForEach($CBSLog in $LogsToProcess){
                 Write-Host ""
                 Write-Host "        Suggested Fix: "
                 Write-host "            Restore health with eval ISO"
-		        Write-host "                1. Download eval ISO"
+        Write-host "                1. Download eval ISO"
                 Write-host "                2. Mount ISO"
                 Write-host "                3. Copy the install.wim to C:\dell"
                 Write-host "                NOTE: Subtract one from the number after index.wim if running Core"
-		Write-host "                4. Online while booted into Windows Server"
-		Write-host "                       Standard: DISM /online /cleanup-image /restorehealth /source:WIM:C:\Dell\install.wim:2 /limitaccess"
+Write-host "                4. Online while booted into Windows Server"
+Write-host "                       Standard: DISM /online /cleanup-image /restorehealth /source:WIM:C:\Dell\install.wim:2 /limitaccess"
                 Write-host "                       Datacenter: DISM /online /cleanup-image /restorehealth /source:WIM:C:\Dell\install.wim:4 /limitaccess"
-		Write-host "                   Offline booted into Windows PE or Recovery Console: "
-		Write-host "                       Standard: Dism /Image:C:\ /Cleanup-Image /RestoreHealth /scratchdir:c:\windows\temp /Source:WIM:C:\Dell\install.wim:2"
-		Write-host "                       Datacenter: Dism /Image:C:\ /Cleanup-Image /RestoreHealth /scratchdir:c:\windows\temp /Source:WIM:C:\Dell\install.wim:4"
-		Write-host "                       NOTE: Command above Assumes C: for OS to fix - G: for Source wim"
+Write-host "                   Offline booted into Windows PE or Recovery Console: "
+Write-host "                       Standard: Dism /Image:C:\ /Cleanup-Image /RestoreHealth /scratchdir:c:\windows\temp /Source:WIM:C:\Dell\install.wim:2"
+Write-host "                       Datacenter: Dism /Image:C:\ /Cleanup-Image /RestoreHealth /scratchdir:c:\windows\temp /Source:WIM:C:\Dell\install.wim:4"
+Write-host "                       NOTE: Command above Assumes C: for OS to fix - G: for Source wim"
                 Write-host "                5. SFC /Scannow"
                 Write-host ""
             }
