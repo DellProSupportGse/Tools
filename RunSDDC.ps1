@@ -1,4 +1,4 @@
-    <#
+﻿    <#
     .Synopsis
        Invoke-SDDC
     .DESCRIPTION
@@ -9,9 +9,9 @@
 
         param(
         [Parameter(Mandatory=$False)]
-          [int] $HoursOfEvents,
+          [int] $HoursOfEvents=168,
         [Parameter(Mandatory=$False)]
-          [int] $PerfSamples
+          [int] $PerfSamples=30
 
          )
     
@@ -21,11 +21,11 @@ Function Invoke-RunSDDC {
         ConfirmImpact = 'High')]
         param(
         [Parameter(Mandatory=$False)]
-         [string] $CaseNumber,
+         [string] $CaseNumber=168,
         [Parameter(Mandatory=$False)]
          [string] $ClusterName=(Get-Cluster).Name,
         [Parameter(Mandatory=$False)]
-          [int] $HoursOfEvents,
+          [int] $HoursOfEvents=30,
         [Parameter(Mandatory=$False)]
           [int] $PerfSamples
 
@@ -75,14 +75,14 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
         $DellGSEPSRepository="C:\ProgramData\Dell\DellGSEPSRepository"
         New-Item -ItemType Directory -Path $DellGSEPSRepository -ErrorAction SilentlyContinue
         Install-PackageProvider -Name 'Nuget' -ForceBootstrap -Force -ErrorAction SilentlyContinue | Out-Null
-	If (-not (Test-Path "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe")) {
-		New-Item -ItemType Directory -Path "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet" -ErrorAction SilentlyContinue
-		$sourceNugetExe = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
-		$targetNugetExe = "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe"
-		Invoke-WebRequest $sourceNugetExe -OutFile $targetNugetExe
-		Set-Alias nuget $targetNugetExe -Scope Global -Verbose
-	}
-	Install-Module PowerShellGet -AllowClobber -Force -ErrorAction SilentlyContinue
+ If (-not (Test-Path "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe")) {
+  New-Item -ItemType Directory -Path "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet" -ErrorAction SilentlyContinue
+  $sourceNugetExe = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+  $targetNugetExe = "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe"
+  Invoke-WebRequest $sourceNugetExe -OutFile $targetNugetExe
+  Set-Alias nuget $targetNugetExe -Scope Global -Verbose
+ }
+ Install-Module PowerShellGet -AllowClobber -Force -ErrorAction SilentlyContinue
         If (-not (Get-PSRepository | ? Name -eq "DellGSEPSRepository")) {
             $registerPSRepositorySplat = @{
                 Name = 'DellGSEPSRepository'
@@ -103,7 +103,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
         try {Publish-Module @publishModuleSplat -Verbose} catch {}
         $DellSDDCInstalledVerson=try {(Get-InstalledModule $module -ErrorAction SilentlyContinue).Version} catch {}
         if ($DellSDDCInstalledVerson -eq $Null) {$DellSDDCInstalledVerson=[Version]'0.0.1.0'}
-	Write-Host "Currently Installed Dell Cluster Log Collector: $($DellSDDCInstalledVerson.tostring())"
+ Write-Host "Currently Installed Dell Cluster Log Collector: $($DellSDDCInstalledVerson.tostring())"
         if ($DellSDDCInstalledVerson -lt ((Find-Module $module -Repository DellGSEPSRepository).version)) {
             if ($DellSDDCInstalledVerson -gt [version]'0.9') {Update-Module $module -Verbose}
             else {Install-Module $module -Repository DellGSEPSRepository -Verbose -Force}
