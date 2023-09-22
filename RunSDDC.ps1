@@ -13,13 +13,13 @@ Function Invoke-RunSDDC {
         ConfirmImpact = 'High')]
         param(
         [Parameter(Mandatory=$False)]
-         [string] $CaseNumber=168,
+         [string] $CaseNumber,
         [Parameter(Mandatory=$False)]
          [string] $ClusterName=(Get-Cluster).Name,
         [Parameter(Mandatory=$False)]
-          [int] $HoursOfEvents=30,
+          [int] $HoursOfEvents=168,
         [Parameter(Mandatory=$False)]
-          [int] $PerfSamples
+          [int] $PerfSamples=30
 
          )
     CLS
