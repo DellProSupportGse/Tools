@@ -44,7 +44,7 @@ Function ShowMenu{
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
-		 $selection = Read-Host "Please make a selection"
+ $selection = Read-Host "Please make a selection"
      }
     until ($selection -match '[1-5,qQ,hH]')
     $Global:AzureStackHCI  = "N"
@@ -137,7 +137,7 @@ IF($AzureStackHCI -eq "Y"){
 IF($ArcForServers -eq "Y"){
     $URLs2Check+= $UrlList | Where-Object{$_.Service -imatch 'Arc For Servers'} | sort URL -Unique
     $AddMissing+= [PSCustomObject]@{
-				Service = "Arc For Servers"
+Service = "Arc For Servers"
                 URL     = "onegetcdn.azureedge.net"
                 Port    = "443"
                 Notes   = "Dell Added: ARC Agent installation needs to access this location for nuget packages"}

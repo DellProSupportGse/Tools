@@ -12,9 +12,9 @@ Function Invoke-TSRCollector{
         ConfirmImpact = 'High')]
         param(
             $param,
-	    [Parameter(Mandatory=$False, Position=1)]
+    [Parameter(Mandatory=$False, Position=1)]
             [string] $CaseNumber,
-	    [Parameter(Mandatory=$False, Position=2)]
+    [Parameter(Mandatory=$False, Position=2)]
             [System.Management.Automation.PSCredential]
             [System.Management.Automation.Credential()]
             $credential = [System.Management.Automation.PSCredential]::Empty)
