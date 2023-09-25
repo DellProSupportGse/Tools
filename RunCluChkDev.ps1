@@ -11,7 +11,7 @@ $start_time = Get-Date
 Try{Invoke-WebRequest -Uri $url -UseDefaultCredentials
     Write-Output "Time taken: $((Get-Date).Subtract($start_time).Seconds) second(s)"
    }
-Catch{Write-Host "	ERROR: Source location NOT accessible. Please try again later"-foregroundcolor Red
+Catch{Write-Host "ERROR: Source location NOT accessible. Please try again later"-foregroundcolor Red
     Pause
     }
 Finally{

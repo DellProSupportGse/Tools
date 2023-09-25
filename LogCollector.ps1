@@ -57,13 +57,13 @@ function add-TableData1 {
         $body = $data | ConvertTo-Json
         #This will write to the table
         #write-host "Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json"
-		try {
-			$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
-		} catch {
-			#write-warning ("table $tableUri")
-			#write-warning ("headers $headers")
-		}
-		
+try {
+$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
+} catch {
+#write-warning ("table $tableUri")
+#write-warning ("headers $headers")
+}
+
 }# End function add-TableData
     
 
