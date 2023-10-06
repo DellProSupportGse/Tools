@@ -1,3 +1,7 @@
+    param(
+    [Parameter(Mandatory=$False, Position=1)]
+    [bool] $IgnoreChecks) 
+      
     <#
     .Synopsis
     .DESCRIPTION
@@ -12,11 +16,7 @@
        Fully Automated
             Invoke-DART -WindowsUpdates:$True -DriverandFirmware:$True -Confirm:$false
     #>
-    
-    param(
-    [Parameter(Mandatory=$False, Position=1)]
-    [bool] $IgnoreChecks)
-
+ 
 Function Invoke-DART {
 
     param(
@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.47"
+$ver="1.48"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
