@@ -62,7 +62,7 @@ $item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $bo
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
 #region Opening Banner and menu
-$Ver="1.31"
+$Ver="1.32"
 # Get the internet connection IP address by querying a public API
     $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
 
@@ -230,17 +230,20 @@ ForEach($CBSLog in $LogsToProcess){
         $objKBList=@()
         ForEach($KB in $BadKBs | sort -Unique){
         # Seach for URI to retrieve the latest KB information
-            $uri = "http://www.catalog.update.microsoft.com/Search.aspx?q=$KB"
+            <#$uri = "http://www.catalog.update.microsoft.com/Search.aspx?q=$KB"
             $kbPage = Invoke-WebRequest -Uri $uri -UseBasicParsing -ErrorAction SilentlyContinue -UseDefaultCredentials
         # Extracting the KBGUID from the KBPage
-            $KBGUID=$kbPage.links|Where-Object{$_.ID -match "_link"} | Where-Object{$_.outerHTML -match '_link' -and $_.outerHTML -match 'Windows Server'}|ForEach-Object{$_.id.replace('_link','')} 
+            $KBGUID=$kbPage.links|Where-Object{$_.ID -match "_link"} | Where-Object{$_.outerHTML -match '_link' -and $_.outerHTML -imatch 'server'}|ForEach-Object{$_.id.replace('_link','')} 
         # Use the KBGUID to find the actual download link for the KB 
-            $Post1='https://www.catalog.update.microsoft.com/DownloadDialog.aspx?updateIDs=[{%22size%22%3A0%2C%22languages%22%3A%22%22%2C%22uidInfo%22%3A%22'
+            $Post1='https://catalog.update.microsoft.com/DownloadDialog.aspx?updateIDs=[{%22size%22%3A0%2C%22languages%22%3A%22%22%2C%22uidInfo%22%3A%22'
             $post2='%22%2C%22updateID%22%3A%22'
             $post3='%22}]&updateIDsBlockedForImport=&wsusApiPresent=&contentImport=&sku=&serverName=&ssl=&portNumber=&version='
             $PostText=$post1+$kbGUID+$post2+$kbGUID+$post3
             $KBDLUriContent=(Invoke-WebRequest -Uri $PostText).content
-            $KBDLUriSource=[regex]::matches( $KBDLUriContent,'downloadInformation\[0\].files\[0\].url\s\=.+').value -replace 'downloadInformation\[0\].files\[0\].url\s\=\s' -replace '\;' -replace"'"
+            $KBDLUriSource=[regex]::matches( $KBDLUriContent,'downloadInformation\[0\].files\[0\].url\s\=.+').value -replace 'downloadInformation\[0\].files\[0\].url\s\=\s' -replace '\;' -replace"'"#>
+            $KBDLUriSource=Get-KBLink -Name $KB
+            #https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2023/10/windows10.0-kb5031364-x64_03606fb9b116659d52e2b5f5a8914bbbaaab6810.msu
+
             If($KBDLUriSource.Length -lt 1){$KBDLUriSource = "Link no longer available"}
             $objKB = New-Object PSObject 
             $objKB | Add-Member -MemberType NoteProperty -Name "            KBNumber" -Value $KB -PassThru | Add-Member -MemberType NoteProperty -Name "            KBDownloadLink" -Value $KBDLUriSource
@@ -305,3 +308,56 @@ Write-host "                       NOTE: Command above Assumes C: for OS to fix 
  IF($UnzipPath2Remove.Count -gt 0){Remove-Item $UnzipPath2Remove -Recurse}
  Stop-Transcript
  }
+        #function from https://gist.github.com/potatoqualitee/b5ed9d584c79f4b662ec38bd63e70a2d
+        function Get-KBLink {
+            param(
+                [Parameter(Mandatory)]
+                [string]$Name
+            )
+            $kb = $Name.Replace("KB", "")
+            $results = Invoke-WebRequest -Uri "https://www.catalog.update.microsoft.com/Search.aspx?q=KB$kb"
+            $kbids = $results.InputFields |
+                Where-Object { $_.type -eq 'Button' -and $_.Value -eq 'Download' } |
+                Select-Object -ExpandProperty  ID
+
+            Write-Verbose -Message "$kbids"
+
+            if (-not $kbids) {
+                Write-Warning -Message "No results found for $Name"
+                return
+            }
+             #$results.Links | Where-Object ID -match '_link'
+            $guids = $results.Links |
+                Where-Object ID -match '_link' |
+                Where-Object { ($_.OuterHTML -match ( "(?=.*" + ( $Filter -join ")(?=.*" ) + ")" ) -and $_.OuterHTML -imatch "server" )} |
+                ForEach-Object { $_.id.replace('_link', '') } |
+                Where-Object { $_ -in $kbids }
+
+            if (-not $guids) {
+                Write-Warning -Message "No file found for $Name"
+                return
+            }
+
+            foreach ($guid in $guids) {
+                Write-Verbose -Message "Downloading information for $guid"
+                $post = @{ size = 0; updateID = $guid; uidInfo = $guid } | ConvertTo-Json -Compress
+                $body = @{ updateIDs = "[$post]" }
+                $request=Invoke-WebRequest -Uri 'https://www.catalog.update.microsoft.com/DownloadDialog.aspx' -Method Post -Body $body
+                #$request.Content
+                #downloadInformation[0].enTitle ='2023-10 Cumulative Update for Microsoft server operating system, version 22H2 for x64-based Systems (KB5031364)';
+                $links = $request |
+                    Select-Object -ExpandProperty Content |
+                    Select-String -AllMatches -Pattern "(http[s]?\://.*download\.windowsupdate\.com\/[^\'\""]*)" |
+                    Select-Object -Unique
+                    # 'https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2023/10/windows10.0-kb5031364-x64_03606fb9b116659d52e2b5f5a8914bbbaaab6810.msu';
+                if (-not $links) {
+                    Write-Warning -Message "No file found for $Name"
+                    return
+                }
+
+                foreach ($link in $links) {
+                    $link.matches.value
+                }
+            }
+        }
+    
