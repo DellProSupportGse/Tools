@@ -62,7 +62,7 @@ $item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $bo
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
 #region Opening Banner and menu
-$Ver="1.32"
+$Ver="1.33"
 # Get the internet connection IP address by querying a public API
     $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
 
@@ -188,6 +188,13 @@ ForEach($CBSLog in $LogsToProcess){
     $BadLangPacks=@()
     Write-Host "Processing: $CBSLog"
     $CBSErrors=Get-Content $CBSLog | Select-String -SimpleMatch "failed",", Error",", Warning" | Select LineNumber,line
+    $NoErr=$CBSErrors | Select-string -SimpleMatch "KB3025096" -Context 0,3
+    $NoErrs=@()
+    $NoErrs=$NoErr | %{($_.Line).Substring(13,6).replace(";","");($_.Context.DisplayPostContext).Substring(13,6).replace(";","")}
+    Foreach ($LNum in $NoErrs) {
+        $CBSErrors=$CBSErrors | ? LineNumber -ne $LNum
+    }
+
     # known list of language tags
     # Ref: https://docs.microsoft.com/en-us/cpp/c-runtime-library/language-strings?view=msvc-160#supported-language-strings
     $LangTags="ar-SA","bg-BG","ca-ES","cs-CZ","da-DK","de-DE","el-GR","en-GB","en-US","es-ES","es-MX","et-EE","eu-ES","fi-FI","fr-CA","fr-FR","gl-ES","he-IL","hr-HR","hu-HU","id-ID","it-IT","ja-JP","ko-KR","lt-LT","lv-LV","nb-NO","nl-NL","pl-PL","pt-BR","pt-PT","ro-RO","ru-RU","sk-SK","sl-SI","sr-Latn-CS","sr-Latn-RS","sv-SE","th-TH","tr-TR","uk-UA","vi-VN","zh-CN","zh-HK","zh-TW"
