@@ -190,7 +190,7 @@ ForEach($CBSLog in $LogsToProcess){
     $CBSErrors=Get-Content $CBSLog | Select-String -SimpleMatch "failed",", Error",", Warning" | Select LineNumber,line
     $NoErr=$CBSErrors | Select-string -SimpleMatch "KB3025096" -Context 0,3
     $NoErrs=@()
-    $NoErrs=$NoErr | %{($_.Line).Substring(13,6).replace(";","");($_.Context.DisplayPostContext).Substring(13,6).replace(";","")}
+    $NoErrs=$NoErr | %{($_.Line).Substring(13,7) -replace "[^0-9]","";($_.Context.DisplayPostContext).Substring(13,7) -replace "[^0-9]",""}
     Foreach ($LNum in $NoErrs) {
         $CBSErrors=$CBSErrors | ? LineNumber -ne $LNum
     }
