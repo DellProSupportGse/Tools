@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.28"
+$Ver="1.29"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -205,8 +205,8 @@ Function ShowMenu{
     IF($selection -match 4){
         Write-Host "Collecting Windows Server (TSS)..."
         $Global:CollectTSS = "Y"
-        Echo TSSv2Collect;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSSv2Collect"; $repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/fginacio/MS/main/TSSv2Collect.ps1'))
-        Invoke-TSSv2Collect -confirm:$False -CaseNumber $CaseNumber
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSSCollect"; $repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/fginacio/MS/main/TSSCollect.ps1'))
+        Invoke-TSSCollect -confirm:$False -CaseNumber $CaseNumber
     }
     IF($Global:CollectTSR -eq "Y") {
     $i=0
