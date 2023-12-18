@@ -62,7 +62,7 @@ $item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $bo
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
 #region Opening Banner and menu
-$Ver="1.33"
+$Ver="1.34"
 # Get the internet connection IP address by querying a public API
     $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
 
@@ -228,8 +228,10 @@ ForEach($CBSLog in $LogsToProcess){
         Write-host "                1. Download identified Language Tag(s)"
         Write-host "                       2016 - https://dell.app.box.com/folder/130829063120?s=qpcf9bramodp6z6mwgjj0ix8q75m0fac"
         Write-host "                       2019 - https://dell.app.box.com/folder/130836135731?s=8nvy78yyp171tcywnas5wvn3tng9h85u"
+        Write-host "                       2022 - https://software-download.microsoft.com/download/sg/20348.1.210507-1500.fe_release_amd64fre_SERVER_LOF_PACKAGES_OEM.iso"
         Write-Host "                2. DISM install identified Language Tag(s)"
         Write-host "                       Example: DISM /online /add-package /packagepath:c:\dell\x64fre_Server_ro-ro_lp.cab"
+        Write-host "                       2022 Example: DISM /online /add-package /packagepath:c:\dell\Microsoft-Windows-Server-Language-Pack_x64_pl-pl.cab"
         Write-Host ""
     }
     $BadKBNumberLink=@()
