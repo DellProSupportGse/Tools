@@ -387,7 +387,7 @@ Return $DSUReboot
            EndScript
        }
    # Check if DSU is already installed
-        <#Write-Host "Checking if DSU is installed..."
+        Write-Host "Checking if DSU is installed..."
         Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
         ForEach($Key in $RegKeyPaths){
@@ -402,7 +402,7 @@ Return $DSUReboot
                 }
             }
         }
-        IF(-not ($IsDSUInstalled -eq "YES")){#>
+        IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell System Update(DSU)..."
             $DSUInstallerLocation=Download-File $LatestDSU.Link
             Write-Host "Installing DSU..."
