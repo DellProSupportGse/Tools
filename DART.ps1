@@ -356,7 +356,7 @@ Return $DSUReboot
 
         }
    # Find latest DSU version on downloads.dell.com
-       Try{
+       <#Try{
            # Use TLS 1.2
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
            Write-Host "Finding Latest Dell System Update(DSU) version..."
@@ -380,6 +380,7 @@ Return $DSUReboot
            EndScript
        }
    # Check if DSU is already installed
+       
         Write-Host "Checking if DSU is installed..."
         Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
@@ -394,10 +395,13 @@ Return $DSUReboot
                     Set-Location c:\
                 }
             }
-        }
+        }#>
+        $IsDSUInstalled="NO"
         IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell System Update(DSU)..."
-            $DSUInstallerLocation=Download-File $LatestDSU.Link
+            $LatestDSU = 'https://dl.dell.com/FOLDER10889507M/1/Systems-Management_Application_RPW7K_WN64_2.0.2.3_A00.EXE'
+            #$DSUInstallerLocation=Download-File $LatestDSU.Link
+            $DSUInstallerLocation=Download-File $LatestDSU
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
             $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
