@@ -396,8 +396,8 @@ Return $DSUReboot
 
                 $DSUVer=(Get-ItemProperty -Path $Key.PSPath).DisplayVersion
                 IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSU.Version}){
-                    Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
-                    $IsDSUInstalled="YES"
+                    #Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
+                    #$IsDSUInstalled="YES"
                     Set-Location c:\
                 }
             }
