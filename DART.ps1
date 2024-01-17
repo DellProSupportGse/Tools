@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.47"
+$ver="1.5"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -360,27 +360,34 @@ Return $DSUReboot
            # Use TLS 1.2
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
            Write-Host "Finding Latest Dell System Update(DSU) version..."
-           $URL="https://downloads.dell.com/omimswac/dsu/"
+           
+           $URL="https://www.dell.com/support/kbdoc/en-us/000130590/dell-emc-system-update-dsu?lang=en"
            #$Results=Invoke-WebRequest $URL -UseDefaultCredentials
-           $Results=Invoke-WebRequest $URL -UseBasicParsing
+           #$userAgent = [Microsoft.PowerShell.Commands.PSUserAgent]::Chrome
+           $Results=Invoke-WebRequest $URL -ErrorAction SilentlyContinue #-UseBasicParsing #-UserAgent $userAgent
+           $LatestDSUURL=((($Results.AllElements | ? InnerText -match "Windows DUP") | select -Last 1).innerHTML).split("""")[1]
+           If ($LatestDSUURL -notmatch "driverid") {
+                $LatestDSUURL=($Results.ParsedHtml.IHTMLDocument3_getElementsByTagName('a') | ? InnerHTML -match "DUP" ) | %{if($_.previousSibling.data -match "Windows") {$_.href}}
+           }
+           $Results=Invoke-WebRequest $LatestDSUURL -UseBasicParsing #-UserAgent $userAgent
            ## Parse the href tag to find the links on the page
            $LatestDSU=@()
-           $results.Links.href | Where-Object {$_ -match "\d"} | ForEach-Object {
+           $Results.Links.href | Where-Object {$_ -match "A...EXE"} | ForEach-Object {
                 ## build an object showing the link and version
                 $LatestDSU+=[PSCustomObject]@{
-                    Link = "https://downloads.dell.com" + $_
+                    Link = $_
                     Version = ((($_ -split "_A00.EXE") -split "WN64_") -match "\d")[1]
                 }
            }
            $LatestDSU=$LatestDSU|sort Version | select -Last 1
-           Write-Host "    Found: $($LatestDSU.Version) | $($LatestDSU.Link)" -ForegroundColor Green
+           Write-Host "    Found: $($LatestDSU.Version) | $($LatestDSU.Link)" -ForegroundColor Green #>
        }
        Catch{
            Write-Host "    ERROR: Failed to find DSU version. Exiting..." -ForegroundColor Red
            EndScript
        }
    # Check if DSU is already installed
-        Write-Host "Checking if DSU is installed..."
+        <#Write-Host "Checking if DSU is installed..."
         Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
         $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
         ForEach($Key in $RegKeyPaths){
@@ -395,7 +402,7 @@ Return $DSUReboot
                 }
             }
         }
-        IF(-not ($IsDSUInstalled -eq "YES")){
+        IF(-not ($IsDSUInstalled -eq "YES")){#>
             Write-Host "Downloading Dell System Update(DSU)..."
             $DSUInstallerLocation=Download-File $LatestDSU.Link
             Write-Host "Installing DSU..."
@@ -405,7 +412,7 @@ Return $DSUReboot
                 Write-Host "    ERROR: Failed to install DSU." -ForegroundColor Red
                 EndScript
             }Else{Write-Host "    SUCCESS: DSU Installed Successfully." -ForegroundColor Green }
-        }
+        #}
         Write-Host "Gather Server Model Info..."
         # Find Storage Spaces Direct RN or AX info
             $Model=(Get-WmiObject -Class Win32_ComputerSystem).model
