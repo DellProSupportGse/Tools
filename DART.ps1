@@ -412,7 +412,7 @@ Return $DSUReboot
                 Write-Host "    ERROR: Failed to install DSU." -ForegroundColor Red
                 EndScript
             }Else{Write-Host "    SUCCESS: DSU Installed Successfully." -ForegroundColor Green }
-        #}
+        }
         Write-Host "Gather Server Model Info..."
         # Find Storage Spaces Direct RN or AX info
             $Model=(Get-WmiObject -Class Win32_ComputerSystem).model
