@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.49"
+$ver="1.50"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -356,50 +356,11 @@ $DSUReboot=$True
 Return $DSUReboot
 
         }
-   # Find latest DSU version on downloads.dell.com
-       Try{
-           # Use TLS 1.2
-           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-           Write-Host "Finding Latest Dell System Update(DSU) version..."
-           $URL="https://downloads.dell.com/omimswac/dsu/"
-           $Results=Invoke-WebRequest $URL -UseBasicParsing -UserAgent::Chrome
-           ## Parse the href tag to find the links on the page
-           $LatestDSU=@()
-           $results.Links.href | Where-Object {$_ -match "\d"} | ForEach-Object {
-                ## build an object showing the link and version
-                $LatestDSU+=[PSCustomObject]@{
-                    Link = "https://downloads.dell.com" + $_
-                    Version = ((($_ -split "_A00.EXE") -split "WN64_") -match "\d")[1]
-                }
-           }
-           $LatestDSU=$LatestDSU|sort Version | select -Last 1
-           Write-Host "    Found: $($LatestDSU.Version) | $($LatestDSU.Link)" -ForegroundColor Green
-       }
-       Catch{
-           Write-Host "    ERROR: Failed to find DSU version. Exiting..." -ForegroundColor Red
-           EndScript
-       }
-   # Check if DSU is already installed
-       
-        Write-Host "Checking if DSU is installed..."
-        Set-Location 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
-        $RegKeyPaths=Get-ChildItem | Select PSPath -ErrorAction SilentlyContinue 
-        ForEach($Key in $RegKeyPaths){
-        
-            IF(Get-ItemProperty -Path $Key.PSPath | ?{$_.DisplayName -ilike 'DELL *System Update'}){
-
-                $DSUVer=(Get-ItemProperty -Path $Key.PSPath).DisplayVersion
-                IF(Get-ItemProperty -Path $Key.PSPath | ?{[version]$_.DisplayVersion -ge [version]$LatestDSU.Version}){
-                    Write-Host "    FOUND: DSU $DSUVer already installed" -ForegroundColor Green
-                    $IsDSUInstalled="YES"
-                    Set-Location c:\
-                }
-            }
-        }
         $IsDSUInstalled="NO"
         IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell System Update(DSU)..."
-            $DSUInstallerLocation=Download-File $LatestDSU.Link
+            $LatestDSU = 'https://dl.dell.com/FOLDER10889507M/1/Systems-Management_Application_RPW7K_WN64_2.0.2.3_A00.EXE'
+            $DSUInstallerLocation=Download-File $LatestDSU
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
             $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
