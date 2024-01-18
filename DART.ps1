@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.47"
+$ver="1.49"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -201,11 +201,12 @@ if ($PSCmdlet.ShouldProcess($param)) {
             # Use TLS 1.2
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             # Download file
-            #Try{Invoke-WebRequest $URL -OutFile $OutFile -UseDefaultCredentials}
             Try{$webClient = [System.Net.WebClient]::new()
+                # Set the User-Agent header to mimic Chrome
+                $webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
                 $webClient.DownloadFile($URL, $OutFile)}
             Catch{
-                Try {Invoke-WebRequest $URL -OutFile $OutFile} Catch {
+                Try {Invoke-WebRequest $URL -OutFile $OutFile -UserAgent::Chrome} Catch {
                 Write-Host "        ERROR: Downloading $URL" -ForegroundColor Red
                 EndScript
             }}
@@ -356,13 +357,12 @@ Return $DSUReboot
 
         }
    # Find latest DSU version on downloads.dell.com
-       <#Try{
+       Try{
            # Use TLS 1.2
            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
            Write-Host "Finding Latest Dell System Update(DSU) version..."
            $URL="https://downloads.dell.com/omimswac/dsu/"
-           #$Results=Invoke-WebRequest $URL -UseDefaultCredentials
-           $Results=Invoke-WebRequest $URL -UseBasicParsing
+           $Results=Invoke-WebRequest $URL -UseBasicParsing -UserAgent::Chrome
            ## Parse the href tag to find the links on the page
            $LatestDSU=@()
            $results.Links.href | Where-Object {$_ -match "\d"} | ForEach-Object {
@@ -395,13 +395,11 @@ Return $DSUReboot
                     Set-Location c:\
                 }
             }
-        }#>
+        }
         $IsDSUInstalled="NO"
         IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell System Update(DSU)..."
-            $LatestDSU = 'https://dl.dell.com/FOLDER10889507M/1/Systems-Management_Application_RPW7K_WN64_2.0.2.3_A00.EXE'
-            #$DSUInstallerLocation=Download-File $LatestDSU.Link
-            $DSUInstallerLocation=Download-File $LatestDSU
+            $DSUInstallerLocation=Download-File $LatestDSU.Link
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
             $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
