@@ -50,7 +50,7 @@ IF($SDDCFileCheck -ine "y"){Write-Host "Please download from https://github.com/
     Import-Module $ModulePath -Force -Verbose   
     
 # Run SDDC
-    Get-SddcDiagnosticInfo
+    Get-SddcDiagnosticInfo -IncludeReliabilityCounters
 
 #Check if user wants to remove the Master.zip file from host
     $MASTERREMCHECK = Read-Host "Do you want to remove the Master.zip file that you downloaded? [y/n]"
