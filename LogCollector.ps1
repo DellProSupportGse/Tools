@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.29"
+$Ver="1.3"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -190,10 +190,14 @@ Function ShowMenu{
     IF($selection -match 2){
         Write-Host "Collecting PowerEdge logs (TSR)..."
         $Global:CollectTSR  = "Y"
-        If(Get-Service clussvc -ErrorAction SilentlyContinue){$credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials"}
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'))
-        $iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
-
+        If(Get-Service clussvc -ErrorAction SilentlyContinue){
+            #$credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials"
+            Do {
+                $credential=Get-Credential -Message "Please enter the iDRAC Administrator credentials" -UserName root;$cred2=Get-Credential -Message "Confirm iDRAC Password" -UserName $credential.GetNetworkCredential().UserName
+            } while (($credential.GetNetworkCredential().Password -ne $cred2.GetNetworkCredential().Password) -or ($credential.GetNetworkCredential().UserName -ne $cred2.GetNetworkCredential().UserName))
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'))
+            $iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
+        }
     }
     IF($selection -match 1){
         Write-Host "Collecting Azure Stack HCI logs (SDDC)..."
@@ -248,7 +252,7 @@ Function ZipNClean{
         $MyTemp=(Get-Item $env:temp).fullname
         $DT=Get-Date -Format "yyyyMMddHHmm"
         IF(Test-Path -Path "$MyTemp\logs"){
-            Compress-Archive -Path "$MyTemp\logs\*.*" -DestinationPath "c:\dell\LogCollector_$($DT)"
+            Compress-Archive -Path "$MyTemp\logs\*.*" -DestinationPath "c:\dell\LogCollector_$($DT).zip"
             Sleep 60            
             IF(Test-Path -Path "c:\dell\LogCollector_$($DT).zip"){
                 Write-Host "Logs can be found here: C:Dell\LogCollector_$($DT).zip"
