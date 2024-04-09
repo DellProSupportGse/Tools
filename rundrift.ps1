@@ -1,6 +1,6 @@
 # Run Drift
 # Created By: Jim Gandy
-# v1.4
+# v1.5
 Function Invoke-RunDriFT{
 Write-Host "Set ExecutionPolicy Bypass..."
     Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -22,7 +22,7 @@ Function Run-Drift{
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $CurrentLoc=$ENV:TEMP
     Write-Host "    Downloading latest version..."
-    $url = 'https://gsetools.blob.core.windows.net/drift/DriFT.ps1.remove?sv=2020-10-02&si=ReadAccess&sr=b&sig=O8lVf4Ye93FOJCWVYIANuMnz%2FZSZTEWv7IQuAbjr6iw%3D'
+    $url = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/drift.ps1'
     $output = "$CurrentLoc\DriFT.ps1"
     $start_time = Get-Date
     Try{

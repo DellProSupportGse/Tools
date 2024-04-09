@@ -45,7 +45,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 #Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 write-host "$(Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log")"
 $text=@"
-v1.82
+v1.83
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -82,7 +82,11 @@ if (-not ($Casenumber)) {$dowait=$true;$CaseNumber = Read-Host -Prompt "Please P
 $user = "root"
 $pass= "calvin"
 $secpasswd = ConvertTo-SecureString $pass -AsPlainText -Force
-if (-not ($credential)) {$credential = New-Object System.Management.Automation.PSCredential($user, $secpasswd)}
+if (-not ($credential)) {
+    Do {
+       $credential=Get-Credential -Message "Please enter the iDRAC Administrator credentials" -UserName root;$cred2=Get-Credential -Message "Confirm iDRAC Password" -UserName $credential.GetNetworkCredential().UserName
+    } while (($credential.GetNetworkCredential().Password -ne $cred2.GetNetworkCredential().Password) -or ($credential.GetNetworkCredential().UserName -ne $cred2.GetNetworkCredential().UserName))
+}
 # Gathers the iDRAC IP addresses from all nodes
 If(Get-Service clussvc -ErrorAction SilentlyContinue){
     Write-Host "Gathering the iDRAC IP Addresses from cluster nodes..."
@@ -143,7 +147,7 @@ $draccreds=@{}
                 $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="!$idrac_ip"
                 $credfail="!"
                 $dowait=$true
-                $newcredential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials for $idrac_ip"
+                $newcredential=Get-Credential -Message "Please enter the iDRAC Administrator credentials for $idrac_ip"
                 $draccreds.add("!$idrac_ip",$newcredential)
                 $result= Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $newcredential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr
                 Write-Host "$(($result.Content| ConvertFrom-Json).'@Message.ExtendedInfo')"

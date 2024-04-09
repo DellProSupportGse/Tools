@@ -113,7 +113,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
 # Run SDDC
     # Run SDDC if cluster service found on node
     IF(Get-Service clussvc -ErrorAction SilentlyContinue){
-        Get-SddcDiagnosticInfo -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -IncludeReliabilityCounters
+        Get-SddcDiagnosticInfo -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -IncludeReliabilityCounters -RunCluChk
     }Else{
         $ClusterToCollectLogsFrom=Read-Host "Please enter the name of the cluster to collect logs from"
         # Check if we can connect to the cluster
@@ -133,7 +133,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
                     Write-Host "    SUCCESS: Able to connect to cluster" -ForegroundColor Green
                     $CheckRSATClusteringPowerShell=IF((Get-WindowsFeature RSAT-Clustering-PowerShell).InstallState -eq 'Installed'){ 
                         Write-Host "Execute: Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom..."
-                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples
+                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -RunCluChk
                     }Else{
                         Write-Host "Remote SDDC requires RSAT-Clustering-PowerShell which requires a rebooted." -ForegroundColor Yellow
                         IF((Read-Host "Would you like to install RSAT-Clustering-PowerShell [y/n]") -imatch 'y'){
