@@ -125,7 +125,7 @@ Function ShowMenu{
          Clear-Host
          Write-Host $text
          Write-Host ""
-         Write-Host "This code is provided as-is and is not supported by Dell Technologies"
+         Write-Host "This code is under the MIT License. See Repository for Licensing/Support details."
          Write-Host ""
          Write-Host "==================== Please make a selection ====================="
          Write-Host ""
