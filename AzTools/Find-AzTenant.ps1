@@ -1,20 +1,12 @@
-# Copyright (c) 2023 Dell Inc. or its subsidiaries. All Rights Reserved.
-#
-# This software contains the intellectual property of Dell Inc. or is licensed to Dell Inc. from third parties.
-# Use of this software and the intellectual property contained therein is expressly limited to the terms and
-# conditions of the License Agreement under which it is provided by or on behalf of Dell Inc. or its subsidiaries.
+Function Invoke-FindAzTenant{
 
-Function Invoke-CheckAzTenant{
-param(
-    [Parameter(Mandatory = $true, Position = 0, ValueFromPipelineByPropertyName = $true)]
-    [string]
-    $azureCloud,
+    param(
+    [Parameter(Mandatory = $true, Position = 0, ValueFromPipelineByPropertyName = $true, HelpMessage="Enter one of the following: AzureCloud, AzureChinaCloud, AzureGermanCloud, AzureUSGovernment")]
+    [string] ${azureCloud},
 
-    [Parameter(Mandatory = $true, Position = 1, ValueFromPipelineByPropertyName = $true)]
-    [string]
-    $subscriptionID
-    )
-    
+    [Parameter(Mandatory = $true, Position = 1, ValueFromPipelineByPropertyName = $true, HelpMessage="Subscription ID should look like this: 00000000-0000-0000-0000-000000000000")]
+    [string] ${subscriptionID} )
+
     function Get-AzureURIs {
         [CmdletBinding()]
         param (
@@ -89,7 +81,7 @@ param(
             throw "[$commandName] Unable to get tenantId for SubscriptionId $SubscriptionId"
         }
     
-        return ,$tenantId
+        return ,"Your Tenant ID is: $tenantId"
     
     }
     
@@ -101,3 +93,4 @@ param(
         exit 1
     }
 }
+Invoke-CheckAzTenant
