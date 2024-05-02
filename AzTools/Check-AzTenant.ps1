@@ -4,16 +4,17 @@
 # Use of this software and the intellectual property contained therein is expressly limited to the terms and
 # conditions of the License Agreement under which it is provided by or on behalf of Dell Inc. or its subsidiaries.
 
+Function Invoke-CheckAzTenant{
 param(
     [Parameter(Mandatory = $true, Position = 0, ValueFromPipelineByPropertyName = $true)]
     [string]
-    ${azureCloud},
+    $azureCloud,
 
     [Parameter(Mandatory = $true, Position = 1, ValueFromPipelineByPropertyName = $true)]
     [string]
-    ${subscriptionID}
+    $subscriptionID
     )
-Function Invoke-CheckAzTenant{
+    
     function Get-AzureURIs {
         [CmdletBinding()]
         param (
