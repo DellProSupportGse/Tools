@@ -12,8 +12,7 @@ param(
     [Parameter(Mandatory = $true, Position = 1, ValueFromPipelineByPropertyName = $true)]
     [string]
     ${subscriptionID}
-
-)
+    )
 Function Invoke-CheckAzTenant{
     function Get-AzureURIs {
         [CmdletBinding()]
