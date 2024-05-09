@@ -1,23 +1,19 @@
-# Run CluChk Dev
+# Run CluChk Del
 # Created By: Jim Gandy
-# v1.4
-Function Invoke-RunCluChkDev{
+# v1.5
+Function Invoke-RunCluChk{
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Write-Host "Downloading latest version..."
-$url = 'https://gsetools.blob.core.windows.net/cluchk/CluChkDEV.ps1.remove?sv=2021-10-04&si=ReadAccess&sr=c&sig=FPrKWcg0IRxzIDZHuu4syLjMSuLn%2Fco3gH1OLkYnPIs%3D'
-#sv=2020-10-02&st=2022-07-15T19%3A43%3A49Z&se=2025-07-16T19%3A43%3A00Z&sr=b&sp=r&sig=HjZEXdUzx8iT7P6BSZLsuIaRPX3ohBMjsAvH3jqXYmE%3D'
-
+$url = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchkdev.ps1'
 $start_time = Get-Date
-Try{Invoke-WebRequest -Uri $url -UseDefaultCredentials
+Try{Invoke-WebRequest -Uri $url -UseDefaultCredentials | Out-Null
     Write-Output "Time taken: $((Get-Date).Subtract($start_time).Seconds) second(s)"
    }
 Catch{Write-Host "ERROR: Source location NOT accessible. Please try again later"-foregroundcolor Red
     Pause
     }
 Finally{
-    $wc = New-Object System.Net.WebClient
-    $wc.UseDefaultCredentials = $true
-    iex ($wc.DownloadString($url))
+Invoke-Expression('$module="RunCluChk";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString($url));Invoke-RunCluChk
     }
 #Variable Cleanup
 Remove-Variable * -ErrorAction SilentlyContinue
