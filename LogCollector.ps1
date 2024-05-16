@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.3"
+$Ver="1.5"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -70,6 +70,93 @@ $item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $bo
 Function EndScript{  
     break
 }
+Function Upload-FileToCase{
+param (
+    [string]$FilePath = '',
+    [string]$ServiceTag = '',
+    [string]$CaseNumber = '',
+    [string]$PreferredName = '',
+    [string]$Email = ''
+)
+$dfilename=Split-Path -Leaf $FilePath
+$CaseSrId= (Invoke-RestMethod -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$CaseNumber").cases.id
+$body = @{"customerEmail"="$Email";"fileName"="$dfilename";"fileSize"="20";"lightningCaseId"="$CaseSrId";"preferredName"="$PreferredName";"serviceRequestNb"="$CaseNumber"} | ConvertTo-Json
+$header = @{
+ "Accept"="application/json"
+ "Content-Type"="application/json"
+} 
+$StartUpload=Invoke-RestMethod -Headers $header -Body $body -Uri  "https://tdm.dell.com/tdm-file-upload/public/v2/initiate-upload" -Method Post -SessionVariable session
+# Define the input file and chunk size
+$tempdir=$env:TEMP+"\"+(New-Guid)
+New-Item -Path $tempdir -ItemType Directory | Out-Null
+$chunkSize = 20000000
+$bufferSize = 8192 # Size of the buffer to read/write data
+$outputStream=$null
+Write-Host "Preparing file for upload"
+# Open the input file in binary mode
+$inputStream = [System.IO.File]::OpenRead($FilePath)
+try {
+    $chunkIndex = 1
+    Do {
+        $chunkFile = Join-Path $tempdir "$(Split-Path -Leaf ($FilePath.substring(0,$FilePath.length-4)))-$chunkIndex"
+        $totalBytesRead = 0
+        $buffer = New-Object byte[] $bufferSize
+        Do {
+            $bytesRead = $inputStream.Read($buffer, 0, [Math]::Min($bufferSize, $chunkSize - $totalBytesRead))
+            if ($bytesRead -ne 0) { 
+                if (!($outputStream)) { $outputStream = [System.IO.File]::OpenWrite($chunkFile)}
+                $outputStream.Write($buffer, 0, $bytesRead)
+                $totalBytesRead += $bytesRead
+            }
+        } while ($totalBytesRead -lt $chunkSize -and $bytesRead -gt 0)
+        $outputStream.Close()
+        $outputStream = $null
+        $chunkIndex++
+    } while ($totalBytesRead -ge $chunkSize)
+}
+finally {$inputStream.Close()}
+$percChunk=100/($chunkIndex-1)
+Add-Type -AssemblyName 'System.Net.Http'
+$httpClient = New-Object System.Net.Http.Httpclient
+Write-Host -NoNewLine "Uploading file."
+Foreach ($chunkFile in (gci $tempdir -File | Sort LastWriteTime)) {
+    try {$packageFileStream.close()} catch {}
+    $packageFileStream = New-Object System.IO.FileStream @($chunkFile.FullName, [System.IO.FileMode]::Open)
+    [int]$chunkNumber=$chunkFile.Name.Substring($chunkFile.Name.LastIndexOf("-")).substring(1)
+    $contentDispositionHeaderValue = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue "form-data"
+    $contentDispositionHeaderValue.Name = "file"
+    $contentDispositionHeaderValue.FileName = ("blob")
+    $streamContent = New-Object System.Net.Http.StreamContent $packageFileStream
+    $streamContent.Headers.ContentDisposition = $contentDispositionHeaderValue
+    try {$streamContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue $ContentType} catch {}
+    $content = New-Object System.Net.Http.MultipartFormDataContent
+    $content.add((New-Object System.Net.Http.StringContent $email),'customerEmail')
+    $content.add((New-Object System.Net.Http.StringContent $StartUpload.fileId),'fileId')
+    $content.add((New-Object System.Net.Http.StringContent $StartUpload.uploadId),'uploadId')
+    $content.add((New-Object System.Net.Http.StringContent "$chunkNumber"),'chunkNumber')
+    $content.Add($streamContent)
+    $httpClient = New-Object System.Net.Http.Httpclient
+    $response=$httpClient.PostAsync("https://tdm.dell.com/tdm-file-upload/public/v2/upload-chunk", $content).Result
+    if ($response.StatusCode -ne "204") {Write-Warning "Chunk $chunkNumber upload failed!!";$response;$packageFileStream.close();return 1}
+    $packageFileStream.close()
+    Write-Host -NoNewLine "$([int]($chunkNumber*$percChunk))%."
+    $chunkNumber++
+} 
+Write-Host "."
+$body=@{customerEmail="$email";fileId=$($StartUpload.fileId);uploadId=$($StartUpload.uploadId)} | ConvertTo-Json
+$response=Invoke-RestMethod -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/upload-complete" -Body $body -Headers @{"Accept"="application/json, text/plain, */*";"Accept-Encoding"="gzip, deflate, br, zstd";"Accept-Language"="en-US,en;q=0.9"} -Method Post -WebSession $session #?uploadId=$($StartUpload.uploadId)&fileId=$($StartUpload.fileId)&chunkNumber=1&customerEmail=$email
+$body=@{emailId="$email";fileId=$($StartUpload.fileId);serviceTag=$Stag;language="en_US"} | ConvertTo-Json
+$response=Invoke-RestMethod -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/file-status"-Body $body -Headers @{"Accept"="application/json, text/plain, */*";"Accept-Encoding"="gzip, deflate, br, zstd";"Accept-Language"="en-US,en;q=0.9"} -Method Post -WebSession $session
+If ($response.uploadCompleted -eq $true) {
+    Write-Host "Upload Completed..."
+    Remove-Item $tempdir -Force -Recurse
+    return 0
+} else {
+    Write-Warning "Upload Failed!!!"
+    return 1
+}
+}
+
 Clear-Host
 # Logs
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
@@ -128,6 +215,16 @@ $consent = (Read-Host "(Y/[N]) ").ToUpper()
 if ($consent -eq "Y") {
 # Collect data to improve customer experience
  Write-Host "Thank you for participating in our program. Your input is valuable to us!"
+ $x=0
+ $Email=$null
+ Do {
+    try {$Email = [mailaddress] (Read-Host -Prompt "Please enter your email address")} catch {Write-Warning "Email address invalid. Please correct"}
+    $x++
+ } while ($x -lt 4 -and !($Email))
+ If ($x -eq 4) {
+    Write-Host "    ERROR: Too many tries. Exiting..." -ForegroundColor Red
+    EndScript
+ }
   
 } else {
   $consent = "N"
@@ -276,56 +373,66 @@ Function UploadLogs {
     #Upload SDDC
     IF(Test-Path -Path "$MyTemp\logs\Healthtest*$CaseNumber*"){
         $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*$CaseNumber* | sort lastwritetime | select -last 1 
+        $s=Upload-FileToCase -FilePath $HealthZip.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$((wmic bios get serialnumber).split("`t")[2])"
+        
         #Get the File-Name without path
-        $name = (Get-Item $HealthZip).Name
+        #$name = (Get-Item $HealthZip).Name
 
         #The target URL wit SAS Token
-        $uri = "https://gsetools.blob.core.windows.net/sddcdata/$($name)?sp=acw&st=2022-06-28T17:26:35Z&se=2032-06-29T01:26:35Z&spr=https&sv=2021-06-08&sr=c&sig=4gtvKkicwS%2BcD6BSBgapTziNrfar11CL%2B6hsVHWzJXI%3D"
+        #$uri = "https://gsetools.blob.core.windows.net/sddcdata/$($name)?sp=acw&st=2022-06-28T17:26:35Z&se=2032-06-29T01:26:35Z&spr=https&sv=2021-06-08&sr=c&sig=4gtvKkicwS%2BcD6BSBgapTziNrfar11CL%2B6hsVHWzJXI%3D"
 
         #Define required Headers
-        $headers = @{
-            'x-ms-blob-type' = 'BlockBlob'
-                }
+        #$headers = @{
+        #    'x-ms-blob-type' = 'BlockBlob'
+        #        }
 
         #Upload File...
-        $resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
-        if ($resp.count -gt 2) {Write-Host "SDDC uploaded"}
+        #$resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
+        if ($s -eq 0) {Write-Host "SDDC uploaded to case $CaseNumber"}
     }
     #Upload ShowTech
     IF(Test-Path -Path "$MyTemp\logs\ShowTechs_$CaseNumber*"){
-        $ZipPath=Get-ChildItem $MyTemp\logs\ShowTechs_$CaseNumber* | sort lastwritetime | select -last 1 
+        $ZipPath=Get-ChildItem $MyTemp\logs\ShowTechs_$CaseNumber* | sort lastwritetime | select -Last 1 
+        Expand-Archive -Path $ZipPath.Fullname -DestinationPath ($env:temp+"\$($ZipPath.BaseName)")
+        $content= Get-Content (Get-ChildItem ($env:temp + "\$($ZipPath.BaseName)") -File | Select -First 1).Fullname
+        Remove-Item ($env:temp + "\$($ZipPath.BaseName)") -Recurse -Force
+        $parsed=($content | Select-String -context 0,2 -SimpleMatch "Svc Tag").ToString()
+        $servicetag=(($parsed.split("`r")[2]) -split "  ")[-2]
+        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag $servicetag
+
         #Get the File-Name without path
-        $name = (Get-Item $ZipPath).Name
+        #$name = (Get-Item $ZipPath).Name
 
         #The target URL wit SAS Token
-        $uri = "https://gsetools.blob.core.windows.net/showtech/$($name)?sp=acw&st=2022-08-14T20:19:23Z&se=2032-08-15T04:19:23Z&spr=https&sv=2021-06-08&sr=c&sig=XfWDMd2y4sQrXm1gxA6up6VRGV5XPrwPkxEINpKTKCs%3D"
+        #$uri = "https://gsetools.blob.core.windows.net/showtech/$($name)?sp=acw&st=2022-08-14T20:19:23Z&se=2032-08-15T04:19:23Z&spr=https&sv=2021-06-08&sr=c&sig=XfWDMd2y4sQrXm1gxA6up6VRGV5XPrwPkxEINpKTKCs%3D"
 
         #Define required Headers
-        $headers = @{
-            'x-ms-blob-type' = 'BlockBlob'
-            }
+        #$headers = @{
+        #    'x-ms-blob-type' = 'BlockBlob'
+        #    }
 
         #Upload File...
-        $resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
-        if ($resp2.count -gt 2) {Write-Host "Showtech uploaded"}
+        #$resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
+        if ($s -eq 0) {Write-Host "Showtech uploaded to case $CaseNumber"}
     }
     #Upload TSR
-    IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_$CaseNumber* -Recurse).count){
-        $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
+    IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse).count){
+        $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
+        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag $servicetag
         #Get the File-Name without path
-        $name = $ZipPath.Name
+        #$name = $ZipPath.Name
 
         #The target URL wit SAS Token
-        $uri = "https://gsetools.blob.core.windows.net/tsrcollect/$($name)?sp=acw&st=2022-08-14T21:28:03Z&se=2032-08-15T05:28:03Z&spr=https&sv=2021-06-08&sr=c&sig=dhqj1OR7bWRkRp4D3HXwnLT%2Ba%2Br4J6ANF80LhKcafAw%3D"
+        #$uri = "https://gsetools.blob.core.windows.net/tsrcollect/$($name)?sp=acw&st=2022-08-14T21:28:03Z&se=2032-08-15T05:28:03Z&spr=https&sv=2021-06-08&sr=c&sig=dhqj1OR7bWRkRp4D3HXwnLT%2Ba%2Br4J6ANF80LhKcafAw%3D"
 
         #Define required Headers
-        $headers = @{
-            'x-ms-blob-type' = 'BlockBlob'
-            }
+        #$headers = @{
+        #    'x-ms-blob-type' = 'BlockBlob'
+        #    }
 
         #Upload File...
-        $resp3=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath.FullName -ErrorAction Continue -Verbose 4>&1
-        if ($resp3.count -gt 2) {Write-Host "TSRs uploaded"}
+        #$resp3=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath.FullName -ErrorAction Continue -Verbose 4>&1
+        if ($s -eq 0) {Write-Host "TSRs uploaded on case $CaseNumber"}
     }
 }
 ShowMenu
