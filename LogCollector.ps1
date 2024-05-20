@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.5"
+$Ver="1.5.1"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -389,6 +389,7 @@ Function UploadLogs {
         #Upload File...
         #$resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
         if ($s -eq 0) {Write-Host "SDDC uploaded to case $CaseNumber"}
+        else {Write-Warning "SDDC upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
     }
     #Upload ShowTech
     IF(Test-Path -Path "$MyTemp\logs\ShowTechs_$CaseNumber*"){
@@ -414,6 +415,7 @@ Function UploadLogs {
         #Upload File...
         #$resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
         if ($s -eq 0) {Write-Host "Showtech uploaded to case $CaseNumber"}
+        else {Write-Warning "Showtech upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
     }
     #Upload TSR
     IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse).count){
@@ -433,6 +435,7 @@ Function UploadLogs {
         #Upload File...
         #$resp3=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath.FullName -ErrorAction Continue -Verbose 4>&1
         if ($s -eq 0) {Write-Host "TSRs uploaded on case $CaseNumber"}
+        else {Write-Warning "TSRs upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
     }
 }
 ShowMenu
