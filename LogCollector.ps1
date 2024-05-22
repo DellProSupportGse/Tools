@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.5.1"
+$Ver="1.6"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -417,23 +417,20 @@ Function UploadLogs {
         if ($s -eq 0) {Write-Host "Showtech uploaded to case $CaseNumber"}
         else {Write-Warning "Showtech upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
     }
+    #Upload TSS
+    IF((Get-ChildItem -Path "C:\Dell\Logs" -Filter "$($CaseNumber).zip" -Recurse).count){
+        $ZipPath=Get-ChildItem -Path "C:\Dell\Logs" -Filter "$($CaseNumber).zip" -Recurse | sort lastwritetime | select -last 1
+        $ZipPath=Rename-Item $ZipPath.FullName "TSS-$($ZipPath.Name)" -PassThru
+        #Upload File...
+        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$((wmic bios get serialnumber).split("`t")[2])"
+        if ($s -eq 0) {Write-Host "TSS uploaded on case $CaseNumber"}
+        else {Write-Warning "TSS upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
+    }
     #Upload TSR
     IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse).count){
         $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
-        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag $servicetag
-        #Get the File-Name without path
-        #$name = $ZipPath.Name
-
-        #The target URL wit SAS Token
-        #$uri = "https://gsetools.blob.core.windows.net/tsrcollect/$($name)?sp=acw&st=2022-08-14T21:28:03Z&se=2032-08-15T05:28:03Z&spr=https&sv=2021-06-08&sr=c&sig=dhqj1OR7bWRkRp4D3HXwnLT%2Ba%2Br4J6ANF80LhKcafAw%3D"
-
-        #Define required Headers
-        #$headers = @{
-        #    'x-ms-blob-type' = 'BlockBlob'
-        #    }
-
         #Upload File...
-        #$resp3=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath.FullName -ErrorAction Continue -Verbose 4>&1
+        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag $servicetag
         if ($s -eq 0) {Write-Host "TSRs uploaded on case $CaseNumber"}
         else {Write-Warning "TSRs upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
     }
