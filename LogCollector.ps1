@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.6"
+$Ver="1.7"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -79,8 +79,8 @@ param (
     [string]$Email = ''
 )
 $dfilename=Split-Path -Leaf $FilePath
-$CaseSrId= (Invoke-RestMethod -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$CaseNumber").cases.id
-$body = @{"customerEmail"="$Email";"fileName"="$dfilename";"fileSize"="20";"lightningCaseId"="$CaseSrId";"preferredName"="$PreferredName";"serviceRequestNb"="$CaseNumber"} | ConvertTo-Json
+If (!($Global:CaseSrId)) {$Global:CaseSrId= (Invoke-RestMethod -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$CaseNumber").cases.id}
+$body = @{"customerEmail"="$Email";"fileName"="$dfilename";"fileSize"="20";"lightningCaseId"="$($Global:CaseSrId)";"preferredName"="$PreferredName";"serviceRequestNb"="$CaseNumber"} | ConvertTo-Json
 $header = @{
  "Accept"="application/json"
  "Content-Type"="application/json"
@@ -218,7 +218,7 @@ if ($consent -eq "Y") {
  $x=0
  $Email=$null
  Do {
-    try {$Email = [mailaddress] (Read-Host -Prompt "Please enter your email address")} catch {Write-Warning "Email address invalid. Please correct"}
+    try {$Email = [mailaddress] (Read-Host -Prompt "`r`nPlease enter your email address")} catch {Write-Warning "Email address invalid. Please correct"}
     $x++
  } while ($x -lt 4 -and !($Email))
  If ($x -eq 4) {
@@ -234,8 +234,21 @@ if ($consent -eq "Y") {
 #only collect personal data when $consent eq 'Y'
 Write-Host ""
 $MyTemp=(Get-Item $env:temp).fullname
-$Global:CaseNumber =""
-$Global:CaseNumber = Read-Host -Prompt "Please enter the relevant technical support case number"
+$Global:CaseNumber =$null
+$Global:CaseSrId=$null
+$x=0
+ Do {
+    try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
+    $x++
+    If ($consent -eq "Y") {
+        try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases.id} catch {}
+        If (!($Global:CaseSrId)) {Write-Host "Invalid Case Number. Please try again" -ForegroundColor Yellow}
+    } else {If (!($Global:CaseNumber)) {$Global:CaseNumber="99999999999"}}
+ } while ($x -lt 4 -and !($Global:CaseSrId) -and $consent -eq "Y")
+ If ($x -eq 4) {
+    Write-Host "    ERROR: Too many tries. Exiting..." -ForegroundColor Red
+    EndScript
+ }
 # Run Menu
 Function ShowMenu{
     do
