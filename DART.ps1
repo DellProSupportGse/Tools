@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.50"
+$ver="1.51"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -182,7 +182,16 @@ Function ShowMenu{
         EndScript
     }
 }#End of ShowMenu
-ShowMenu
+#Added for SBE Update of HCI 23H2 so we do no harm
+IF($OSInfo.caption -imatch "Azure Stack HCI" -and $OSInfo.BuildNumber -ge "25398"){
+CLS
+Write-Host 
+Write-Host "WARNING: At this time DART does not support updating $($OSInfo.caption) 23H2." -ForegroundColor Yellow
+Write-Host "    For more information and detailed instructions for updating $($OSInfo.caption) 23H2, please refer to the release notes available here:"  -ForegroundColor Yellow
+Write-Host "        'https://www.dell.com/support/kbdoc/en-us/000224407/dell-for-microsoft-azure-stack-hci-ax-hardware-updates-release-notes'" -ForegroundColor Yellow
+Write-Host 
+EndScript
+}Else{ShowMenu}
 
 #Check for ignore checks
 If($IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}
