@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.51"
+$ver="1.52"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -183,6 +183,7 @@ Function ShowMenu{
     }
 }#End of ShowMenu
 #Added for SBE Update of HCI 23H2 so we do no harm
+$OSInfo = Get-WmiObject -Class Win32_OperatingSystem
 IF($OSInfo.caption -imatch "Azure Stack HCI" -and $OSInfo.BuildNumber -ge "25398"){
 CLS
 Write-Host 
