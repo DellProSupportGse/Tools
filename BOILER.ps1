@@ -250,7 +250,7 @@ ForEach($CBSLog in $LogsToProcess){
             $PostText=$post1+$kbGUID+$post2+$kbGUID+$post3
             $KBDLUriContent=(Invoke-WebRequest -Uri $PostText).content
             $KBDLUriSource=[regex]::matches( $KBDLUriContent,'downloadInformation\[0\].files\[0\].url\s\=.+').value -replace 'downloadInformation\[0\].files\[0\].url\s\=\s' -replace '\;' -replace"'"#>
-            $KBDLUriSource=Get-KBLink -Name $KB
+            $KBDLUriSource=Get-KBLink -Name $KB | Sort -Unique | Select -Last 1
             #https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2023/10/windows10.0-kb5031364-x64_03606fb9b116659d52e2b5f5a8914bbbaaab6810.msu
 
             If($KBDLUriSource.Length -lt 1){$KBDLUriSource = "Link no longer available"}
@@ -269,9 +269,9 @@ ForEach($CBSLog in $LogsToProcess){
             IF($objkb -notmatch "Link no longer available"){
                 Write-Host "           Suggested Fix (In Powershell): "
                 Write-host "                1. Example: mkdir C:\Dell\$($objkb.'            KBNumber')"
-                Write-host "                            wget $($objkb.'            KBDownloadLink'[-1]) -OutFile C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/')[-1])"
+                Write-host "                            wget $($objkb.'            KBDownloadLink') -OutFile C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/')[-1])"
                 Write-host '                2. Expand KB '
-                Write-host "                            expand ""C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/')[-1])"" -F:* C:\Dell\$($objkb.'            KBNumber')"
+                Write-host "                            expand ""C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/'))"" -F:* C:\Dell\$($objkb.'            KBNumber')"
                 Write-host "                3. DISM install identified KB(s) "
                 Write-host "                   Example: (gci C:\Dell\$($objkb.'            KBNumber')\*.cab | sort lastwritetime).fullname | %{dism /online /add-package /packagepath:`$_}"
                 Write-host ""
