@@ -268,17 +268,22 @@ ForEach($CBSLog in $LogsToProcess){
             $objkb | Format-List *
             IF($objkb -notmatch "Link no longer available"){
                 Write-Host "           Suggested Fix (In Powershell): "
-                Write-host "                1. Example: mkdir C:\Dell\$($objkb.'            KBNumber')"
+                Write-host "                1. Example: mkdir C:\Dell\$($objkb.'            KBNumber')\cabs"
                 Write-host "                            wget $($objkb.'            KBDownloadLink') -OutFile C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/')[-1])"
-                Write-host '                2. Expand KB '
-                Write-host "                            expand ""C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/'))"" -F:* C:\Dell\$($objkb.'            KBNumber')"
+                Write-host '                2. Expand KB and cabs '
+                Write-host "                            expand ""C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/')[-1])"" -F:* C:\Dell\$($objkb.'            KBNumber')"
+                Write-host "                            (gci C:\Dell\$($objkb.'            KBNumber')\*.cab).fullname | %{expand `$_ -F:*.cab C:\Dell\$($objkb.'            KBNumber')\cabs}"
                 Write-host "                3. DISM install identified KB(s) "
-                Write-host "                   Example: (gci C:\Dell\$($objkb.'            KBNumber')\*.cab | sort lastwritetime).fullname | %{dism /online /add-package /packagepath:`$_}"
+                Write-host "                   Example: (gci C:\Dell\$($objkb.'            KBNumber')\*.cab -Recurse | sort lastwritetime).fullname | %{dism /online /add-package /packagepath:`$_}"
                 Write-host ""
-            }ElseIF($objkb -match "Link no longer available"){
+            }ElseIF($objkb -match "Link no longer available" -and $objkb.'            KBNumber'.length -gt 0){
                 Write-Host "            Suggested Fix: "
                 Write-Host "                Remove KB from registry. See Josh's CBS reg cleaner script"
                 Write-host ""
+                <#mkdir C:\Dell\KB5040437\cabs
+expand "C:\Dell\KB5040437\windows10.0-kb5040437-x64_c1c5b6fc0825f932db8a90481dd087b07053de91.msu" -F:* C:\Dell\KB5040437
+(gci C:\Dell\KB5040437\*.cab | sort lastwritetime).fullname | %{expand $_ -F:*.cab C:\Dell\KB5040437\cabs}
+(gci C:\Dell\KB5040437\*.cab -Recurse | sort lastwritetime).fullname | %{dism /online /add-package /packagepath:$_}#>
             }
         }
     }
