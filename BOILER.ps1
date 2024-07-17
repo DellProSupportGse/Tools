@@ -272,7 +272,7 @@ ForEach($CBSLog in $LogsToProcess){
                 Write-host "                            wget $($objkb.'            KBDownloadLink') -OutFile C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/')[-1])"
                 Write-host '                2. Expand KB and cabs '
                 Write-host "                            expand ""C:\Dell\$($objkb.'            KBNumber')\$(($objkb.'            KBDownloadLink').split('/')[-1])"" -F:* C:\Dell\$($objkb.'            KBNumber')"
-                Write-host "                            (gci C:\Dell\$($objkb.'            KBNumber')\*.cab).fullname | %{expand `$_ -F:*.cab C:\Dell\$($objkb.'            KBNumber')\cabs}"
+                Write-host "                            (gci C:\Dell\$($objkb.'            KBNumber')\*.cab).fullname | %{expand `$_ -F:* C:\Dell\$($objkb.'            KBNumber')\cabs}"
                 Write-host "                3. DISM install identified KB(s) "
                 Write-host "                   Example: (gci C:\Dell\$($objkb.'            KBNumber')\*.cab -Recurse | sort lastwritetime).fullname | %{dism /online /add-package /packagepath:`$_}"
                 Write-host ""
