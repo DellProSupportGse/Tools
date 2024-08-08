@@ -20,7 +20,7 @@ Function Invoke-GetShowTech {
     Start-Transcript -NoClobber -Path "C:\programdata\Dell\GetShowTech\GetShowTech_$DateTime.log"
 
 $text=@"
-v1.11
+v1.12
    ___     _   ___ _               _____       _    
   / __|___| |_/ __| |_  _____ __ _|_   _|__ __| |_  
  | (_ / -_)  _\__ \ ' \/ _ \ V  V / | |/ -_) _| ' \ 
@@ -53,7 +53,7 @@ if ($PSCmdlet.ShouldProcess($param)) {
     # Get switch IP addresses
         $SwIPs=Read-Host "Please enter comma delimited list of switch IP addresse(s)"
         $i=0
-        IF($SwIPs -imatch ','){$SwIPs=$SwIPs -split ','}
+        IF($SwIPs -imatch ','){$SwIPs=($SwIPs -split ',').Trim()}
         While(($SwIPs.count -eq ($SwIPs | %{[IPAddress]$_.Trim()}).count) -eq $False){
             $i++
             Write-Host "WARNING: Not a valid IP. Please try again." -ForegroundColor Yellow
