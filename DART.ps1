@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.54"
+$ver="1.55"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -118,6 +118,9 @@ $ver
 |__/ /~~\ |  \  |  
 "@
 # Run Menu
+$OSInfo = Get-WmiObject -Class Win32_OperatingSystem
+$Global:pre23h2=($OSInfo.caption -inotmatch "Azure Stack HCI" -and $OSInfo.BuildNumber -lt "25398")
+if ($Global:pre23h2) {$sel='[1-2,qQ,hH]'} else {$sel='[1,qQ,hH]'}
 Function ShowMenu{
     do
      {
@@ -129,15 +132,15 @@ Function ShowMenu{
          Write-Host ""
          Write-Host "==================== Please make a selection ====================="
          Write-Host ""
-         Write-Host "Press '1' to Install Windows Updates"
-         Write-Host "Press '2' to Install Dell Drivers and Firmware"
-         Write-Host "Press '3' to Install Windows Updates and Dell Drivers and Firmware"
+         Write-Host "Press '1' to Install Dell Drivers and Firmware"
+         IF($Global:pre23h2){Write-Host "Press '2' to Install Windows Updates"}
+         #Write-Host "Press '3' to Install Windows Updates and Dell Drivers and Firmware"
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
          $selection = Read-Host "Please make a selection"
      }
-    until ($selection -match '[1-3,qQ,hH]')
+    until ($selection -match $sel)
     $Global:WindowsUpdates=$False
     $Global:DriverandFirmware=$False
     $Global:Confirm=$False
@@ -157,25 +160,25 @@ Function ShowMenu{
         Pause
         ShowMenu
     }
-    IF($selection -match 1){
+    IF($selection -match 2 -and $Global:pre23h2){
         Write-Host "Installing Windows Updates..."
         $Global:WindowsUpdates=$True
-        $Global:DriverandFirmware=$False
+        #$Global:DriverandFirmware=$False
         $Global:Confirm=$false
     }
 
-    IF($selection -match 2){
+    IF($selection -match 1){
         Write-Host "Installing Dell Drivers and Firmware..."
-        $Global:WindowsUpdates=$False
+        #$Global:WindowsUpdates=$False
         $Global:DriverandFirmware=$True
         $Global:Confirm=$false
     }
-    IF($selection -match 3){
+    <#IF($selection -match 3){
         Write-Host "Installing Windows Updates and Dell Drivers and Firmware..."
         $Global:WindowsUpdates=$True
         $Global:DriverandFirmware=$True
         $Global:Confirm=$false
-    }
+    }#>
 
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
@@ -186,10 +189,9 @@ Function ShowMenu{
 If($IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}
 If($IgnoreVersion -eq $True){Write-Host "IgnoreVersion:True" -ForegroundColor Yellow}
 
-IF(!($IgnoreChecks -eq $True)){
+IF(!($IgnoreChecks -eq $True) -and !($IgnoreVersion -eq $True)){
     #Added for SBE Update of HCI 23H2 so we do no harm
-    $OSInfo = Get-WmiObject -Class Win32_OperatingSystem
-    IF($OSInfo.caption -imatch "Azure Stack HCI" -and $OSInfo.BuildNumber -ge "25398"){
+    IF(!($Global:pre23h2)){
     CLS
     Write-Host 
     Write-Host "WARNING: At this time DART does not support updating $($OSInfo.caption) 23H2." -ForegroundColor Yellow
@@ -527,4 +529,4 @@ If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}# Dell Server Check
 Stop-Transcript
 }               
-               Invoke-DART -IgnoreChecks $IgnoreChecks
+               Invoke-DART -IgnoreChecks $IgnoreChecks -IgnoreVersion $IgnoreVersion
