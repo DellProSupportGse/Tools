@@ -15,13 +15,13 @@
     
     param(
     [Parameter(Mandatory=$False, Position=1)]
-    [bool] $IgnoreChecks)
+    [bool] $IgnoreChecks,[bool] $IgnoreVersion)
 
 Function Invoke-DART {
 
     param(
     [Parameter(Mandatory=$False, Position=1)]
-    [bool] $IgnoreChecks,
+    [bool] $IgnoreChecks,[bool] $IgnoreVersion,
     $param)
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.53"
+$ver="1.54"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -184,6 +184,7 @@ Function ShowMenu{
 }#End of ShowMenu
 #Check for ignore checks
 If($IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}
+If($IgnoreVersion -eq $True){Write-Host "IgnoreVersion:True" -ForegroundColor Yellow}
 
 IF(!($IgnoreChecks -eq $True)){
     #Added for SBE Update of HCI 23H2 so we do no harm
