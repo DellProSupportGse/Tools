@@ -15,13 +15,13 @@
     
     param(
     [Parameter(Mandatory=$False, Position=1)]
-    [bool] $IgnoreChecks,[bool] $IgnoreVersion)
+    [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False)
 
 Function Invoke-DART {
 
     param(
     [Parameter(Mandatory=$False, Position=1)]
-    [bool] $IgnoreChecks,[bool] $IgnoreVersion,
+    [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False,
     $param)
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
