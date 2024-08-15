@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.55"
+$ver="1.56"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -119,7 +119,7 @@ $ver
 "@
 # Run Menu
 $OSInfo = Get-WmiObject -Class Win32_OperatingSystem
-$Global:pre23h2=($OSInfo.caption -inotmatch "Azure Stack HCI" -and $OSInfo.BuildNumber -lt "25398")
+$Global:pre23h2=!($OSInfo.caption -imatch "Azure Stack HCI" -and $OSInfo.BuildNumber -ge "25398")
 if ($Global:pre23h2) {$sel='[1-2,qQ,hH]'} else {$sel='[1,qQ,hH]'}
 Function ShowMenu{
     do
