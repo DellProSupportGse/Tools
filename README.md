@@ -102,6 +102,7 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
    Transcript Logging: C:\ProgramData\Dell\DART
    
    Use -IgnoreChecks:$True to install updates without suspending cluster node or enabling storage maintenance mode for Azure Stack HCI
+   
    Use -IgnoreVersion:$True to ignore the block for for 23H2 prior to the cluster deployment
    
 -------------------------------------------------------------------------------------------------------------------------------------------------
