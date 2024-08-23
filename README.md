@@ -81,7 +81,7 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
    4. Is Azure Stack HCI (Storage Spaces Direct Ready Node or AX node)
       - We download and extract the AZHCI-Catalog to use with DSU
       - We Pause & Drain the node and Enable Storage Maintenance Mode
-      - Installs Windows Updates
+      - Installs Windows Updates (Only pre 23H2 OS releases)
       - Runs DSU
         - No reboot required: We resume the node, disable Storage Maintenance Mode and show Installation Report
         - Reboot Required: We setup a logon task that will resume the node and disable Storage Maintenance Mode after the reboot and logon
@@ -102,6 +102,7 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
    Transcript Logging: C:\ProgramData\Dell\DART
    
    Use -IgnoreChecks:$True to install updates without suspending cluster node or enabling storage maintenance mode for Azure Stack HCI
+   Use -IgnoreVersion:$True to force DART to allow installation of Dell updates on AX 23H2+ nodes.
    
    Use -IgnoreVersion:$True to ignore the block for for 23H2 prior to the cluster deployment
    
