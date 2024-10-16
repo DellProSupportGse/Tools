@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.56"
+$ver="1.57"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -134,6 +134,7 @@ Function ShowMenu{
          Write-Host ""
          Write-Host "Press '1' to Install Dell Drivers and Firmware"
          IF($Global:pre23h2){Write-Host "Press '2' to Install Windows Updates"}
+         IF($Global:pre23h2){Write-Host "Press '12' to Install both Dell Drivers and Firmware as well as Windows Updates"}
          #Write-Host "Press '3' to Install Windows Updates and Dell Drivers and Firmware"
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
@@ -469,6 +470,7 @@ $DSUReboot=$False
         }ElseIF($DriverandFirmware -eq $False){Write-Host "    Skipped Dell Drivers and Firmware" -ForegroundColor Yellow}
 If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
     Write-Host "Please reboot to complete installation" -ForegroundColor Yellow
+    Write-Host "Will create Exit Maintenance Mode Scheduled Task to run at next logon or five minutes after finishing OS boot...." -ForegroundColor Yellow
             try {$Host.UI.RawUI.FlushInputBuffer() } catch {while ($Host.UI.RawUI.KeyAvailable) {
                     $Host.UI.RawUI.ReadKey() | Out-Null
                 }}
@@ -480,7 +482,11 @@ If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
                         New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
                     }
                     $Script | Out-File -FilePath c:\dell\exit-maintenancemode.ps1 -Force
-                    Register-ScheduledTask -User "system" -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
+                    $trigger=@()
+                    $trigger+=New-ScheduledTaskTrigger -AtStartup
+                    $trigger[0].Delay='PT5M'
+                    $trigger+=New-ScheduledTaskTrigger -AtLogon
+                    Register-ScheduledTask -User "system" -TaskName "Exit Maintenance Mode" -Trigger $trigger -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Settings (New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew) -Force;
                     Restart-Computer -Force
                     EndScript
                     }
@@ -520,8 +526,12 @@ If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
                             New-Item -Path "c:\" -Name "Dell" -ItemType "directory"
                         }
                         $Script | Out-File -FilePath c:\dell\exit-maintenancemode.ps1 -Force
-                        Write-Host "Creating Exit Maintenance Mode Scheduled Task to run at next logon...."
-                        Register-ScheduledTask -User "system" -TaskName "Exit Maintenance Mode" -Trigger (New-ScheduledTaskTrigger -AtLogon) -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Force;
+                        Write-Host "Creating Exit Maintenance Mode Scheduled Task to run at next logon or five minutes after finishing OS boot...."
+                        $trigger=@()
+                        $trigger+=New-ScheduledTaskTrigger -AtStartup
+                        $trigger[0].Delay='PT5M'
+                        $trigger+=New-ScheduledTaskTrigger -AtLogon
+                        Register-ScheduledTask -User "system" -TaskName "Exit Maintenance Mode" -Trigger $trigger -Action (New-ScheduledTaskAction -Execute "${Env:WinDir}\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument "-WindowStyle Hidden -Command `"& 'c:\dell\exit-maintenancemode.ps1'`"") -RunLevel Highest -Settings (New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew) -Force;
                     }
             }
         }
