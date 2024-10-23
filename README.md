@@ -21,6 +21,15 @@ Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocol
 ### Solution:
  	$browser = New-Object System.Net.WebClient;$browser.Proxy.Credentials =[System.Net.CredentialCache]::DefaultNetworkCredentials;Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/ToolBox.ps1'));Invoke-ToolBox
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## APEX VM Log Collection
+   This script is used to collect logs from a APEX VM
+	
+### Usage
+Copy the code and paste it into the terminal on your APEX VM after elevating to root
+```Bash
+curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && chmod 755 log_collect.sh && bash ./log_collect.sh
+``` 
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## AzHCIUrlChecker
    This script checks the URLs that the Azure Stack HCI operating system may need to access as per Microsoft Doc: 
 	https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firewall-requirements
