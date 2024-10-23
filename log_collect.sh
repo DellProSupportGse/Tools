@@ -18,10 +18,10 @@
 	echo #
 	df -h -t ext4
 	echo #
-	read -p "This script will create manual logs on the folder that is being executed. If needed, move the script to another partition with more space available before proceeding. Proceed (Y/N) " -n 1 -r
+#	read -p "This script will create manual logs on the folder that is being executed. If needed, move the script to another partition with more space available before proceeding. Proceed (Y/N) " -n 1 -r
 	 
-	if [[ $REPLY =~ ^[Yy]$ ]]
-	then
+#	if [[ $REPLY =~ ^[Yy]$ ]]
+#	then
 	  echo -e ""
 	  mkdir -p /$PWD/$folder/dump
 	  echo $version > /$PWD/$folder/script_version.txt
