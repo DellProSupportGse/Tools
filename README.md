@@ -19,9 +19,7 @@ Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocol
 ##### If you see the following error:
 ![alt text](readme/ToolBoxProxyError.jpg)
 ### Solution:
-##### Run this in the PowerShell windows before running the command
- 	$browser = New-Object System.Net.WebClient
-	$browser.Proxy.Credentials =[System.Net.CredentialCache]::DefaultNetworkCredentials
+ 	$browser = New-Object System.Net.WebClient;$browser.Proxy.Credentials =[System.Net.CredentialCache]::DefaultNetworkCredentials;Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/ToolBox.ps1'));Invoke-ToolBox
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## AzHCIUrlChecker
    This script checks the URLs that the Azure Stack HCI operating system may need to access as per Microsoft Doc: 
