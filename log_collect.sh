@@ -114,6 +114,7 @@ then
   mv /data/store2/container_logs_script/* /$PWD/$folder/service_status/container_logs
   rm /data/store2/container_logs_script -r
   zip -r /$PWD/$file /$PWD/$folder/*
+  echo "Zip file created at: $PWD/$file"
   rm -R /$PWD/$folder/
 fi
 
