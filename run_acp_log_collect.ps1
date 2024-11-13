@@ -9,6 +9,7 @@
 
 Function Invoke-RunAPEXlogsCollector {
 clear-host
+Write-host ""
 $ver="1.1"
 $text=@"
 $ver
@@ -19,6 +20,7 @@ $ver
                                 |___/                                   
 
 "@
+
 $text
 
 # Ask for APEX VM IP
