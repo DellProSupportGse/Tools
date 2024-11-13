@@ -1,2 +1,4 @@
-#!/bin/sh
-[ "$(whoami)" != "root" ] && exec sudo -- "$0" "$@"
+ if [ $(id -u) != 0 ]; then
+     echo "You're not root"
+     # elevate script privileges
+ fi
