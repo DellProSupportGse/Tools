@@ -20,7 +20,7 @@ $ver
                                 |___/                                   
 "@
 
-$titletext
+Write-host $titletext
 
 # Ask for APEX VM IP
 [ipaddress]$axvmip=Read-host "Please provide APEX VM IP address "
