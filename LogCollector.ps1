@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.7"
+$Ver="1.8"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -259,6 +259,7 @@ Function ShowMenu{
          Write-Host ""
          Write-Host "============ Please make a selection ==================="
          Write-Host ""
+         Write-Host "0)  APEX Logs (ACP/ECE)"
          Write-Host "1)  Azure Stack HCI/S2D logs (SDDC)"
          Write-Host "2)  PowerEdge logs (TSR)"
          Write-Host "3)  Switch logs (Show Tech)"
@@ -267,11 +268,12 @@ Function ShowMenu{
          Write-Host ""
          $selection = Read-Host "Type a number(s) and press [Enter]"
      }
-    until ($selection -match '[1-4,qQ,hH]')
-    $Global:CollectSTS  = "N"
-    $Global:CollectSDDC = "N"
-    $Global:CollectTSR  = "N"
-    $Global:CollectTSS  = "N"
+    until ($selection -match '[0-4,qQ,hH]')
+    $Global:CollectACPECE  = "N"
+    $Global:CollectSTS     = "N"
+    $Global:CollectSDDC    = "N"
+    $Global:CollectTSR     = "N"
+    $Global:CollectTSS     = "N"
     IF($selection -imatch 'h'){
         Clear-Host
         Write-Host ""
@@ -289,6 +291,13 @@ Function ShowMenu{
         Write-Host ""
         Pause
         ShowMenu
+    }
+    IF($selection -match 0){
+        Write-Host "Gathering APEX Logs (ACP/ECE)..."
+        $Global:CollectACPECE = "Y"
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="run_acp_log_collect";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/run_acp_log_collect.ps1'))
+        $ACPLogPath = Invoke-RunAPEXlogsCollecter -confirm:$False
+
     }
     IF($selection -match 3){
         Write-Host "Gathering Switch logs (Show Tech)..."
@@ -383,6 +392,13 @@ Function ZipNClean{
 Function UploadLogs {
     $MyTemp=(Get-Item $env:temp).fullname
     Write-Host "Uploading files. Please wait...."
+    # Upload ACPECE logs
+        IF($ACPLogPath){
+            $s=Upload-FileToCase -FilePath $ACPLogPath -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$((wmic bios get serialnumber).split("`t")[2])"
+        if ($s -eq 0) {Write-Host "ACP/ECE logs uploaded to case $CaseNumber"}
+            else {Write-Warning "ACP/ECE logs upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
+        }
+
     #Upload SDDC
     IF(Test-Path -Path "$MyTemp\logs\Healthtest*$CaseNumber*"){
         $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*$CaseNumber* | sort lastwritetime | select -last 1 
