@@ -11,17 +11,16 @@ Function Invoke-RunAPEXlogsCollector {
 clear-host
 Write-host ""
 $ver="1.1"
-$text=@"
+$titletext=@"
 $ver
     _   ___ _____  __  _                 ___     _ _        _           
    /_\ | _ \ __\ \/ / | |   ___  __ _   / __|___| | |___ __| |_ ___ _ _ 
   / _ \|  _/ _| >  <  | |__/ _ \/ _| | | (__/ _ \ | / -_) _|  _/ _ \ '_|
  /_/ \_\_| |___/_/\_\ |____\___/\__, |  \___\___/_|_\___\__|\__\___/_|  
                                 |___/                                   
-
 "@
 
-$text
+$titletext
 
 # Ask for APEX VM IP
 [ipaddress]$axvmip=Read-host "Please provide APEX VM IP address "
