@@ -295,7 +295,7 @@ Function ShowMenu{
     IF($selection -match 0){
         Write-Host "Gathering APEX Logs (ACP/ECE)..."
         $Global:CollectACPECE = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="run_acp_log_collect";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/run_acp_log_collect.ps1'))
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunAcpLogCollector";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/run_acp_log_collect.ps1'))
         $ACPLogPath = Invoke-RunAPEXlogsCollector -confirm:$False
 
     }
