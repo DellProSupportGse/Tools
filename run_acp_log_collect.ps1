@@ -1,3 +1,4 @@
+Function Invoke-RunAPEXlogsCollecter {
 clear-host
 $ver="1.0"
 $text=@"
@@ -32,3 +33,4 @@ $logname = Split-Path $logpath -leaf
 scp mystic@$($axvmip.IPAddressToString):$logpath $env:temp\$logname
 
 Write-host "Logs can be found at: $env:temp\$logname"
+}
