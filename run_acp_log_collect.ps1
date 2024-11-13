@@ -1,12 +1,21 @@
+    <#
+    .Synopsis
+       Invoke-RunAPEXlogsCollector
+    .DESCRIPTION
+       This tool is used to collect logs from APEX VM
+    .EXAMPLE
+       Invoke-RunAPEXlogsCollector
+    #>
+
 Function Invoke-RunAPEXlogsCollector {
 clear-host
-$ver="1.0"
+$ver="1.1"
 $text=@"
 $ver
     _   ___ _____  __  _                 ___     _ _        _           
    /_\ | _ \ __\ \/ / | |   ___  __ _   / __|___| | |___ __| |_ ___ _ _ 
-  / _ \|  _/ _| >  <  | |__/ _ \/ _| | | (__/ _ \ | / -_) _|  _/ -_) '_|
- /_/ \_\_| |___/_/\_\ |____\___/\__, |  \___\___/_|_\___\__|\__\___|_|  
+  / _ \|  _/ _| >  <  | |__/ _ \/ _| | | (__/ _ \ | / -_) _|  _/ _ \ '_|
+ /_/ \_\_| |___/_/\_\ |____\___/\__, |  \___\___/_|_\___\__|\__\___/_|  
                                 |___/                                   
 
 "@
