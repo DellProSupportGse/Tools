@@ -1,4 +1,4 @@
-Function Invoke-RunAPEXlogsCollecter {
+Function Invoke-RunAPEXlogsCollector {
 clear-host
 $ver="1.0"
 $text=@"
