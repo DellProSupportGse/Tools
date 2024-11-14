@@ -9,7 +9,7 @@
 
 Function Invoke-RunAPEXlogsCollector {
 clear-host
-$ver="1.1"
+$ver="1.2"
 $titletext=@"
 $ver
     _   ___ _____  __  _                 ___     _ _        _           
@@ -22,16 +22,18 @@ Write-host ""
 Write-host $titletext
 
 # Ask for APEX VM IP
-[ipaddress]$axvmip=Read-host "Please provide APEX VM IP address "
+[ipaddress]$axvmip=Read-host "Please enter the IP address of the APEX VM:"
 
 # Ask for Root password
-$rootpwd=Read-Host "Please provide root password" -AsSecureString
+$rootpwd=Read-Host "Please enter the root password for the APEX VM:" -AsSecureString
 
 # Download, run and remove log_collect.sh script
-$Result = ssh mystic@$($axvmip.IPAddressToString) "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
+Write-host "Executing log collection..."
+$Result = ssh mystic@$($axvmip.IPAddressToString) "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && rm -f manual_log* && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
 
 # Clear root password
 $rootpwd=""
+Write-host "Cleared the stored root password."
 
 # Find path to output
 $logpath = $result | select -last 1
@@ -39,8 +41,9 @@ $logpath = ($logpath -split ": ")[-1]
 $logname = Split-Path $logpath -leaf
 
 # Copy local
+Write-host "Please enter the password to enable SCP for log transfer:"
 scp mystic@$($axvmip.IPAddressToString):$logpath $env:temp\$logname
 
-Write-host "Logs can be found at: $env:temp\$logname"
+Write-host "Log files are located at: $env:temp\$logname"
 return "$env:temp\$logname"
 }
