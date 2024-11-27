@@ -21,7 +21,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.28
+v1.29
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -94,7 +94,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
  Write-Host "Currently Installed Dell Cluster Log Collector: $($DellSDDCInstalledVerson.tostring())"
         if ($DellSDDCInstalledVerson -lt ((Find-Module $module -Repository DellGSEPSRepository).version)) {
             if ($DellSDDCInstalledVerson -gt [version]'0.9') {Update-Module $module -Verbose}
-            else {Install-Module $module -Repository DellGSEPSRepository -Verbose -Force}
+            else {Install-Module $module -Repository DellGSEPSRepository -SkipPublisherCheck -Force}
         }
     } catch {
         Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $MyTemp\$branch.zip
