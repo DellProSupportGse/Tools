@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.8"
+$Ver="1.81"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -393,7 +393,7 @@ Function UploadLogs {
     Write-Host "Uploading files. Please wait...."
     # Upload ACPECE logs
         IF($ACPLogPath){
-            $s=Upload-FileToCase -FilePath $ACPLogPath -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$((wmic bios get serialnumber).split("`t")[2])"
+            $s=Upload-FileToCase -FilePath $ACPLogPath -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
         if ($s -eq 0) {Write-Host "ACP/ECE logs uploaded to case $CaseNumber"}
             else {Write-Warning "ACP/ECE logs upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
         }
@@ -401,7 +401,7 @@ Function UploadLogs {
     #Upload SDDC
     IF(Test-Path -Path "$MyTemp\logs\Healthtest*$CaseNumber*"){
         $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*$CaseNumber* | sort lastwritetime | select -last 1 
-        $s=Upload-FileToCase -FilePath $HealthZip.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$((wmic bios get serialnumber).split("`t")[2])"
+        $s=Upload-FileToCase -FilePath $HealthZip.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
         
         #Get the File-Name without path
         #$name = (Get-Item $HealthZip).Name
@@ -450,7 +450,7 @@ Function UploadLogs {
         $ZipPath=Get-ChildItem -Path "C:\Dell\Logs" -Filter "$($CaseNumber).zip" -Recurse | sort lastwritetime | select -last 1
         $ZipPath=Rename-Item $ZipPath.FullName "TSS-$($ZipPath.Name)" -PassThru
         #Upload File...
-        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$((wmic bios get serialnumber).split("`t")[2])"
+        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
         if ($s -eq 0) {Write-Host "TSS uploaded on case $CaseNumber"}
         else {Write-Warning "TSS upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
     }
