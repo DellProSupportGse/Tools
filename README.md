@@ -70,6 +70,8 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
   
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## DART
+**DO NOT USE on 23H2**
+
    **D**ell **A**utomated se**R**ver upda**T**er is a Windows Failover Cluster and HCI/S2D aware tool that will automatically download and 
    install Windows Updates, Drivers/Firmware on Dell Servers.
   
