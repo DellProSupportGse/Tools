@@ -18,20 +18,6 @@
 
 Function Invoke-EceLogCollection{
 	
-# Gather creds without showing the Password
-	$LocalAdminCreds=Get-Credential -UserName (Get-LocalUser | Where-Object { $_.SID -like '*-500' }).name -Message "Please enter the local administrator account credentials."
-	$LocalAdminUser = $LocalAdminCreds.UserName
-	$Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($LocalAdminCreds.Password)
-	$LocalAdminPswd = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($Ptr)
-	[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Ptr)
-
-	$LcmCreds=Get-Credential -Message "Please enter the LCM account credentials."
-	$AdUser = $LcmCreds.UserName
-	$Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($LcmCreds.Password)
-	$AdPswd = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($Ptr)
-	[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Ptr)
-
-
 param(
     [Parameter(Mandatory = $true, Position = 0, ValueFromPipelineByPropertyName = $true)]
     [string]
@@ -49,6 +35,19 @@ param(
     [string]
     ${AdPswd}
 )
+
+# Gather creds without showing the Password
+	$LocalAdminCreds=Get-Credential -UserName (Get-LocalUser | Where-Object { $_.SID -like '*-500' }).name -Message "Please enter the local administrator account credentials."
+	$LocalAdminUser = $LocalAdminCreds.UserName
+	$Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($LocalAdminCreds.Password)
+	$LocalAdminPswd = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($Ptr)
+	[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Ptr)
+
+	$LcmCreds=Get-Credential -Message "Please enter the LCM account credentials."
+	$AdUser = $LcmCreds.UserName
+	$Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($LcmCreds.Password)
+	$AdPswd = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($Ptr)
+	[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Ptr)
 
 function copyFile(){
     [CmdletBinding()]
