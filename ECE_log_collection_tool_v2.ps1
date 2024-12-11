@@ -35,21 +35,6 @@ Function Invoke-EceLogCollection{
 
 Function Invoke-RunEceLogCollection {
 
-        [CmdletBinding()]
-    Param(
-        [Parameter(Mandatory=$true, Position=0, HelpMessage="Nodecredential")]
-        [System.Management.Automation.PSCredential]
-        $Nodecredential,
-
-        [Parameter(Mandatory=$true, Position=1, HelpMessage="ADcredential")]
-        [System.Management.Automation.PSCredential]
-        $ADcredential,
-
-        [Parameter(Mandatory=$true, Position=2, HelpMessage="node ip")]
-        [String]
-        $IP,
-    )
-
 function copyFile(){
     [CmdletBinding()]
     Param(
