@@ -18,24 +18,6 @@
 
 Function Invoke-EceLogCollection{
 	
-param(
-    [Parameter(Mandatory = $true, Position = 0, ValueFromPipelineByPropertyName = $true)]
-    [string]
-    ${LocalAdminUser},
-
-    [Parameter(Mandatory = $true, Position = 1, ValueFromPipelineByPropertyName = $true)]
-    [string]
-    ${LocalAdminPswd},
-
-    [Parameter(Mandatory = $true, Position = 2, ValueFromPipelineByPropertyName = $true)]
-    [string]
-    ${AdUser},
-
-    [Parameter(Mandatory = $true, Position = 3, ValueFromPipelineByPropertyName = $true)]
-    [string]
-    ${AdPswd}
-)
-
 # Gather creds without showing the Password
 	$LocalAdminCreds=Get-Credential -UserName (Get-LocalUser | Where-Object { $_.SID -like '*-500' }).name -Message "Please enter the local administrator account credentials."
 	$LocalAdminUser = $LocalAdminCreds.UserName
@@ -48,6 +30,10 @@ param(
 	$Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($LcmCreds.Password)
 	$AdPswd = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($Ptr)
 	[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Ptr)
+	Invoke-RunEceLogCollection $LocalAdminUser $LocalAdminPswd $AdUser $AdPswd
+}
+
+Function Invoke-RunEceLogCollection {
 
 function copyFile(){
     [CmdletBinding()]
