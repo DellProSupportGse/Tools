@@ -17,7 +17,7 @@
 # 4.The log zip will be generated in the directory where this script is located
 
 Function Invoke-EceLogCollection{
-    	
+
 # Gather creds without showing the Password
 	$LocalAdminCreds=Get-Credential -UserName (Get-LocalUser | Where-Object { $_.SID -like '*-500' }).name -Message "Please enter the local administrator account credentials."
 	$LocalAdminUser = $LocalAdminCreds.UserName
@@ -30,6 +30,7 @@ Function Invoke-EceLogCollection{
 	$Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($LcmCreds.Password)
 	$AdPswd = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($Ptr)
 	[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Ptr)
+
 	Invoke-RunEceLogCollection $LocalAdminUser $LocalAdminPswd $AdUser $AdPswd
 }
 
@@ -279,3 +280,5 @@ $ZipFileOutputFullName=(Get-item $zipFilePath).fullname
 Write-Host "zip path: $ZipFileOutputFullName"
 Return $ZipFileOutputFullName
 }
+
+Invoke-EceLogCollection
