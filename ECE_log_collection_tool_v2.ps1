@@ -17,7 +17,7 @@
 # 4.The log zip will be generated in the directory where this script is located
 
 Function Invoke-EceLogCollection{
-	
+    	
 # Gather creds without showing the Password
 	$LocalAdminCreds=Get-Credential -UserName (Get-LocalUser | Where-Object { $_.SID -like '*-500' }).name -Message "Please enter the local administrator account credentials."
 	$LocalAdminUser = $LocalAdminCreds.UserName
@@ -34,6 +34,21 @@ Function Invoke-EceLogCollection{
 }
 
 Function Invoke-RunEceLogCollection {
+
+        [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$true, Position=0, HelpMessage="Nodecredential")]
+        [System.Management.Automation.PSCredential]
+        $Nodecredential,
+
+        [Parameter(Mandatory=$true, Position=1, HelpMessage="ADcredential")]
+        [System.Management.Automation.PSCredential]
+        $ADcredential,
+
+        [Parameter(Mandatory=$true, Position=2, HelpMessage="node ip")]
+        [String]
+        $IP,
+    )
 
 function copyFile(){
     [CmdletBinding()]
