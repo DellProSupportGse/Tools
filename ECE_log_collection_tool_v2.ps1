@@ -275,5 +275,7 @@ $zipFilePath = "$LogsRootDirectory.zip"
 Write-Host "=====================remove log folder==========================="
 Remove-Item -Path $LogsRootDirectory -Force -Recurse
 Write-Host "collect finish!"
-Write-Host "zip path: $zipFilePath"
+$ZipFileOutputFullName=(Get-item $zipFilePath).fullname
+Write-Host "zip path: $ZipFileOutputFullName"
+Return $ZipFileOutputFullName
 }
