@@ -377,7 +377,7 @@ Return $DSUReboot
         $IsDSUInstalled="NO"
         IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell System Update(DSU)..."
-            $LatestDSU = 'https://dl.dell.com/FOLDER10889507M/1/Systems-Management_Application_RPW7K_WN64_2.0.2.3_A00.EXE'
+            $LatestDSU = 'https://dl.dell.com/FOLDER12418375M/1/Systems-Management_Application_03GC8_WN64_2.1.1.0_A00.EXE'
             $DSUInstallerLocation=Download-File $LatestDSU
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
