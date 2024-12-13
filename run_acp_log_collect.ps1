@@ -9,7 +9,7 @@
 
 Function Invoke-RunAPEXlogsCollector {
 clear-host
-$ver="1.4"
+$ver="1.5"
 $titletext=@"
 $ver
     _   ___ _____  __  _                 ___     _ _        _           
@@ -29,9 +29,15 @@ $rootpwd = Read-Host "Enter root password for APEX VM (input will be hidden and 
 
 # Download, run and remove log_collect.sh script
 Write-Host "Gathering logs..."
+$UserCheck = Read-host "Use mystic account [y/n]?"
+IF($UserCheck -eq "y"){
 Write-Host "Please enter the SSH password for APEX VM access:"
-$Result = ssh mystic@$($axvmip.IPAddressToString) "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && rm -f manual_log* && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
-
+    $Result = ssh mystic@$($axvmip.IPAddressToString) "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && rm -f manual_log* && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
+}Else{
+Write-Host "Please enter the SSH password for APEX VM access:"
+$SshUsername = Read-host "Please provide ssh user name"
+    $Result = ssh $SshUsername@$($axvmip.IPAddressToString) "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && rm -f manual_log* && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
+}
 # Clear root password
 $rootpwd=""
 Write-Host "Securely cleared the root password from memory."
