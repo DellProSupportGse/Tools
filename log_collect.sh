@@ -32,21 +32,8 @@ then
   mkdir -p /$PWD/$folder/data
   mkdir -p /$PWD/$folder/cert
 
-  # Post-Hook directory
-  target_directory="/var/lib/service_data/workflow_engine/data/instance/"
-  # Loop through each directory to get the post-hook logs if they exist
-  if [ ! -d "$target_directory" ]; then
-    for dir in "$target_directory"*/ ; do
-      # Check if the item is indeed a directory
-      if [ -d "$dir" ]; then
-          # Print the name of the directory
-          echo "Processing directory: $dir"
-          # You can place your commands here to process each directory
-          cp $dir /$PWD/$folder/cert/ -R      
-      fi
-    fi
-  done
-  
+  cp /var/lib/service_data/workflow_engine/data/instance /$PWD/$folder/cert/ -R
+  cp /var/lib/service_data/az-day1-bringup/data /$PWD/$folder/cert/ -R
   cp /var/lib/apexcp/trust /$PWD/$folder/cert/ -R
   cp /var/lib/service_data/* /$PWD/$folder/data/ -R
   cp /var/lib/rancher/rke2/agent/containerd/containerd.log /$PWD/$folder/logs
