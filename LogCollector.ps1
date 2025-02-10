@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.82"
+$Ver="1.81"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -237,14 +237,14 @@ $MyTemp=(Get-Item $env:temp).fullname
 $Global:CaseNumber =$null
 $Global:CaseSrId=$null
 $x=0
- #Do {
+ Do {
     try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
     $x++
     If ($consent -eq "Y") {
-    #    try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases.id} catch {}
-    #    If (!($Global:CaseSrId)) {Write-Host "Invalid Case Number. Please try again" -ForegroundColor Yellow}
+        try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases.id} catch {}
+        If (!($Global:CaseSrId)) {Write-Host "Invalid Case Number. Please try again" -ForegroundColor Yellow}
     } else {If (!($Global:CaseNumber)) {$Global:CaseNumber="99999999999"}}
- #} while ($x -lt 4 -and !($Global:CaseSrId) -and $consent -eq "Y")
+ } while ($x -lt 4 -and !($Global:CaseSrId) -and $consent -eq "Y")
  If ($x -eq 4) {
     Write-Host "    ERROR: Too many tries. Exiting..." -ForegroundColor Red
     EndScript
