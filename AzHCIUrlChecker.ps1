@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker{
-$Ver="1.7"
+$Ver="1.8
 Clear-Host
 $text = @"
 v$Ver
@@ -30,7 +30,8 @@ v$Ver
 
 # Step 1: Download the main GitHub HTML page
     $mainUrl = 'https://github.com/MicrosoftDocs/azure-stack-docs/blob/main/azure-local/concepts/firewall-requirements.md#required-firewall-urls-for-azure-local-deployments'
-    Write-host "Gathering Regions..."
+    Write-host "Gathering Regions from"
+    Write-host "    $mainUrl"
     Write-host ""
     $mainPage = Invoke-WebRequest -Uri $mainUrl -UseBasicParsing -UserAgent "Mozilla/5.0"
 
@@ -167,7 +168,7 @@ v$Ver
     $testableEndpoints = $endpointObjects | Where-Object { $_.'Endpoint URL' -notlike '*`**' -and $_.'Endpoint URL' -notlike 'your*' }
     
     Write-Host ""
-    Write-Host "===== ⚠️ Untestable Endpoints (Need Manual Handling) =====" -ForegroundColor Yellow
+    Write-Host "===== Untestable Endpoints (Need Manual Handling) =====" -ForegroundColor Yellow
     $wildcardEndpoints | Format-Table Id, 'Endpoint URL', Port, Notes -AutoSize
 
     
@@ -227,7 +228,7 @@ foreach ($endpoint in $testableEndpoints) {
 
 
 # Step 9: Output the parsed endpoint table
-    Write-Host "`n===== ✅ Testable Endpoints =====" -ForegroundColor Green
+    Write-Host "`n===== Testable Endpoints =====" -ForegroundColor Green
     $testedendpoints = $testedendpoints | sort 'Accessible',Id -Descending 
     #$testedendpoints | select Id,'Azure Local',Component,'Endpoint URL',Port,'Accessible', Notes |ft 
 
