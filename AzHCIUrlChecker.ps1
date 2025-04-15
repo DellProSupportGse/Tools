@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker{
-$Ver="1.8
+$Ver="1.9"
 Clear-Host
 $text = @"
 v$Ver
@@ -21,7 +21,6 @@ v$Ver
                                
                                                       by: Jim Gandy 
 "@
-
          Clear-Host
          Write-Host $text
          Write-Host ""
@@ -164,6 +163,7 @@ v$Ver
     }
 
 # Step 9: Split into groups based on wildcard Endpoint URL (*)
+    $testedendpoints=@()
     $wildcardEndpoints = $endpointObjects | Where-Object { $_.'Endpoint URL' -like '*`**' -or $_.'Endpoint URL' -like 'your*' }
     $testableEndpoints = $endpointObjects | Where-Object { $_.'Endpoint URL' -notlike '*`**' -and $_.'Endpoint URL' -notlike 'your*' }
     
@@ -171,98 +171,105 @@ v$Ver
     Write-Host "===== Untestable Endpoints (Need Manual Handling) =====" -ForegroundColor Yellow
     $wildcardEndpoints | Format-Table Id, 'Endpoint URL', Port, Notes -AutoSize
 
-    
-    #$testableEndpoints | Format-Table Id, 'Endpoint URL', Port, Notes -AutoSize
 
-    #Test-PortFast $testableEndpoints
+    # Add Dell endpoints
+        $staticEndpoints = @(
+            @{ Id = '401'; 'Azure Local Component' = 'Dell APEX Cloud Platform Manager'; 'Endpoint URL' = 'downloads.dell.com'; Port = 443; Accessible = $null; Notes = 'Used to download updates from Dell';'Arc gateway support' ='Unknown';'Required for' = 'Deployment' },
+            @{ Id = '402'; 'Azure Local Component' = 'Dell APEX Cloud Platform Manager'; 'Endpoint URL' = 'dl.dell.com'; Port = 443; Accessible = $null; Notes = 'Used to download updates from Dell';'Arc gateway support' ='Unknown';'Required for' = 'Deployment'  },
+            @{ Id = '403'; 'Azure Local Component' = 'Dell APEX Cloud Platform Manager'; 'Endpoint URL' = 'esrs3-core.emc.com'; Port = 443; Accessible = $null; Notes = 'Used for Dell APEX Cloud Plateform Manager extension support access';'Arc gateway support' ='Unknown';'Required for' = 'Deployment'  },
+            @{ Id = '404'; 'Azure Local Component' = 'Dell APEX Cloud Platform Manager'; 'Endpoint URL' = 'esrs3-coredr.emc.com'; Port = 443; Accessible = $null; Notes = 'Used for Dell APEX Cloud Plateform Manager extension support access';'Arc gateway support' ='Unknown';'Required for' = 'Deployment'  },
+            @{ Id = '405'; 'Azure Local Component' = 'Dell APEX Cloud Platform Manager'; 'Endpoint URL' = 'esrs3-core.emc.com'; Port = 8443; Accessible = $null; Notes = 'Used for Dell APEX Cloud Plateform Manager extension support access';'Arc gateway support' ='Unknown';'Required for' = 'Deployment'  },
+            @{ Id = '406'; 'Azure Local Component' = 'Dell APEX Cloud Platform Manager'; 'Endpoint URL' = 'esrs3-coredr.emc.com'; Port = 8443; Accessible = $null; Notes = 'Used for Dell APEX Cloud Plateform Manager extension support access';'Arc gateway support' ='Unknown';'Required for' = 'Deployment'  }
+        )
+
+        foreach ($entry in $staticEndpoints) {
+            $testableEndpoints += [PSCustomObject]$entry
+        }
 
 
+# Step: 10 Test endpoint access
+    function Test-PortFast {
+        param (
+            [string]$ComputerName,
+            [int]$Port,
+            [int]$TimeoutMs = 2000
+        )
 
-function Test-PortFast {
-    param (
-        [string]$ComputerName,
-        [int]$Port,
-        [int]$TimeoutMs = 2000
-    )
+        try {
+            $ComputerName=$ComputerName -replace "http://" -replace "https://"
+            $client = New-Object System.Net.Sockets.TcpClient
+            $async = $client.BeginConnect($ComputerName, $Port, $null, $null)
+            $wait = $async.AsyncWaitHandle.WaitOne($TimeoutMs, $false)
 
-    try {
-        $ComputerName=$ComputerName -replace "http://" -replace "https://"
-        $client = New-Object System.Net.Sockets.TcpClient
-        $async = $client.BeginConnect($ComputerName, $Port, $null, $null)
-        $wait = $async.AsyncWaitHandle.WaitOne($TimeoutMs, $false)
-
-        if ($wait -and $client.Connected) {
-            $client.Close()
-            return $true
-        } else {
-            $client.Close()
+            if ($wait -and $client.Connected) {
+                $client.Close()
+                return $true
+            } else {
+                $client.Close()
+                return $false
+            }
+        } catch {
             return $false
         }
-    } catch {
-        return $false
     }
-}
 
-$total = $testableEndpoints.Count
-$counter = 0
-$testedendpoints = @()
+    $total = $testableEndpoints.Count
+    $counter = 0
+    $testedendpoints = @()
 
-foreach ($endpoint in $testableEndpoints) {
-    $counter++
-    $ep2test = $endpoint.'Endpoint URL'.Trim()
-    $port = [int]$endpoint.Port
+    foreach ($endpoint in $testableEndpoints) {
+        $counter++
+        $ep2test = $endpoint.'Endpoint URL'.Trim()
+        $port = [int]$endpoint.Port
 
-    Write-Progress -Activity "Testing Endpoints" -Status "$counter of $($total):$($ep2test):$($port)" -PercentComplete (($counter / $total) * 100)
+        Write-Progress -Activity "Testing Endpoints" -Status "$counter of $($total):$($ep2test):$($port)" -PercentComplete (($counter / $total) * 100)
 
-    $isUp = Test-PortFast -ComputerName $ep2test -Port $port
+        $isUp = Test-PortFast -ComputerName $ep2test -Port $port
 
-    # Clone the object to make sure it’s not shared reference
-    $obj = $endpoint.PSObject.Copy()
-    $obj | Add-Member -NotePropertyName 'Accessible' -NotePropertyValue $isUp -Force
+        # Clone the object to make sure it’s not shared reference
+        $obj = $endpoint.PSObject.Copy()
+        $obj | Add-Member -NotePropertyName 'Accessible' -NotePropertyValue $isUp -Force
 
-    $testedendpoints += $obj
-}
+        $testedendpoints += $obj
+    }
 
-
-
-
-
-# Step 9: Output the parsed endpoint table
+# Step 11: Output the parsed endpoint table
     Write-Host "`n===== Testable Endpoints =====" -ForegroundColor Green
     $testedendpoints = $testedendpoints | sort 'Accessible',Id -Descending 
     #$testedendpoints | select Id,'Azure Local',Component,'Endpoint URL',Port,'Accessible', Notes |ft 
 
-# Convert ID to float for proper sorting (handles 24.1, 24.2, etc.)
-$testedendpoints | ForEach-Object {
-    $_ | Add-Member -NotePropertyName "SortId" -NotePropertyValue ([double]$_.'Id') -Force
-}
-
-# Sort by Accessible (True first), then numeric ID
-$sortedEndpoints = $testedendpoints |
-    Sort-Object -Property @{Expression = 'Accessible'; Descending = $true}, @{Expression = 'SortId'; Ascending = $true}
-
-# Format table and output with aligned columns and color
-$table = $sortedEndpoints |
-    Select-Object Id, @{Name='Component'; Expression={$_.'Azure Local Component'}},
-                  @{Name='Endpoint';  Expression={$_.'Endpoint URL'}},
-                  Port, Accessible, Notes |
-    Format-Table -AutoSize | Out-String -Stream
-
-# Extract and print header
-$header = $table[0]
-$separator = $table[1]
-Write-Host $header
-Write-Host $separator
-
-# Print rows with color based on accessibility
-foreach ($line in $table[2..($table.Count - 1)]) {
-    if ($line -match '\bTrue\b') {
-        Write-Host $line
-    } elseif ($line -match '\bFalse\b') {
-        Write-Host $line -ForegroundColor Red
-    } else {
-        Write-Host $line
+# Step 12: Format output
+    # Convert ID to float for proper sorting (handles 24.1, 24.2, etc.)
+    $testedendpoints | ForEach-Object {
+        $_ | Add-Member -NotePropertyName "SortId" -NotePropertyValue ([double]$_.'Id') -Force
     }
-}
+
+    # Sort by Accessible (True first), then numeric ID
+    $sortedEndpoints = $testedendpoints |
+        Sort-Object -Property @{Expression = 'Accessible'; Descending = $true}, @{Expression = 'SortId'; Ascending = $true}
+
+    # Format table and output with aligned columns and color
+    $table = $sortedEndpoints |
+        Select-Object Id, @{Name='Component'; Expression={$_.'Azure Local Component'}},
+                      @{Name='Endpoint';  Expression={$_.'Endpoint URL'}},
+                      Port, Accessible, Notes |
+        Format-Table -AutoSize | Out-String -Stream
+
+    # Extract and print header
+    $header = $table[0]
+    $separator = $table[1]
+    Write-Host $header
+    Write-Host $separator
+
+    # Print rows with color based on accessibility
+    foreach ($line in $table[2..($table.Count - 1)]) {
+        if ($line -match '\bTrue\b') {
+            Write-Host $line
+        } elseif ($line -match '\bFalse\b') {
+            Write-Host $line -ForegroundColor Red
+        } else {
+            Write-Host $line
+        }
+    }
 
 }
