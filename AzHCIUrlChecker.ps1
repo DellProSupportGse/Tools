@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker{
-$Ver="1.9"
+$Ver="1.10"
 Clear-Host
 $text = @"
 v$Ver
@@ -36,18 +36,18 @@ v$Ver
 
     if ($mainPage.StatusCode -eq 200) {
         # Safer regex pattern in PowerShell double-quoted string
-        $urlPattern = "https?://[^""']+\.md"
-        $FwUrls = [regex]::Matches($mainPage.Content, $urlPattern) | ForEach-Object { $_.Value }
+        $urlPattern = "https?://[^""']+\-hci-endpoints.md"
+        $FwUrls = [regex]::Matches($mainPage.Content, $urlPattern) | ForEach-Object { $_.Value } | Select-Object -Unique
+        
     } else {
         Write-Host "ERROR: Webpage status code $($mainPage.StatusCode)" -ForegroundColor Red
         return
     }
 
 # Step 2: Extract region names from URLs
-    $regionPattern = "/([a-z]+(?:[a-z]*))-hci-endpoints\.md"
-    $regions = [regex]::Matches(($FwUrls -join "`n"), $regionPattern) | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
-
-
+    $regionPattern = "/([a-z,A-Z]+(?:[a-z,A-Z]*))-hci-endpoints\.md"
+    $regions = [regex]::Matches(($FwUrls -join "`n"), $regionPattern) | ForEach-Object { $_.Groups[1].Value }
+   
 # Step 3: User menu
     Write-Host "============ Please make a selection ==================="
     Write-Host ""
