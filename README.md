@@ -138,7 +138,7 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
    
    This tool is used to collect all the logs Switches, Servers and OS
    
-   ![alt text](readme/logcollector_v1.28.jpg)
+   ![alt text](readme/LogCollector_v1.81.jpg)
    
    How To Use: 
       From PowerShell as admin execute the following and follow the prompts:
