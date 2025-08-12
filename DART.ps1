@@ -1,4 +1,4 @@
-    <#
+<#
     .Synopsis
     .DESCRIPTION
        This script will install Windows updates and Dell Drivers and Firmware on a single node
@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.57"
+$ver="1.58"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -107,6 +107,7 @@ $data = @{
     lon=$response.lon
     timezone=$response.timezone
 }
+$Global:SolutionUpdates=(gcm Get-StampInformation -ErrorAction SilentlyContinue).count
 $RowKey=(new-guid).guid
 $PartitionKey="DART"
 add-TableData1 -TableName "DARTTelemetryData" -PartitionKey $PartitionKey -RowKey $RowKey -data $data
@@ -119,8 +120,8 @@ $ver
 "@
 # Run Menu
 $OSInfo = Get-WmiObject -Class Win32_OperatingSystem
-$Global:pre23h2=!($OSInfo.caption -imatch "Azure Stack HCI" -and $OSInfo.BuildNumber -ge "25398")
-if ($Global:pre23h2) {$sel='[1-2,qQ,hH]'} else {$sel='[1,qQ,hH]'}
+#$Global:pre23h2=!($OSInfo.caption -imatch "Azure Stack HCI" -and $OSInfo.BuildNumber -ge "25398")
+if ($Global:SolutionUpdates) {$sel='[1,qQ,hH]'} else {$sel='[1-2,qQ,hH]'}
 Function ShowMenu{
     do
      {
@@ -133,8 +134,8 @@ Function ShowMenu{
          Write-Host "==================== Please make a selection ====================="
          Write-Host ""
          Write-Host "Press '1' to Install Dell Drivers and Firmware"
-         IF($Global:pre23h2){Write-Host "Press '2' to Install Windows Updates"}
-         IF($Global:pre23h2){Write-Host "Press '12' to Install both Dell Drivers and Firmware as well as Windows Updates"}
+         IF(-not $Global:SolutionUpdates) {Write-Host "Press '2' to Install Windows Updates"}
+         IF(-not $Global:SolutionUpdates) {Write-Host "Press '12' to Install both Dell Drivers and Firmware as well as Windows Updates"}
          #Write-Host "Press '3' to Install Windows Updates and Dell Drivers and Firmware"
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
@@ -161,7 +162,7 @@ Function ShowMenu{
         Pause
         ShowMenu
     }
-    IF($selection -match 2 -and $Global:pre23h2){
+    IF($selection -match 2 -and -not $Global:SolutionUpdates){
         Write-Host "Installing Windows Updates..."
         $Global:WindowsUpdates=$True
         #$Global:DriverandFirmware=$False
@@ -192,11 +193,11 @@ If($IgnoreVersion -eq $True){Write-Host "IgnoreVersion:True" -ForegroundColor Ye
 
 IF(!($IgnoreChecks -eq $True) -and !($IgnoreVersion -eq $True)){
     #Added for SBE Update of HCI 23H2 so we do no harm
-    IF(!($Global:pre23h2)){
+    IF($Global:SolutionUpdates){
     CLS
     Write-Host 
-    Write-Host "WARNING: At this time DART does not support updating $($OSInfo.caption) 23H2." -ForegroundColor Yellow
-    Write-Host "    For more information and detailed instructions for updating $($OSInfo.caption) 23H2, please refer to the release notes available here:"  -ForegroundColor Yellow
+    Write-Host "WARNING: At this time DART does not support updating $($OSInfo.caption) 23H2+ with MS Solution Updates." -ForegroundColor Yellow
+    Write-Host "    For more information and detailed instructions for updating $($OSInfo.caption) 23H2+, please refer to the release notes available here:"  -ForegroundColor Yellow
     Write-Host "        'https://www.dell.com/support/kbdoc/en-us/000224407/dell-for-microsoft-azure-stack-hci-ax-hardware-updates-release-notes'" -ForegroundColor Yellow
     Write-Host 
     EndScript
