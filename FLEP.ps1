@@ -7,7 +7,7 @@
     Jim Gandy
 #>
 Function Invoke-FLEP{
-$FLEPVer="1.3"
+$FLEPVer="1.4"
 Clear-Host
 $text = @"
 v$FLEPVer
@@ -37,21 +37,21 @@ Function ShowMenu{
          Write-Host "Press '1' to Export System Event logs"
          Write-Host "Press '2' to Filter for 505 Events"
          Write-Host "Press '3' to Filter System Event logs for Usual Suspects"
+         Write-Host "Press '4' to Filter Custom List of Events"
          Write-Host "Press 'H' to Display Help"
          Write-Host "Press 'Q' to Quit"
          Write-Host ""
          $selection = Read-Host "Please make a selection"
      }
-    until ($selection -match '[1-3,qQ,hH]')
+    until ($selection -match '[1-4,qQ,hH]')
     $Global:FilterSystem  = "N"
     $Global:Filter505 = "N"
     IF($selection -imatch 'h'){
         Clear-Host
         Write-Host ""
         Write-Host "What's New in"$CluChkVer":"
-        Write-Host "    v1.3"
-        Write-host "        1. New Feature: Added Export System Event logs to export the whole log" 
-        Write-host "        2. New Feature: Added UTC Time Created to output" 
+        Write-Host "    v1.4"
+        Write-host "        1. New Feature: Added Filter Custom List of Events"
         Write-Host ""
         Write-Host "Usage:"
         Write-Host "    Make a selection by entering a comma delimited string of numbers from the menu."
@@ -82,6 +82,11 @@ Function ShowMenu{
         Write-Host "Filter System Event logs for Usual Suspects (13, 20, 28, 41, 57, 129, 153, 134, 301, 1001, 1017, 1018, 1135, 5120, 6003 - 6009)..."
         $Global:FilterSystem = "Y"
     }
+
+    IF($selection -match 4){
+        Write-Host "Filter for custom list of events..."
+        $Global:FilterCustom  = "Y"
+    }
     
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
@@ -90,7 +95,7 @@ Function ShowMenu{
 }#End of ShowMenu
 
 ShowMenu
-IF($FilterSystem -ieq "y" -or $Filter505 -ieq "y"-or $ExportSystem -ieq "y"){
+IF($FilterSystem -ieq "y" -or $Filter505 -ieq "y"-or $ExportSystem -ieq "y" -or $FilterCustom -ieq "y"){
     
     # Added to Select-Object the extracted SDDC
     Do{$Extracted = Read-Host "Do you already have the logs extracted? [y/n]"}
@@ -161,6 +166,15 @@ If($Filter505 -ieq "y"){
     $logs = Get-ChildItem -Recurse -Path $lpath | Where-Object{$_.Name -like "Microsoft-Windows-Storage-Storport-Operational.EVTX"}
     $MSCS=(Get-Date).ToFileTime() - (Get-Date).adddays(-7).ToFileTime()
 }
+If($FilterCustom -ieq "y"){
+	$FilterLogName = Read-Host "Please enter the file name of the event log to filer on (ex: System.evtx)"
+    $logs = Get-ChildItem -Recurse -Path $lpath | Where-Object{$_.Name -imatch $FilterLogName}
+    # Ask user for list of Event IDs
+    $EventsToFilterFor = Read-Host "Please enter a comma delimited list of EventIDs (ex: 1,2,3,1001)"
+    
+    # Convert comma list into "EventID=1 or EventID=2 or ..."
+    $EventIdClause = (($EventsToFilterFor -split ",") | ForEach-Object { "EventID=$($_.Trim())" }) -join " or "
+}
 ForEach($log in $logs){
     Write-Host "Processing log $(($log).fullname)"
     $FPath=$(($log).fullname)
@@ -193,6 +207,16 @@ IF($ExportSystem -ieq "Y"){
             </Query>
         </QueryList>
 '@
+}
+IF($FilterCustom -ieq "Y"){
+    # Now build XML query dynamically
+    $EvntIDXML = @"
+<QueryList>
+  <Query Id="0" Path="file://C:\">
+    <Select Path="file://XXXXX">*[System[($EventIdClause)]]</Select>
+  </Query>
+</QueryList>
+"@
 }
 $ScriptBlock={
     param($FPath,$EvntIDXML,$MSCS)
