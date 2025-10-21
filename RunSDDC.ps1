@@ -21,7 +21,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.29
+v1.31
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -106,11 +106,52 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
         Import-Module $ModulePath -Force
     }
  
-
 # Clean up old SDDC's
     IF(Test-Path "$env:USERPROFILE\HealthTest-*.zip"){Remove-Item $env:USERPROFILE\HealthTest-*.zip -Force}    
     IF(Test-Path "$Logs\HealthTest-*.zip"){Remove-Item $Logs\HealthTest-*.zip -Force}
 # Run SDDC
+if (-not (gcm Get-SddcDiagnosticInfo)) {
+    mkdir "$($env:USERPROFILE)\HealthTest" -ErrorAction SilentlyContinue
+    $sharepath="\\$($env:COMPUTERNAME)\$(($env:USERPROFILE).replace('C:\','c$\'))\HealthTest"
+    if ((gcm Get-ClusterNode)) {
+        (Get-ClusterNode).Name | %{Invoke-Command -AsJob -JobName "SendDiags-$($_)" -ComputerName $_ -ScriptBlock {
+		            $Rpath="C:\SendDiags"
+                    Remove-Item $RPath -Recurse -Force -ErrorAction SilentlyContinue
+                    New-Item -Path $RPath -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
+                    Send-DiagnosticData -SaveToPath $Rpath
+                    Copy-Item $Rpath $using:sharepath -Recurse
+        }}
+    
+    } else { 
+        Send-DiagnosticData -SaveToPath "$($env:USERPROFILE)\Healthtest"
+    }
+    while ((Get-Job).State -match "Running") {Get-Job | Receive-Job -ErrorAction SilentlyContinue;Write-Host "." -NoNewLine;sleep 30}
+    Get-Job | Remove-Job
+    Write-Host "Copying Diag logs...."
+    Start-Job -Name "CopyJob" -ScriptBlock {foreach ($node in (Get-ClusterNode).Name) {
+       	Move-Item "\\$node\c$\SendDiags\*" "$($env:USERPROFILE)\HealthTest"
+    }}
+    while ((Get-Job).State -match "Running") {Get-Job | Receive-Job -ErrorAction SilentlyContinue;Write-Host "." -NoNewLine;sleep 5}
+
+    $ZipSuffix = '-' + ((Get-Date).ToString('yyyyMMdd-HHmm')) + '.ZIP'
+    $ZipSuffix = '-' + ($CNames.Split('.',2)[0]) + $ZipSuffix
+    $ZipPath = "$($env:USERPROFILE)\Healthtest" + $ZipSuffix
+
+    try {
+        Add-Type -Assembly System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::CreateFromDirectory("$($env:USERPROFILE)\Healthtest\", $ZipPath, [System.IO.Compression.CompressionLevel]::Fastest, $false)
+        $ZipPath = Convert-Path $ZipPath
+        Write-Host "Zip File Name : $ZipPath"
+
+        Write-Host "Cleaning up temporary directory $($env:USERPROFILE)\Healthtest\"
+        Remove-Item -Path "$($env:USERPROFILE)\Healthtest\" -ErrorAction SilentlyContinue -Recurse
+
+    } catch {
+        Write-Warning "Error=$($_.Exception.Message)"
+        Write-Host -ForegroundColor Red "Error creating the ZIP file!`nContent remains available at $($env:USERPROFILE)\Healthtest\"
+    }
+ } else {
+
     # Run SDDC if cluster service found on node
     IF(Get-Service clussvc -ErrorAction SilentlyContinue){
         Get-SddcDiagnosticInfo -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -IncludeReliabilityCounters -RunCluChk
@@ -129,6 +170,9 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
                 }
             }
             Write-Host "    SUCCESS: Able to ping $ClusterToCollectLogsFrom" -ForegroundColor Green
+              If ($ClusterToCollectLogsFrom -ieq 'local') {
+                Get-SDDCDiagnosticInfo -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -RunCluChk
+              } else {
                 IF((Invoke-Command -ComputerName $ClusterToCollectLogsFrom -ErrorAction SilentlyContinue -ScriptBlock{(Get-cluster).name}) -imatch $ClusterToCollectLogsFrom){
                     Write-Host "    SUCCESS: Able to connect to cluster" -ForegroundColor Green
                     $CheckRSATClusteringPowerShell=IF((Get-WindowsFeature RSAT-Clustering-PowerShell).InstallState -eq 'Installed'){ 
@@ -148,6 +192,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
                 }Else{
                     Write-Error "    ERROR: Failed to connect to cluster $ClusterToCollectLogsFrom. Please check the cluster name and run again."
                 }
+              }
             }
 # Move to Logs 
 IF(Test-Path -Path "$MyTemp\logs"){
@@ -159,5 +204,6 @@ IF(Test-Path -Path "$MyTemp\logs"){
         #Get the File-Name without path
 $name = (Get-Item $HealthZip).Name
 
+}
 }
 } # End of Invoke-RunSDDC

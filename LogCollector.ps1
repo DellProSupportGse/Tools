@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.81"
+$Ver="1.82"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -318,6 +318,8 @@ Function ShowMenu{
         }
     }
     IF($selection -match 1){
+        If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor Yellow "This module MUST be run locally on a cluster node";EndScript}
+        if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
         Write-Host "Collecting Azure Stack HCI logs (SDDC)..."
         $Global:CollectSDDC = "Y"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'))
@@ -325,6 +327,7 @@ Function ShowMenu{
 
     }
     IF($selection -match 4){
+        if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
         Write-Host "Collecting Windows Server (TSS)..."
         $Global:CollectTSS = "Y"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSSCollect"; $repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/fginacio/MS/main/TSSCollect.ps1'))
