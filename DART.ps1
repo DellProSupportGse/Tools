@@ -82,7 +82,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.58"
+$ver="1.6"
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -396,6 +396,10 @@ $IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} 
                 $ASHCI="YES"
                 $URL="https://downloads.dell.com/catalog/ASHCI-Catalog.xml.gz"
                 $InFile="$MyTemp\ASHCI-Catalog.xml.gz"
+                IF ([System.Environment]::OSVersion.OSVersion -match "10.0.14393") {
+                   Write-Host "Windows Server 2016 detected" -ForegroundColor Green
+                   $URL="https://dl.dell.com/FOLDER09682297M/1/ASHCI-Catalog.xml.gz"
+                }
             }Else{
                 $ASHCI="NO"
                 # Check if node is a Cluster memeber
