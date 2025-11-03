@@ -93,7 +93,7 @@ Function ShowMenu{
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunCluChk";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchk.ps1'));Invoke-RunCluChk
     }
     IF($selection -match 8){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunSLIC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/slic.ps1'));Invoke-SLIC
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunSLIC";$repo="PowershellScripts"'+(new-object net.webclient -Property @{ Encoding = [System.Text.Encoding]::UTF8 }).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/slic.ps1'));Invoke-SLIC
     }    
 
     IF($selection -imatch 'q'){
