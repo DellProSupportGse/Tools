@@ -5,14 +5,17 @@
        This script is a menu to the other tools 
     .EXAMPLES
        Invoke-ToolBox
+    .UPDATES
+        2025/11/03:v1.2 - 1. JG - Added SLIC
 #>
+
 Function EndScript{ 
     break
 }
 
 Function Invoke-ToolBox{
 Clear-Host
-$Ver=1.1
+$Ver=1.2
 $text = @"
 v$Ver
   _____         _   ___          
@@ -45,11 +48,12 @@ Function ShowMenu{
          Write-Host "5)  LogCollector - Make log collection easier"
          Write-Host "6)  DriFT        - Driver and Firmware Tool ***INTERNAL ONLY***"
          Write-Host "7)  CluChk       - Cluster Checker ***INTERNAL ONLY***"
+         Write-Host "8)  SLIC         - Switch Log Insight Checker ***INTERNAL ONLY***"
          Write-Host "Q to Quit"
          Write-Host ""
          $selection = Read-Host "Type a number and press [Enter]"
      }
-    until ($selection -match '[1-7,qQ,hH]')
+    until ($selection -match '[1-8,qQ,hH]')
     $Global:WindowsUpdates=$False
     $Global:DriverandFirmware=$False
     $Global:Confirm=$False
@@ -88,6 +92,9 @@ Function ShowMenu{
     IF($selection -match 7){
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunCluChk";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchk.ps1'));Invoke-RunCluChk
     }
+    IF($selection -match 8){
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunSLIC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/slic.ps1'));Invoke-SLIC
+    }    
 
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
