@@ -179,7 +179,6 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
 2. Launch **Notepad** (type `notepad`).
 3. Use **File > Save As** to paste and save `master.zip`.
 
----
 
 ## Step 2: Get the Script
 
@@ -194,7 +193,6 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
 2. Type **y** when prompted to run and confirm local copy.
 3. Browse to `C:\Dell`, select the `master.zip` file, and click **Open**.
 
----
 
 ## Step 3: Run & Finish
 
