@@ -198,7 +198,7 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
 
 - The tool extracts to all nodes and starts data collection (takes several minutes).  
 - When prompted, choose to delete (**y**) or keep (**n**) the master file.  
-- Output will be saved in:
+- Output will be saved in: C:\Users\<current user>\, starting with (**HealthTest**).
 	   
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## TSR Collector
