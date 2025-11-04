@@ -163,51 +163,44 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
-## SDDC Offline
- 
-### How To Use with Desktop Experience:
-1. From a machine that has Internet access, download the SDDC master file from here: <https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip>
-2. Right click and copy the downloaded file.
-3. Connect to a node of the cluster using RDP.
-4. If Sconfig launches, select option 15 to exit to Powershell.
-5. Type notepad at the prompt to launch Notepad.
-6. From the File menu, select Save As.
-7. Browse to the folder where you wish to save the master.zip file and type Ctrl-V to paste it into the folder.
-8. Return to the machine with Internet access and browse to https://github.com/DellProSupportGse/Tools.
-9. Click SDDCOffline.ps1.
-10. Near the upper-right corner of the code window, click Raw to view only the PowerShell code.
-11. Type Ctrl-A to select the complete PowerShell script, then Ctrl-C to copy it.
-12. Return to the RDP session on the cluster node and paste the copied text directly into PowerShell.
-13. Press Enter to begin running the script.
-14. Type y at the Ready to run? prompt.
-15. Any previous versions of the SDDC tool will be removed automatically.
-16. Type y again when asked if the SDDC has been copied locally.
-17. Browse to the C:\Dell folder and select the zipped SDDC master file. Click Open.
-18. The offline SDDC tool will be extracted to all nodes, and data collection will begin. This will take several minutes.
-19. When prompted, type y to remove the downloaded SDDC master file or n to retain it.
-20. The zipped output file will be located in C:\users\<current user>\ and will have a name that begins with HealthTest.
-    
- ### How to use with Server Core/HCI OS:
-1. From a machine that has Internet access, download the SDDC master file from here: <https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip>
-2. Right click and copy the downloaded file.
-3. Connect to a node of the cluster using RDP.
-4. If Sconfig launches, select option 15 to exit to Powershell.
-5. Type notepad at the prompt to launch Notepad.
-6. From the File menu, select Save As.
-7. Browse to the folder where you wish to save the master.zip file and type Ctrl-V to paste it into the folder.
-8. Return to the machine with Internet access and browse to https://github.com/DellProSupportGse/Tools.
-9. Click SDDCOffline.ps1.
-10. Near the upper-right corner of the code window, click Raw to view only the PowerShell code.
-11. Type Ctrl-A to select the complete PowerShell script, then Ctrl-C to copy it.
-12. Return to the RDP session on the cluster node and paste the copied text directly into PowerShell.
-13. Press Enter to begin running the script.
-14. Type y at the Ready to run? prompt.
-15. Any previous versions of the SDDC tool will be removed automatically.
-16. Type y again when asked if the SDDC has been copied locally.
-17. Browse to the C:\Dell folder and select the zipped SDDC master file. Click Open.
-18. The offline SDDC tool will be extracted to all nodes, and data collection will begin. This will take several minutes.
-19. When prompted, type y to remove the downloaded SDDC master file or n to retain it.
-20. The zipped output file will be located in C:\users\<current user>\ and will have a name that begins with HealthTest.	
+# Using SDDC Offline Tool
+
+## Step 1: Prepare Files
+
+### On a machine with internet access:
+
+1. Download the **SDDC master file**:  
+   [https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip](https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip)
+2. Copy the file.
+
+### RDP into a cluster node:
+
+1. If **Sconfig** launches, choose **option 15** to exit to PowerShell.
+2. Launch **Notepad** (type `notepad`).
+3. Use **File > Save As** to paste and save `master.zip`.
+
+---
+
+## Step 2: Get the Script
+
+### On the internet-connected machine:
+
+1. Go to [https://github.com/DellProSupportGse/Tools/SDDCOffline.ps1](https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/SDDCOffline.ps1).
+2. Click **Raw**, then press **Ctrl + A** to select all and **Ctrl + C** to copy.
+
+### Back in the RDP session:
+
+1. Paste the script into **PowerShell** and press **Enter**.
+2. Type **y** when prompted to run and confirm local copy.
+3. Browse to `C:\Dell`, select the `master.zip` file, and click **Open**.
+
+---
+
+## Step 3: Run & Finish
+
+- The tool extracts to all nodes and starts data collection (takes several minutes).  
+- When prompted, choose to delete (**y**) or keep (**n**) the master file.  
+- Output will be saved in:
 	   
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## TSR Collector
