@@ -48,7 +48,7 @@ Function ShowMenu{
          Write-Host "5)  LogCollector - Make log collection easier"
          Write-Host "6)  DriFT        - Driver and Firmware Tool ***INTERNAL ONLY***"
          Write-Host "7)  CluChk       - Cluster Checker ***INTERNAL ONLY***"
-         Write-Host "8)  SLIC         - Switch Log Insight Checker ***INTERNAL ONLY***"
+         Write-Host "8)  SLIC         - Switch Log InspeCtor ***INTERNAL ONLY***"
          Write-Host "Q to Quit"
          Write-Host ""
          $selection = Read-Host "Type a number and press [Enter]"
