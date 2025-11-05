@@ -8,7 +8,7 @@ We'd like to inform you that this code is freely available under the [MIT Licens
 ## Tool Box
 Tool Box is a menu of all the tools to run them from one place
 	 
-   ![alt text](readme/toolbox_v1.1.jpg)
+   ![alt text](readme/ToolBox.jpg)
    
 ### Usage
 Copy the below powershell code and paste into PowerShell
