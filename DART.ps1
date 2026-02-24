@@ -26,6 +26,8 @@ Function Invoke-DART {
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
+$Global:IgnoreChecks=$IgnoreChecks
+$Global:IgnoreVersion=$IgnoreVersion
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
 function add-TableData1 {
@@ -82,7 +84,10 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.6"
+$ver="1.61"
+$addtablefunction=${function:add-TableData1}
+Start-Job -Name "Telemetry" -ScriptBlock {
+${function:add-TableData1} = $using:addtablefunction
 # Generating a unique report id to link telemetry data to report data
     $CReportID=""
     $CReportID=(new-guid).guid
@@ -107,11 +112,15 @@ $data = @{
     lon=$response.lon
     timezone=$response.timezone
 }
-$Global:SolutionUpdates=(gcm Get-StampInformation -ErrorAction SilentlyContinue).count
 $RowKey=(new-guid).guid
 $PartitionKey="DART"
 add-TableData1 -TableName "DARTTelemetryData" -PartitionKey $PartitionKey -RowKey $RowKey -data $data
 #endregion End of Telemetry data
+} | Out-Null
+$Global:SolutionUpdates=(gcm Get-StampInformation -ErrorAction SilentlyContinue).count
+$Global:EnforcedMode=$false
+$Global:EnforcedMode=if((Get-Command Get-ASWDACPolicyMode -ErrorAction SilentlyContinue).count) {if((Get-ASWDACPolicyMode | ? NodeName -eq (hostname)).policymode -ne "Audit"){$True}}
+
 $text=@"
 $ver
  __        __  ___ 
@@ -129,6 +138,11 @@ Function ShowMenu{
          Clear-Host
          Write-Host $text
          Write-Host ""
+         #Check for ignore checks
+         If($Global:IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}
+         If($Global:IgnoreVersion -eq $True){Write-Host "IgnoreVersion:True" -ForegroundColor Yellow}
+         if($Global:EnforcedMode -eq $true){Write-Host "ASWDAC is not in Audit mode. Updates may fail." -ForegroundColor DarkYellow}
+
          Write-Host "This code is under the MIT License. See Repository for Licensing/Support details."
          Write-Host ""
          Write-Host "==================== Please make a selection ====================="
@@ -187,11 +201,9 @@ Function ShowMenu{
         EndScript
     }
 }#End of ShowMenu
-#Check for ignore checks
-If($IgnoreChecks -eq $True){Write-Host "IgnoreChecks:True" -ForegroundColor Yellow}
-If($IgnoreVersion -eq $True){Write-Host "IgnoreVersion:True" -ForegroundColor Yellow}
 
-IF(!($IgnoreChecks -eq $True) -and !($IgnoreVersion -eq $True)){
+
+IF(!($Global:IgnoreChecks -eq $True) -and !($Global:IgnoreVersion -eq $True)){
     #Added for SBE Update of HCI 23H2 so we do no harm
     IF($Global:SolutionUpdates){
     CLS
@@ -383,7 +395,7 @@ Return $DSUReboot
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
             $DSUInstallStatus=$DSUInstallerLocation.Split('\\')[-1] -replace ".exe",""
-            IF(((Get-Content "C:\ProgramData\Dell\UpdatePackage\log\$DSUInstallStatus.txt" | select-string -Pattern 'Exit code ' -SimpleMatch | Select-Object -Last 1) -split "= ")[-1] -eq 1){
+            IF(((Get-Content "C:\ProgramData\Dell\UpdatePackage\log\$DSUInstallStatus.txt" | select-string -Pattern 'Exit code ' -SimpleMatch | Select-Object -Last 1) -split "= ")[-1] -eq 1 -or (Get-ChildItem -Path "C:\Program Files\Dell\" -Filter DSU.EXE -Recurse).count -eq 0){
                 Write-Host "    ERROR: Failed to install DSU." -ForegroundColor Red
                 EndScript
             }Else{Write-Host "    SUCCESS: DSU Installed Successfully." -ForegroundColor Green }
@@ -408,7 +420,7 @@ $IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} 
                 $InFile="$MyTemp\Catalog.xml.gz"
                 If($IsClusterMember -eq "NO"){
                     # Added to patch none cluster power edge server 
-                    $IgnoreChecks = $True
+                    $Global:IgnoreChecks = $True
                 }
             }
         Write-Host "    SUCCESS: $Model" -ForegroundColor Green
@@ -423,17 +435,17 @@ $IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} 
                     Write-Host "    SUCCESS: Catalog expanded" -ForegroundColor Green
                 }
             }
-            If($IgnoreChecks -ne $True){
+            If($Global:IgnoreChecks -ne $True){
                 Run-ASHCIPre
                 $NoClusterPre=$True
             }
         }
         IF($NoClusterPre -ne $True){
-            If($IgnoreChecks -ne $True){
+            If($Global:IgnoreChecks -ne $True){
 If ($IsS2d) {Run-ASHCIPre} else {Run-ClusterPre}
             }
         }
-        If($IgnoreChecks -eq $True){Write-Host "Ignoring ASHCI/Cluster Prechecks" -ForegroundColor Yellow}
+        If($Global:IgnoreChecks -eq $True){Write-Host "Ignoring ASHCI/Cluster Prechecks" -ForegroundColor Yellow}
         # Check if Windows
 $WinReboot=$False
         IF([System.Environment]::OSVersion.VersionString -imatch 'Windows'){
@@ -501,7 +513,7 @@ If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
                 }
                 EndScript
 }
-        IF($IgnoreChecks -ne $True){
+        IF($Global:IgnoreChecks -ne $True){
             try {$Host.UI.RawUI.FlushInputBuffer() } catch {while ($Host.UI.RawUI.KeyAvailable) {
                     $Host.UI.RawUI.ReadKey() | Out-Null
                 }}
@@ -509,7 +521,7 @@ If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
             Switch ($ExitSMM){
                   "y"{
                         # Resume Cluster
-                        IF($IgnoreChecks -ne $True){
+                        IF($Global:IgnoreChecks -ne $True){
                             IF(($IsClusterMemeber -eq "YES") -or ($ASHCI -eq "YES")){
                                 Write-Host "Resuming Cluster Node $ENV:COMPUTERNAME..."
                                 Resume-ClusterNode -Name $Env:COMPUTERNAME -Failback Immediate -ErrorAction SilentlyContinue >$null
@@ -517,7 +529,7 @@ If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
                         }
 
                         # Disable Storage Maintenance Mode
-                        IF($IgnoreChecks -ne $True){
+                        IF($Global:IgnoreChecks -ne $True){
                             IF($ASHCI -eq "YES" -or $isS2d){
                                 Write-Host "Exiting Storage Maintenance Mode..."
                                 Get-StorageFaultDomain -type StorageScaleUnit | Where-Object {$_.FriendlyName -eq "$($Env:ComputerName)"} | Disable-StorageMaintenanceMode -ErrorAction SilentlyContinue
