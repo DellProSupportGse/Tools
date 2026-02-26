@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.0.0"
+$APP_VERSION = "1.1.0"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -44,9 +44,13 @@ function Save-History {
 }
 
 function Load-History {
-    if (Test-Path $HistoryPath) {
-        $loaded = Get-Content $HistoryPath -Raw | ConvertFrom-Json
-        if ($loaded) { $global:History = @($loaded) }
+    $global:History = @()
+    if (-not (Test-Path $HistoryPath)) { return }
+    $raw = Get-Content $HistoryPath -Raw
+    if ([string]::IsNullOrWhiteSpace($raw)) { return }
+    $loaded = $raw | ConvertFrom-Json
+    if ($loaded -is [System.Collections.IEnumerable]) {
+        $global:History = @($loaded)
     }
 }
 
@@ -551,10 +555,30 @@ Show-AddCommandDialog $cmd $defaultName
 })
 
 $btnClearHist.Add_Click({
-$global:History=@()
-Refresh-HistoryList
-Save-History
+
+    if ($global:History.Count -eq 0) { return }
+
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        "Are you sure you want to clear all history?",
+        "Confirm Clear History",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Warning
+    )
+
+    if ($confirm -eq [System.Windows.Forms.DialogResult]::Yes) {
+
+        # Clear memory
+        $global:History = @()
+
+        # Clear UI
+        $lstHistory.Items.Clear()
+
+        # Force write empty JSON array
+        Set-Content -Path $HistoryPath -Value "[]"
+    }
 })
+
+
 
 $treeCommands.Add_NodeMouseDoubleClick({
 param($sender,$e)
