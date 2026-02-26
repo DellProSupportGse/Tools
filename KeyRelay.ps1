@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.1.0"
+$APP_VERSION = "1.2.0"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -262,12 +262,24 @@ function Show-AddCommandDialog {
 
 function Send-CharacterSafe {
     param($text,$delay)
+
+    $specialChars = '+^%~(){}'
+
     foreach ($char in $text.ToCharArray()) {
+
         if (-not $global:IsTyping) { break }
-        [System.Windows.Forms.SendKeys]::SendWait($char)
+
+        if ($specialChars.Contains($char)) {
+            [System.Windows.Forms.SendKeys]::SendWait("{$char}")
+        }
+        else {
+            [System.Windows.Forms.SendKeys]::SendWait($char)
+        }
+
         Start-Sleep -Milliseconds $delay
     }
 }
+
 
 function Start-Typing {
 
