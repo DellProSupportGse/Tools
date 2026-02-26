@@ -134,6 +134,19 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
 ```  
    
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## KeyRelay
+   
+   This is a GUI tool to send text to applications that do not allow pasting.
+   
+   ![alt text](readme/KeyRelayScreenShot.jpg)
+   
+   How To Use: 
+      From PowerShell as admin execute the following and follow the prompts:
+```Powershell
+Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="KeyRelay";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.ps1'));Invoke-KeyRelay
+```
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## LogCollector
    
    This tool is used to collect all the logs Switches, Servers and OS
