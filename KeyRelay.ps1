@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.3.0"
+$APP_VERSION = "1.4.0"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -212,7 +212,7 @@ function Show-AddCommandDialog {
 
     $dialog = New-Object Windows.Forms.Form
     $dialog.Text = "Add New Command"
-    $dialog.Size = New-Object Drawing.Size(560,500)
+    $dialog.Size = New-Object Drawing.Size(560,510)
     $dialog.StartPosition = "CenterParent"
     $dialog.AutoScaleMode = "None"
 
@@ -243,7 +243,7 @@ function Show-AddCommandDialog {
     $txtCmd.SetBounds(20,140,490,260)
     $txtCmd.Multiline = $true
     $txtCmd.ScrollBars = "Vertical"
-    $txtCmd.Font = New-Object Drawing.Font("Consolas",10)
+    $txtCmd.Font = New-Object Drawing.Font("Consolas",14)
     $txtCmd.Text = $defaultCommand
 
     $btnSave = New-Object Windows.Forms.Button
@@ -310,6 +310,14 @@ function Start-Typing {
     if ($text -eq $PLACEHOLDER_TEXT) { return }
     if ([string]::IsNullOrWhiteSpace($text)) { return }
 
+    # Wrap in Invoke-Command if checkbox selected
+    if ($chkInvokeCluster.Checked) {
+
+        # Normalize line breaks for scriptblock
+        $normalized = ($text -replace "`r`n","`n")
+
+        $text = "Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock { $normalized }"
+    }
 
     Maybe-AddToHistory $text
 
@@ -346,7 +354,7 @@ $form.AutoScaleMode = "None"
 $txtInput = New-Object Windows.Forms.TextBox
 $txtInput.Multiline = $true
 $txtInput.ScrollBars = "Vertical"
-$txtInput.Font = New-Object Drawing.Font("Consolas",10)
+$txtInput.Font = New-Object Drawing.Font("Consolas",14)
 $txtInput.SetBounds(12,12,750,500)
 
 # Placeholder setup
@@ -358,6 +366,7 @@ $tabRight.SetBounds(780,12,290,550)
 
 $tabCommands = New-Object Windows.Forms.TabPage
 $tabCommands.Text = "Commands"
+$tabCommands.Font = New-Object Drawing.Font("Consolas",10)
 
 $treeCommands = New-Object Windows.Forms.TreeView
 $treeCommands.Dock = "Fill"
@@ -365,6 +374,7 @@ $tabCommands.Controls.Add($treeCommands)
 
 $tabHistory = New-Object Windows.Forms.TabPage
 $tabHistory.Text = "History"
+$tabHistory.Font = New-Object Drawing.Font("Consolas",10)
 
 $lstHistory = New-Object Windows.Forms.ListBox
 $lstHistory.Dock = "Fill"
@@ -481,32 +491,37 @@ $panelBottom.SetBounds(12,530,750,200)
 
 $lblStart = New-Object Windows.Forms.Label
 $lblStart.Text = "Start Delay (sec)"
-$lblStart.SetBounds(10,10,120,25)
+$lblStart.SetBounds(10,10,140,25)
 
 $inpStartDelay = New-Object Windows.Forms.TextBox
 $inpStartDelay.Text = "4"
-$inpStartDelay.SetBounds(140,8,50,25)
+$inpStartDelay.SetBounds(165,8,30,25)
 
 $lblKey = New-Object Windows.Forms.Label
 $lblKey.Text = "Per-Key Delay (ms)"
-$lblKey.SetBounds(210,10,130,25)
+$lblKey.SetBounds(210,10,160,25)
 
 $inpKeyDelay = New-Object Windows.Forms.TextBox
 $inpKeyDelay.Text = "35"
-$inpKeyDelay.SetBounds(350,8,50,25)
+$inpKeyDelay.SetBounds(370,8,30,25)
 
 $lblLine = New-Object Windows.Forms.Label
 $lblLine.Text = "Between Lines (ms)"
-$lblLine.SetBounds(420,10,140,25)
+$lblLine.SetBounds(420,10,160,25)
 
 $inpLineDelay = New-Object Windows.Forms.TextBox
 $inpLineDelay.Text = "120"
-$inpLineDelay.SetBounds(570,8,60,25)
+$inpLineDelay.SetBounds(590,8,30,25)
 
 $chkEnter = New-Object Windows.Forms.CheckBox
 $chkEnter.Text = "Press Enter After Each Line"
 $chkEnter.Checked = $true
 $chkEnter.SetBounds(10,45,250,25)
+
+$chkInvokeCluster = New-Object Windows.Forms.CheckBox
+$chkInvokeCluster.Text = "Run on Cluster Nodes"
+$chkInvokeCluster.SetBounds(270,45,220,25)
+$panelBottom.Controls.Add($chkInvokeCluster)
 
 $btnType = New-Object Windows.Forms.Button
 $btnType.Text = "Type It"
@@ -522,7 +537,7 @@ $btnClear.SetBounds(230,90,120,35)
 
 $btnTop = New-Object Windows.Forms.Button
 $btnTop.Text = "Always On Top: OFF"
-$btnTop.SetBounds(370,90,170,35)
+$btnTop.SetBounds(370,90,180,35)
 
 $btnExit = New-Object Windows.Forms.Button
 $btnExit.Text = "Exit"
