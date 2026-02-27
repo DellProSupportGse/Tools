@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.2.0"
+$APP_VERSION = "1.3.0"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -30,9 +30,11 @@ if (-not (Test-Path $AppFolder)) { New-Item -ItemType Directory -Path $AppFolder
 
 $HistoryPath = Join-Path $AppFolder "KeyRelay.history.json"
 $CommandPath = Join-Path $AppFolder "KeyRelay.commands.json"
+$SettingsPath = Join-Path $AppFolder "KeyRelay.settings.json"
 
 $global:IsTyping = $false
 $global:History  = @()
+$global:Settings  = @{}
 $PLACEHOLDER_TEXT = "Paste your command here that you would like to relay..."
 
 # =====================================================
@@ -137,6 +139,25 @@ function Remove-CategoryFromJson {
     )
 
     $json | ConvertTo-Json -Depth 20 | Set-Content $CommandPath
+}
+
+function Save-Settings {
+    $global:Settings | ConvertTo-Json -Depth 5 | Set-Content $SettingsPath
+    }
+
+function Load-Settings {
+    $global:Settings = @{}
+    if (-not (Test-Path $SettingsPath)) { return }
+    $raw = Get-Content $SettingsPath -Raw
+    if ([string]::IsNullOrWhiteSpace($raw)) { return }
+    $loaded = $raw | ConvertFrom-Json
+    if ($loaded.GetHashCode()) {
+        $global:Settings.startDelay=[int]$loaded.startDelay
+        $global:Settings.keyDelay=[int]$loaded.keyDelay
+        $global:Settings.lineDelay=[int]$loaded.lineDelay
+        $global:Settings.enterEach=[bool]$loaded.enterEach
+        $global:Settings.TopMost=[bool]$loaded.TopMost
+    }
 }
 
 function Load-CommandTree {
@@ -426,6 +447,16 @@ $menuRemoveCategory.Add_Click({
     }
 })
 
+Load-Settings
+if ($global:Settings.count -eq 0) {
+   $global:Settings=@{}
+   $global:Settings.startDelay=4
+   $global:Settings.keyDelay=35
+   $global:Settings.lineDelay=120
+   $global:Settings.enterEach=$true
+   $global:Settings.TopMost=$false
+   Save-Settings
+}
 
 # Right Buttons
 $btnReload = New-Object Windows.Forms.Button
@@ -511,6 +542,14 @@ $btnReload,$btnAdd,$btnAddHist,$btnClearHist,
 $panelBottom
 ))
 
+$inpStartDelay.Text=$global:Settings.startDelay.ToString()
+$inpKeyDelay.Text=$global:Settings.keyDelay.ToString()
+$inpLineDelay.Text=$global:Settings.lineDelay.ToString()
+$chkEnter.Checked=[bool]$global:Settings.enterEach
+$enterEach = $chkEnter.Checked
+$form.TopMost=[bool]$global:Settings.TopMost
+$btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
+
 # EVENTS
 
 # Placeholder behavior (corrected)
@@ -542,15 +581,61 @@ $txtInput.Add_Leave({
         $txtInput.Text = $PLACEHOLDER_TEXT
     }
 })
+$inpKeyDelay.Add_Leave({
+        $global:Settings.startDelay=$inpStartDelay.Text
+        $global:Settings.keyDelay=$inpKeyDelay.Text
+        $global:Settings.lineDelay=$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        Save-Settings
+})
+$inpStartDelay.Add_Leave({
+        $global:Settings.startDelay=[int]$inpStartDelay.Text
+        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+        $global:Settings.lineDelay=[int]$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        Save-Settings
+})
+$inpLineDelay.Add_Leave({
+        $global:Settings.startDelay=[int]$inpStartDelay.Text
+        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+        $global:Settings.lineDelay=[int]$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        Save-Settings
+})
+$chkEnter.Add_Leave({
+        $global:Settings.startDelay=[int]$inpStartDelay.Text
+        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+        $global:Settings.lineDelay=[int]$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        Save-Settings
+})
+
 
 $btnType.Add_Click({ Start-Typing })
 $btnStop.Add_Click({ $global:IsTyping=$false })
 $btnClear.Add_Click({ $txtInput.Clear() })
-$btnExit.Add_Click({ $form.Close() })
+$btnExit.Add_Click({
+        $global:Settings.startDelay=[int]$inpStartDelay.Text
+        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+        $global:Settings.lineDelay=[int]$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        Save-Settings
+$form.Close() })
 
 $btnTop.Add_Click({
-$form.TopMost = -not $form.TopMost
-$btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
+        $form.TopMost = -not $form.TopMost
+        $global:Settings.startDelay=[int]$inpStartDelay.Text
+        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+        $global:Settings.lineDelay=[int]$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        Save-Settings
+        $btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
 })
 
 $btnReload.Add_Click({ Load-CommandTree })
