@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.4.0"
+$APP_VERSION = "1.5.0"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -150,14 +150,7 @@ function Load-Settings {
     if (-not (Test-Path $SettingsPath)) { return }
     $raw = Get-Content $SettingsPath -Raw
     if ([string]::IsNullOrWhiteSpace($raw)) { return }
-    $loaded = $raw | ConvertFrom-Json
-    if ($loaded.GetHashCode()) {
-        $global:Settings.startDelay=[int]$loaded.startDelay
-        $global:Settings.keyDelay=[int]$loaded.keyDelay
-        $global:Settings.lineDelay=[int]$loaded.lineDelay
-        $global:Settings.enterEach=[bool]$loaded.enterEach
-        $global:Settings.TopMost=[bool]$loaded.TopMost
-    }
+    (ConvertFrom-Json $raw).psobject.properties | Foreach { $global:Settings[$_.Name] = $_.Value }
 }
 
 function Load-CommandTree {
@@ -305,6 +298,8 @@ function Send-CharacterSafe {
 function Start-Typing {
 
     if ($global:IsTyping) { return }
+
+    if ($global:Settings.AltTab) {Sleep -Milliseconds 200;[System.Windows.Forms.SendKeys]::SendWait("%{TAB}");Sleep -Milliseconds 200}
 
     $text = $txtInput.Text
     if ($text -eq $PLACEHOLDER_TEXT) { return }
@@ -465,6 +460,8 @@ if ($global:Settings.count -eq 0) {
    $global:Settings.lineDelay=120
    $global:Settings.enterEach=$true
    $global:Settings.TopMost=$false
+   $global:Settings.InvokeCluster=$false
+   $global:Settings.AltTab=$false
    Save-Settings
 }
 
@@ -520,8 +517,14 @@ $chkEnter.SetBounds(10,45,250,25)
 
 $chkInvokeCluster = New-Object Windows.Forms.CheckBox
 $chkInvokeCluster.Text = "Run on Cluster Nodes"
-$chkInvokeCluster.SetBounds(270,45,220,25)
+$chkInvokeCluster.SetBounds(265,45,150,25)
 $panelBottom.Controls.Add($chkInvokeCluster)
+
+$chkAltTab = New-Object Windows.Forms.CheckBox
+$chkAltTab.Text = "Select Previous Window on Type It"
+$chkAltTab.SetBounds(475,45,220,25)
+$panelBottom.Controls.Add($chkAltTab)
+
 
 $btnType = New-Object Windows.Forms.Button
 $btnType.Text = "Type It"
@@ -563,6 +566,9 @@ $inpLineDelay.Text=$global:Settings.lineDelay.ToString()
 $chkEnter.Checked=[bool]$global:Settings.enterEach
 $enterEach = $chkEnter.Checked
 $form.TopMost=[bool]$global:Settings.TopMost
+$chkInvokeCluster.Checked=[bool]$global:Settings.InvokeCluster
+$chkAltTab.Checked=[bool]$global:Settings.AltTab
+
 $btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
 
 # EVENTS
@@ -602,6 +608,8 @@ $inpKeyDelay.Add_Leave({
         $global:Settings.lineDelay=$inpLineDelay.Text
         $global:Settings.enterEach=$chkEnter.Checked
         $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
         Save-Settings
 })
 $inpStartDelay.Add_Leave({
@@ -610,6 +618,8 @@ $inpStartDelay.Add_Leave({
         $global:Settings.lineDelay=[int]$inpLineDelay.Text
         $global:Settings.enterEach=$chkEnter.Checked
         $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
         Save-Settings
 })
 $inpLineDelay.Add_Leave({
@@ -618,6 +628,8 @@ $inpLineDelay.Add_Leave({
         $global:Settings.lineDelay=[int]$inpLineDelay.Text
         $global:Settings.enterEach=$chkEnter.Checked
         $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
         Save-Settings
 })
 $chkEnter.Add_Leave({
@@ -626,9 +638,20 @@ $chkEnter.Add_Leave({
         $global:Settings.lineDelay=[int]$inpLineDelay.Text
         $global:Settings.enterEach=$chkEnter.Checked
         $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
         Save-Settings
 })
-
+$chkAltTab.Add_Leave({
+        $global:Settings.startDelay=[int]$inpStartDelay.Text
+        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+        $global:Settings.lineDelay=[int]$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
+        Save-Settings
+})
 
 $btnType.Add_Click({ Start-Typing })
 $btnStop.Add_Click({ $global:IsTyping=$false })
