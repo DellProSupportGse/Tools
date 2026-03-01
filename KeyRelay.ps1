@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.5.1"
+$APP_VERSION = "1.5.0"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -329,9 +329,8 @@ function Start-Typing {
     foreach ($line in $lines) {
         if (-not $global:IsTyping) { break }
         Send-CharacterSafe $line $keyDelay
-        if ($enterEach) { [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
-           Start-Sleep -Milliseconds $lineDelay
-        }
+        if ($enterEach) { [System.Windows.Forms.SendKeys]::SendWait("{ENTER}") }
+        Start-Sleep -Milliseconds $lineDelay
     }
 
     $global:IsTyping = $false
