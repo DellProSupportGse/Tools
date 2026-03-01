@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.5.0"
+$APP_VERSION = "1.5.1"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -662,6 +662,8 @@ $btnExit.Add_Click({
         $global:Settings.lineDelay=[int]$inpLineDelay.Text
         $global:Settings.enterEach=$chkEnter.Checked
         $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
         Save-Settings
 $form.Close() })
 
@@ -672,9 +674,22 @@ $btnTop.Add_Click({
         $global:Settings.lineDelay=[int]$inpLineDelay.Text
         $global:Settings.enterEach=$chkEnter.Checked
         $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
         Save-Settings
         $btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
 })
+$form.Add_Closing({param($sender,$e)
+        $global:Settings.startDelay=[int]$inpStartDelay.Text
+        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+        $global:Settings.lineDelay=[int]$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
+        Save-Settings
+})
+
 
 $btnReload.Add_Click({ Load-CommandTree })
 $btnAdd.Add_Click({ Show-AddCommandDialog "" "" })
