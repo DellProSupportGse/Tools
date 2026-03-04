@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.7"
+$APP_VERSION = "1.7.1"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -435,7 +435,7 @@ $menuDocs.Add_Click({
 
 # Open Quick Start
 $menuQuick.Add_Click({
-    Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/KeyRelayREADME.md#keyrelay-quick-start"
+    Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/KeyRelayQuickStart.md"
 })
 
 
