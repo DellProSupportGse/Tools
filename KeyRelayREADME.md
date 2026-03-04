@@ -1,243 +1,260 @@
-# KeyRelay
+# KeyRelay v1.7
 
-**KeyRelay** is a PowerShell GUI tool that sends text to applications **by simulating keystrokes** instead of using the clipboard.
+**KeyRelay** is a PowerShell GUI tool that allows you to send commands
+to applications or consoles that **do not allow paste operations** (for
+example: RDP sessions, restricted consoles, BIOS tools, lab
+environments, etc.).
 
-This is useful for environments where **paste is disabled or blocked**, such as:
+Instead of pasting text, KeyRelay **relays keystrokes** one character at
+a time using simulated keyboard input.
 
-* Restricted consoles
-* Remote shells
-* Legacy applications
-* Secure terminals
-* iDRAC / BMC consoles
-* Training lab environments
-* Cluster management consoles
+This makes it extremely useful for:
 
-KeyRelay allows you to **type commands automatically into another application window**.
+-   Windows Server labs
+-   Cluster management consoles
+-   RDP sessions with restricted paste
+-   Training environments
+-   Secure terminals
+-   Remote systems with keyboard layout differences
 
----
+------------------------------------------------------------------------
 
-# Features
+# Key Features
 
-### Keystroke Relay
+## Keystroke Relay
 
-Instead of pasting text, KeyRelay types characters one-by-one using Windows SendKeys.
+KeyRelay types commands exactly as if they were typed manually.
 
-### Command Library
+Features include:
 
-Store commonly used commands in categorized lists.
+-   Adjustable **Start Delay**
+-   Adjustable **Per-Key Delay**
+-   Adjustable **Between-Line Delay**
+-   Optional **Press Enter After Each Line**
 
-### Command History
+------------------------------------------------------------------------
 
-Automatically remembers recently executed commands.
+# Command Library
 
-### Adjustable Typing Speed
+KeyRelay includes a built‑in **command library** organized by category.
 
-Configure delays to ensure compatibility with slow terminals.
+Commands are stored in:
 
-### Multi-Line Script Support
+    Documents\KeyRelay\KeyRelay.commands.json
 
-Send entire scripts line-by-line.
+Capabilities:
 
-### Cluster Execution Mode
+-   Add new commands
+-   Add commands from history
+-   Edit existing commands
+-   Remove commands
+-   Remove entire categories
+-   Commands automatically sort alphabetically
 
-Automatically wrap commands in:
+Double‑clicking a command loads it into the editor.
 
+------------------------------------------------------------------------
+
+# Right‑Click Command Editing
+
+Commands can be managed directly in the command tree.
+
+Right‑click options include:
+
+    Edit Command
+    Remove Command
+    Remove Category
+
+Editing opens the command dialog with the command pre‑filled so it can
+be modified and saved.
+
+------------------------------------------------------------------------
+
+# Command History
+
+KeyRelay keeps a history of previously executed commands.
+
+History is stored in:
+
+    Documents\KeyRelay\KeyRelay.history.json
+
+Features:
+
+-   Last **10 commands** stored
+-   Double‑click history to reload into the editor
+-   Add history items directly to the command library
+-   Clear history with confirmation prompt
+
+------------------------------------------------------------------------
+
+# Cluster Execution Mode
+
+KeyRelay can automatically run commands across cluster nodes.
+
+When **Run on Cluster Nodes** is enabled, commands are automatically
+wrapped with:
+
+``` powershell
+Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock { command }
 ```
-Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock { }
+
+This allows administrators to easily execute commands across all cluster
+nodes.
+
+------------------------------------------------------------------------
+
+# Keyboard Layout Translation
+
+KeyRelay supports typing into systems using different keyboard layouts.
+
+Supported layouts:
+
+-   US
+-   French
+-   German
+-   Spanish
+-   UK
+
+KeyRelay temporarily switches the keyboard layout during typing to
+ensure the correct characters are sent.
+
+NOTE: To find the keyboard layout you are using run the following on the target system
+``` powershell
+([system.windows.forms.inputlanguage]::DefaultInputLanguage).culture.name
 ```
 
-### Window Switching
+------------------------------------------------------------------------
 
-Optional automatic **Alt+Tab** to the previous window before typing begins.
+# Window Control Features
 
-### Always-On-Top Mode
+## Always On Top
 
-Keep the KeyRelay window visible while working.
+Keeps KeyRelay visible while interacting with other windows.
 
-### Persistent Settings
+## Select Previous Window on Type
 
-User settings automatically saved between sessions.
+Optionally switches focus back to the previous window before typing
+begins.
 
----
+------------------------------------------------------------------------
 
-# Running KeyRelay
+# Safety Controls
 
-Launch the GUI by copying and pasting the following into PowerShell or Terminal:
+## Start Delay
 
-```powershell
-Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="KeyRelay";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.ps1'));Invoke-KeyRelay
+Allows time to switch to the target window before typing begins.
+
+## STOP Button
+
+Stops the typing process immediately.
+
+While typing:
+
+-   **Type It button is disabled**
+-   **STOP button is enabled**
+
+------------------------------------------------------------------------
+
+# Command Storage Format
+
+Commands are stored in JSON format:
+
+``` json
+{
+  "Commands": [
+    {
+      "Name": "Storage",
+      "Children": [
+        {
+          "Name": "Get Storage Pools",
+          "Command": "Get-StoragePool -IsPrimordial $False"
+        }
+      ]
+    }
+  ]
+}
 ```
-NOTE: No admin rights needed when opening PowerShell or Terminal
 
----
-# KeyRelay Quick Start
+------------------------------------------------------------------------
 
-Step 1 — Launch KeyRelay
+# Settings Storage
 
-Run:
+User preferences are stored in:
 
-Invoke-KeyRelay
+    Documents\KeyRelay\KeyRelay.settings.json
 
-Step 2 — Enter Your Command
+Saved settings include:
 
-Paste or type the command into the main editor.
+-   Start delay
+-   Key delay
+-   Line delay
+-   Enter per line
+-   Always on top
+-   Cluster execution
+-   Window focus behavior
 
-Example:
-
-Get-ClusterNode
-
-Step 3 — Set Start Delay
-
-Set a delay (3–5 seconds recommended).
-
-This gives you time to switch to the target window.
-
-Step 4 — Click "Type It"
-
-KeyRelay will wait the configured delay.
-
-Step 5 — Switch to the Target Application
-
-Select the console or application that should receive the command.
-
-Step 6 — Watch the Command Type Automatically
-
-KeyRelay will simulate typing the command.
-
-Optional Features
-
-Run on Cluster Nodes
-Automatically runs the command on all cluster nodes.
-
-Select Previous Window on Type
-Automatically switches to the previous window.
-
-Press Enter After Each Line
-Useful for multi-line scripts.
-
-Tip
-
-If typing appears too fast for the destination console, increase the **Per-Key Delay** setting.
-
----
+------------------------------------------------------------------------
 
 # File Locations
 
-KeyRelay stores data in the user's Documents folder.
+  File                     Purpose
+  ------------------------ -----------------
+  KeyRelay.commands.json   Command library
+  KeyRelay.history.json    Command history
+  KeyRelay.settings.json   User settings
 
+All files are stored in:
+
+    Documents\KeyRelay\
+
+------------------------------------------------------------------------
+
+# Quick Start
+
+1.  Run:
+
+``` powershell
+Invoke-KeyRelay
 ```
-Documents\KeyRelay\
-```
 
-Files created:
+2.  Paste or type the command into the editor.
+3.  Click **Type It**.
+4.  Switch to the target window before the start delay expires.
 
-| File                   | Purpose          |
-| ---------------------- | ---------------- |
-| KeyRelay.commands.json | Command library  |
-| KeyRelay.history.json  | Command history  |
-| KeyRelay.settings.json | User preferences |
+KeyRelay will relay the command as keyboard input.
 
----
-
-# Main Interface
-
-KeyRelay has four primary areas:
-
-### Command Editor
-
-Where you enter the command or script you want to relay.
-
-### Commands Tab
-
-A categorized command library.
-
-Double-click a command to load it into the editor.
-
-### History Tab
-
-Shows recently executed commands.
-
-### Control Panel
-
-Typing speed and behavior controls.
-
----
-
-# Settings
-
-| Setting                        | Description                         |
-| ------------------------------ | ----------------------------------- |
-| Start Delay                    | Delay before typing begins          |
-| Per-Key Delay                  | Delay between characters            |
-| Between Lines                  | Delay between lines                 |
-| Press Enter After Each Line    | Sends Enter after every line        |
-| Run on Cluster Nodes           | Wrap command in Invoke-Command      |
-| Select Previous Window on Type | Automatically Alt-Tab before typing |
-
----
-
-# Typical Workflow
-
-1. Open KeyRelay
-2. Paste or type your command into the editor
-3. Configure delays if needed
-4. Click **Type It**
-5. Switch to the target window
-6. KeyRelay types the command automatically
-
----
+------------------------------------------------------------------------
 
 # Example
 
-Command entered in KeyRelay:
+Example command entered in KeyRelay:
 
-```
+``` powershell
 Get-ClusterNode
 ```
 
-KeyRelay types it into the target console exactly as if you typed it manually.
+If **Run on Cluster Nodes** is enabled, KeyRelay will type:
 
----
-
-# Best Practices
-
-### Use a Start Delay
-
-Recommended:
-
-```
-3–5 seconds
+``` powershell
+Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock { Get-ClusterNode }
 ```
 
-This gives time to switch to the destination window.
+------------------------------------------------------------------------
 
----
+# Version
 
-### Adjust Delays for Slow Consoles
+Current Version:
 
-Example:
+    KeyRelay v1.7
 
-```
-Per-Key Delay: 50ms
-Line Delay: 200ms
-```
-
----
-
-### Save Frequently Used Commands
-
-Use the **Command Library** to store common scripts.
-
----
-
-# Safety Notes
-
-KeyRelay sends keystrokes directly to the active application.
-
-Always ensure the **correct window is focused before typing begins**.
-
----
+------------------------------------------------------------------------
 
 # Author
 
 Jim Gandy
+
+------------------------------------------------------------------------
+
+# Repository
+
+https://github.com/DellProSupportGse/Tools
