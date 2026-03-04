@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.6.1"
+$APP_VERSION = "1.7"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -36,6 +36,13 @@ $global:IsTyping = $false
 $global:History  = @()
 $global:Settings  = @{}
 $PLACEHOLDER_TEXT = "Paste your command here that you would like to relay..."
+
+
+# =====================================================
+# KEYBOARD LAYOUT DETECTION
+# =====================================================
+
+$global:OriginalKeyboardLayout = ([system.windows.forms.inputlanguage]::DefaultInputLanguage).culture.name
 
 # =====================================================
 # HISTORY
@@ -270,6 +277,7 @@ function Show-AddCommandDialog {
     $dialog.ShowDialog()
 }
 
+
 # =====================================================
 # TYPING ENGINE
 # =====================================================
@@ -283,11 +291,13 @@ function Send-CharacterSafe {
 
         if (-not $global:IsTyping) { break }
 
-        if ($specialChars.Contains($char)) {
-            [System.Windows.Forms.SendKeys]::SendWait("{$char}")
+        $translated = $char
+
+        if ($specialChars.Contains($translated)) {
+            [System.Windows.Forms.SendKeys]::SendWait("{$translated}")
         }
         else {
-            [System.Windows.Forms.SendKeys]::SendWait($char)
+            [System.Windows.Forms.SendKeys]::SendWait($translated)
         }
 
         Start-Sleep -Milliseconds $delay
@@ -295,22 +305,47 @@ function Send-CharacterSafe {
 }
 
 
+
 function Start-Typing {
 
     if ($global:IsTyping) { return }
 
-    if ($global:Settings.AltTab) {Sleep -Milliseconds 200;[System.Windows.Forms.SendKeys]::SendWait("%{TAB}");Sleep -Milliseconds 200}
+    $layoutMap = @{
+        "US"      = "en-US"
+        "German"  = "de-DE"
+        "UK"      = "en-GB"
+        "French"  = "fr-FR"
+        "Spanish" = "es-ES"
+    }
+
+    $targetLayout = $cmbLayout.SelectedItem
+
+    if ([string]::IsNullOrWhiteSpace($targetLayout)) {
+        $targetLayout = "US"
+    }
+
+    $targetCulture = $layoutMap[$targetLayout]
+
+    $restoreKeyboard = $false
+
+    if ($targetCulture -and $targetCulture -ne $global:OriginalKeyboardLayout) {
+        Set-WinUserLanguageList $targetCulture -Force -WarningAction SilentlyContinue
+        Start-Sleep -Milliseconds 300
+        $restoreKeyboard = $true
+    }
+
+    if ($global:Settings.AltTab) {
+        Start-Sleep -Milliseconds 200
+        [System.Windows.Forms.SendKeys]::SendWait("%{TAB}")
+        Start-Sleep -Milliseconds 200
+    }
 
     $text = $txtInput.Text
     if ($text -eq $PLACEHOLDER_TEXT) { return }
     if ([string]::IsNullOrWhiteSpace($text)) { return }
 
-    # Wrap in Invoke-Command if checkbox selected
     if ($chkInvokeCluster.Checked) {
-
-        # Normalize line breaks for scriptblock
         $normalized = ($text -replace "`r`n","`n")
-
         $text = "Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock { $normalized }"
     }
 
@@ -324,16 +359,39 @@ function Start-Typing {
     $lines = ($text -replace "`r`n","`n").Split("`n")
 
     $global:IsTyping = $true
-    Start-Sleep -Seconds $startDelay
+    $btnType.Enabled = $false
+    $btnStop.Enabled = $true
 
-    foreach ($line in $lines) {
-        if (-not $global:IsTyping) { break }
-        Send-CharacterSafe $line $keyDelay
-        if ($enterEach) { [System.Windows.Forms.SendKeys]::SendWait("{ENTER}") }
-        Start-Sleep -Milliseconds $lineDelay
+    try {
+
+        Start-Sleep -Seconds $startDelay
+
+        foreach ($line in $lines) {
+
+            if (-not $global:IsTyping) { break }
+
+            Send-CharacterSafe $line $keyDelay
+
+            if ($enterEach) {
+                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+            }
+
+            Start-Sleep -Milliseconds $lineDelay
+        }
+
     }
+    finally {
 
-    $global:IsTyping = $false
+        $global:IsTyping = $false
+
+        if ($restoreKeyboard) {
+            Set-WinUserLanguageList $global:OriginalKeyboardLayout -Force -WarningAction SilentlyContinue
+        }
+
+        $btnType.Enabled = $true
+        $btnStop.Enabled = $false
+
+    }
 }
 
 # =====================================================
@@ -420,6 +478,9 @@ $tabRight.TabPages.Add($tabHistory)
 
 $treeMenu = New-Object System.Windows.Forms.ContextMenuStrip
 
+$menuEditCommand = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuEditCommand.Text = "Edit Command"
+
 $menuRemoveCommand = New-Object System.Windows.Forms.ToolStripMenuItem
 $menuRemoveCommand.Text = "Remove Command"
 
@@ -427,9 +488,11 @@ $menuRemoveCategory = New-Object System.Windows.Forms.ToolStripMenuItem
 $menuRemoveCategory.Text = "Remove Category"
 
 $treeMenu.Items.AddRange(@(
+    $menuEditCommand,
     $menuRemoveCommand,
     $menuRemoveCategory
 ))
+
 
 $treeCommands.ContextMenuStrip = $treeMenu
 
@@ -444,16 +507,35 @@ $treeCommands.Add_NodeMouseClick({
         $script:RightClickedNode = $e.Node
 
         if ($e.Node.Tag) {
-            # Leaf
+            # Leaf (command)
+            $menuEditCommand.Visible = $true
             $menuRemoveCommand.Visible = $true
             $menuRemoveCategory.Visible = $false
         }
         else {
-            # Category (branch)
+            # Category
+            $menuEditCommand.Visible = $false
             $menuRemoveCommand.Visible = $false
             $menuRemoveCategory.Visible = $true
         }
+
     }
+})
+
+# Edit Command (leaf)
+$menuEditCommand.Add_Click({
+
+    if (-not $script:RightClickedNode) { return }
+
+    $commandName  = $script:RightClickedNode.Text
+    $categoryName = $script:RightClickedNode.Parent.Text
+    $commandText  = $script:RightClickedNode.Tag
+
+    # Remove existing command
+    Remove-CommandFromJson $categoryName $commandName
+
+    # Open dialog prefilled so user can edit it
+    Show-AddCommandDialog $commandText $commandName
 })
 
 # Remove Command (leaf)
@@ -524,27 +606,27 @@ $panelBottom.SetBounds(12,530,750,200)
 
 $lblStart = New-Object Windows.Forms.Label
 $lblStart.Text = "Start Delay (sec)"
-$lblStart.SetBounds(10,10,140,25)
+$lblStart.SetBounds(10,10,110,25)
 
 $inpStartDelay = New-Object Windows.Forms.TextBox
 $inpStartDelay.Text = "4"
-$inpStartDelay.SetBounds(165,8,30,25)
+$inpStartDelay.SetBounds(125,8,30,25)
 
 $lblKey = New-Object Windows.Forms.Label
 $lblKey.Text = "Per-Key Delay (ms)"
-$lblKey.SetBounds(210,10,160,25)
+$lblKey.SetBounds(165,10,130,25)
 
 $inpKeyDelay = New-Object Windows.Forms.TextBox
 $inpKeyDelay.Text = "35"
-$inpKeyDelay.SetBounds(370,8,30,25)
+$inpKeyDelay.SetBounds(300,8,30,25)
 
 $lblLine = New-Object Windows.Forms.Label
 $lblLine.Text = "Between Lines (ms)"
-$lblLine.SetBounds(420,10,160,25)
+$lblLine.SetBounds(340,10,130,25)
 
 $inpLineDelay = New-Object Windows.Forms.TextBox
 $inpLineDelay.Text = "120"
-$inpLineDelay.SetBounds(590,8,30,25)
+$inpLineDelay.SetBounds(475,8,30,25)
 
 $chkEnter = New-Object Windows.Forms.CheckBox
 $chkEnter.Text = "Press Enter After Each Line"
@@ -553,14 +635,33 @@ $chkEnter.SetBounds(10,45,250,25)
 
 $chkInvokeCluster = New-Object Windows.Forms.CheckBox
 $chkInvokeCluster.Text = "Run on Cluster Nodes"
-$chkInvokeCluster.SetBounds(265,45,150,25)
+$chkInvokeCluster.SetBounds(265,45,170,25)
 $panelBottom.Controls.Add($chkInvokeCluster)
 
 $chkAltTab = New-Object Windows.Forms.CheckBox
 $chkAltTab.Text = "Select Previous Window on Type It"
-$chkAltTab.SetBounds(475,45,220,25)
+$chkAltTab.SetBounds(475,45,250,25)
 $panelBottom.Controls.Add($chkAltTab)
 
+$lblLayout = New-Object Windows.Forms.Label
+$lblLayout.Text = "Target Keyboard"
+$lblLayout.SetBounds(510,10,110,25)
+
+$cmbLayout = New-Object Windows.Forms.ComboBox
+$cmbLayout.SetBounds(630,10,120,25)
+$cmbLayout.DropDownStyle = "DropDownList"
+$cmbLayout.Items.AddRange(@("US","German","UK","French","Spanish"))
+
+switch ($global:OriginalKeyboardLayout) {
+    "de-DE" { $cmbLayout.SelectedItem = "German" }
+    "fr-FR" { $cmbLayout.SelectedItem = "French" }
+    "es-ES" { $cmbLayout.SelectedItem = "Spanish" }
+    "en-GB" { $cmbLayout.SelectedItem = "UK" }
+    default { $cmbLayout.SelectedItem = "US" }
+}
+
+
+$panelBottom.Controls.AddRange(@($lblLayout,$cmbLayout))
 
 $btnType = New-Object Windows.Forms.Button
 $btnType.Text = "Type It"
@@ -569,6 +670,7 @@ $btnType.SetBounds(10,90,100,35)
 $btnStop = New-Object Windows.Forms.Button
 $btnStop.Text = "STOP"
 $btnStop.SetBounds(120,90,100,35)
+$btnStop.Enabled = $false
 
 $btnClear = New-Object Windows.Forms.Button
 $btnClear.Text = "Clear Editor"
@@ -689,8 +791,11 @@ $chkAltTab.Add_Leave({
         Save-Settings
 })
 
-$btnType.Add_Click({ Start-Typing })
-$btnStop.Add_Click({ $global:IsTyping=$false })
+$btnType.Add_Click({ [void](Start-Typing) })
+$btnStop.Add_Click({
+    $global:IsTyping = $false
+})
+
 $btnClear.Add_Click({ $txtInput.Clear() })
 $btnExit.Add_Click({
         $global:Settings.startDelay=[int]$inpStartDelay.Text
