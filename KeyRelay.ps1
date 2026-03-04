@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.5.1"
+$APP_VERSION = "1.6"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -346,18 +346,54 @@ $form.Size = New-Object Drawing.Size(1100,800)
 $form.StartPosition = "CenterScreen"
 $form.AutoScaleMode = "None"
 
+# =====================================================
+# MENU BAR
+# =====================================================
+
+$menuStrip = New-Object System.Windows.Forms.MenuStrip
+
+$menuHelp = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuHelp.Text = "Help"
+$menuHelp.Font = New-Object Drawing.Font("Consolas",9)
+
+$menuDocs = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuDocs.Text = "Documentation"
+
+$menuQuick = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuQuick.Text = "Quick Start"
+
+$menuHelp.DropDownItems.Add($menuDocs)
+$menuHelp.DropDownItems.Add($menuQuick)
+
+$menuStrip.Items.Add($menuHelp)
+
+$form.MainMenuStrip = $menuStrip
+$form.Controls.Add($menuStrip)
+
+# Open GitHub Documentation
+$menuDocs.Add_Click({
+    Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/KeyRelayREADME.md"
+})
+
+# Open Quick Start
+$menuQuick.Add_Click({
+    Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/KeyRelayREADME.md#keyrelay-quick-start"
+})
+
+
+
 $txtInput = New-Object Windows.Forms.TextBox
 $txtInput.Multiline = $true
 $txtInput.ScrollBars = "Vertical"
 $txtInput.Font = New-Object Drawing.Font("Consolas",14)
-$txtInput.SetBounds(12,12,750,500)
+$txtInput.SetBounds(12,40,750,500)
 
 # Placeholder setup
 $txtInput.ForeColor = [System.Drawing.Color]::Gray
 $txtInput.Text = $PLACEHOLDER_TEXT
 
 $tabRight = New-Object Windows.Forms.TabControl
-$tabRight.SetBounds(780,12,290,550)
+$tabRight.SetBounds(780,40,290,550)
 
 $tabCommands = New-Object Windows.Forms.TabPage
 $tabCommands.Text = "Commands"
