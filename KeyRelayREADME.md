@@ -70,6 +70,56 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 NOTE: No admin rights needed when opening PowerShell or Terminal
 
 ---
+# KeyRelay Quick Start
+
+Step 1 — Launch KeyRelay
+
+Run:
+
+Invoke-KeyRelay
+
+Step 2 — Enter Your Command
+
+Paste or type the command into the main editor.
+
+Example:
+
+Get-ClusterNode
+
+Step 3 — Set Start Delay
+
+Set a delay (3–5 seconds recommended).
+
+This gives you time to switch to the target window.
+
+Step 4 — Click "Type It"
+
+KeyRelay will wait the configured delay.
+
+Step 5 — Switch to the Target Application
+
+Select the console or application that should receive the command.
+
+Step 6 — Watch the Command Type Automatically
+
+KeyRelay will simulate typing the command.
+
+Optional Features
+
+Run on Cluster Nodes
+Automatically runs the command on all cluster nodes.
+
+Select Previous Window on Type
+Automatically switches to the previous window.
+
+Press Enter After Each Line
+Useful for multi-line scripts.
+
+Tip
+
+If typing appears too fast for the destination console, increase the **Per-Key Delay** setting.
+
+---
 
 # File Locations
 
