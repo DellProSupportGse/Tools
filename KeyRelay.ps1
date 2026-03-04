@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.6"
+$APP_VERSION = "1.6.1"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -386,14 +386,14 @@ $txtInput = New-Object Windows.Forms.TextBox
 $txtInput.Multiline = $true
 $txtInput.ScrollBars = "Vertical"
 $txtInput.Font = New-Object Drawing.Font("Consolas",14)
-$txtInput.SetBounds(12,40,750,500)
+$txtInput.SetBounds(12,40,750,470)
 
 # Placeholder setup
 $txtInput.ForeColor = [System.Drawing.Color]::Gray
 $txtInput.Text = $PLACEHOLDER_TEXT
 
 $tabRight = New-Object Windows.Forms.TabControl
-$tabRight.SetBounds(780,40,290,550)
+$tabRight.SetBounds(780,40,290,520)
 
 $tabCommands = New-Object Windows.Forms.TabPage
 $tabCommands.Text = "Commands"
