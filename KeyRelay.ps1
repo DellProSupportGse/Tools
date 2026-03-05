@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.8"
+$APP_VERSION = "1.8.1"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -648,10 +648,10 @@ $panelBottom.Controls.Add($chkAltTab)
 
 $lblLayout = New-Object Windows.Forms.Label
 $lblLayout.Text = "Target Lang (ex: fr-FR)"
-$lblLayout.SetBounds(480,10,150,25)
+$lblLayout.SetBounds(520,10,180,25)
 
 $txtLayout = New-Object Windows.Forms.TextBox
-$txtLayout.SetBounds(630,10,120,25)
+$txtLayout.SetBounds(700,10,40,25)
 $txtLayout.Text = $global:OriginalKeyboardLayout
 
 $panelBottom.Controls.AddRange(@($lblLayout,$txtLayout))
