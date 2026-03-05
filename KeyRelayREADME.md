@@ -103,23 +103,37 @@ nodes.
 
 ------------------------------------------------------------------------
 
-# Keyboard Layout Translation
+# Target Language Field
 
-KeyRelay supports typing into systems using different keyboard layouts.
+Enter the **Windows language culture code** for the keyboard layout you want the remote system to use.
 
-Supported layouts:
+Examples:
 
--   US
--   French
--   German
--   Spanish
--   UK
+| Language | Culture Code |
+|--------|--------|
+| US English | `en-US` |
+| UK English | `en-GB` |
+| French (France) | `fr-FR` |
+| French (Canada) | `fr-CA` |
+| German | `de-DE` |
+| Spanish | `es-ES` |
+| Japanese | `ja-JP` |
 
-KeyRelay temporarily switches the keyboard layout during typing to
-ensure the correct characters are sent.
+When typing begins, KeyRelay will:
 
-NOTE: To find the keyboard layout you are using run the following on the target system
-``` powershell
+1. Temporarily switch the keyboard layout to the specified culture.
+2. Send the keystrokes.
+3. Restore your original keyboard layout when finished.
+
+This ensures that characters are sent **exactly as the target system expects**, even when keyboard layouts differ.
+
+---
+
+## Finding the Keyboard Layout on a Target System
+
+To determine the keyboard layout currently in use on a system, run the following command in PowerShell:
+
+```powershell
 ([system.windows.forms.inputlanguage]::DefaultInputLanguage).culture.name
 ```
 
