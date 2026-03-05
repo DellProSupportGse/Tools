@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.9"
+$APP_VERSION = "1.10"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -245,6 +245,72 @@ function Load-SharedCommands {
         )
 
     }
+}
+
+function Perform-Search {
+
+    $query = $txtSearch.Text.ToLower()
+
+    if ($tabRight.SelectedTab.Text -eq "My Commands") {
+
+        Load-CommandTree
+
+        if ($query.Length -eq 0) { return }
+
+        foreach ($node in $treeCommands.Nodes) {
+
+            foreach ($child in @($node.Nodes)) {
+
+                if (-not $child.Text.ToLower().Contains($query) -and
+                    -not $child.Tag.ToLower().Contains($query)) {
+
+                    $node.Nodes.Remove($child)
+
+                }
+
+            }
+
+        }
+
+    }
+
+    elseif ($tabRight.SelectedTab.Text -eq "Shared") {
+
+        Load-SharedCommands
+
+        if ($query.Length -eq 0) { return }
+
+        foreach ($node in $treeShared.Nodes) {
+
+            foreach ($child in @($node.Nodes)) {
+
+                if (-not $child.Text.ToLower().Contains($query) -and
+                    -not $child.Tag.ToLower().Contains($query)) {
+
+                    $node.Nodes.Remove($child)
+
+                }
+
+            }
+
+        }
+
+    }
+
+    elseif ($tabRight.SelectedTab.Text -eq "History") {
+
+        $lstHistory.Items.Clear()
+
+        foreach ($item in $global:History) {
+
+            if ($query.Length -eq 0 -or $item.ToLower().Contains($query)) {
+                $lstHistory.Items.Add($item) | Out-Null
+            }
+
+        }
+
+    }
+
 }
 
 
@@ -500,7 +566,6 @@ $menuQuick.Add_Click({
 })
 
 
-
 $txtInput = New-Object Windows.Forms.TextBox
 $txtInput.Multiline = $true
 $txtInput.ScrollBars = "Vertical"
@@ -511,8 +576,15 @@ $txtInput.SetBounds(12,40,750,470)
 $txtInput.ForeColor = [System.Drawing.Color]::Gray
 $txtInput.Text = $PLACEHOLDER_TEXT
 
+$lblSearch = New-Object Windows.Forms.Label
+$lblSearch.Text = "Search:"
+$lblSearch.SetBounds(780,545,60,25)
+
+$txtSearch = New-Object Windows.Forms.TextBox
+$txtSearch.SetBounds(840,543,230,25)
+
 $tabRight = New-Object Windows.Forms.TabControl
-$tabRight.SetBounds(780,40,290,520)
+$tabRight.SetBounds(780,40,290,490)
 
 $tabCommands = New-Object Windows.Forms.TabPage
 $tabCommands.Text = "My Commands"
@@ -527,7 +599,6 @@ $treeShared.Dock = "Fill"
 $treeShared.ShowNodeToolTips = $true
 
 $tabShared.Controls.Add($treeShared)
-
 
 $treeCommands = New-Object Windows.Forms.TreeView
 $treeCommands.Dock = "Fill"
@@ -772,9 +843,11 @@ $btnType,$btnStop,$btnClear,$btnTop,$btnExit
 
 $form.Controls.AddRange(@(
 $txtInput,$tabRight,
+$lblSearch,$txtSearch,
 $btnReload,$btnAdd,$btnAddHist,$btnClearHist,
 $panelBottom
 ))
+
 
 $inpStartDelay.Text=$global:Settings.startDelay.ToString()
 $inpKeyDelay.Text=$global:Settings.keyDelay.ToString()
@@ -788,6 +861,14 @@ $chkAltTab.Checked=[bool]$global:Settings.AltTab
 $btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
 
 # EVENTS
+
+$txtSearch.Add_TextChanged({
+    Perform-Search
+})
+$tabRight.Add_SelectedIndexChanged({
+    Perform-Search
+})
+
 
 # Placeholder behavior (corrected)
 $txtInput.Add_GotFocus({
