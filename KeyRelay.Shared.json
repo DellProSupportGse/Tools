@@ -103,12 +103,12 @@
 "Arc Agent": [
     {
       "Name": "Arc Show",
-      "Command": "& 'C:\Program Files\AzureConnectedMachineAgent\azcmagent.exe' show",
+      "Command": "& 'C:\\Program Files\\AzureConnectedMachineAgent\\azcmagent.exe' show",
       "Description": "Displays Arc Agent Version Information."
     },
   {
       "Name": "Arc Check",
-      "Command": "& 'C:\Program Files\AzureConnectedMachineAgent\azcmagent.exe' check",
+      "Command": "& 'C:\\Program Files\\AzureConnectedMachineAgent\\azcmagent.exe' check",
       "Description": "Displays Arc Agent Connectivity/Gateway Information."
     },
   ],
