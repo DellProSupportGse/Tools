@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.8.3"
+$APP_VERSION = "1.8.4"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -667,6 +667,10 @@ $lblLayout.SetBounds(520,10,180,25)
 $txtLayout = New-Object Windows.Forms.TextBox
 $txtLayout.SetBounds(700,10,40,25)
 $txtLayout.Text = $global:OriginalKeyboardLayout
+$options = @("en-US", "zh-CN", "en-GB", "fr-CA","es-ES", "ar-SA", "pt-BR", "fr-FR", "ja-JP", "ru-RU", "de-DE", "hi-IN")
+$txtLayout.AutoCompleteMode = 'SuggestAppend'
+$txtLayout.AutoCompleteSource = 'CustomSource'
+$txtLayout.AutoCompleteCustomSource.AddRange($options)
 
 $panelBottom.Controls.AddRange(@($lblLayout,$txtLayout))
 
