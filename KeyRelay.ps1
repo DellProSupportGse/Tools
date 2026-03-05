@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.8.1"
+$APP_VERSION = "1.8.2"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -163,6 +163,20 @@ function Load-Settings {
 function Load-CommandTree {
 
     $treeCommands.Nodes.Clear()
+    # -----------------------------------------------------
+    # Built-in Helper Commands
+    # -----------------------------------------------------
+
+    $helperNode = New-Object System.Windows.Forms.TreeNode
+    $helperNode.Text = "Helpers"
+
+    $checkLangNode = New-Object System.Windows.Forms.TreeNode
+    $checkLangNode.Text = "Check Language Culture"
+    $checkLangNode.Tag  = "([system.windows.forms.inputlanguage]::DefaultInputLanguage).culture.name"
+
+    $helperNode.Nodes.Add($checkLangNode) | Out-Null
+    $treeCommands.Nodes.Add($helperNode) | Out-Null
+
     Ensure-CommandFile
 
     $json = Get-Content $CommandPath -Raw | ConvertFrom-Json
