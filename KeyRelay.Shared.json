@@ -1,0 +1,21 @@
+{
+  "Cluster": [
+    {
+      "Name": "Cluster Name",
+      "Command": "Get-Cluster",
+      "Description": "Show the cluster name."
+    },
+    {
+      "Name": "Cluster Nodes",
+      "Command": "Get-ClusterNode",
+      "Description": "Shows all nodes that are part of the cluster."
+    }
+  ],
+  "Networking": [
+    {
+      "Name": "IP Config",
+      "Command": "ipconfig /all",
+      "Description": "Displays full network adapter configuration."
+    }
+  ]
+}
