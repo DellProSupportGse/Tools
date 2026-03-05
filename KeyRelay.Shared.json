@@ -70,10 +70,15 @@
 
   "Azure Local": [
     {
-      "Name": "SBE Version",
-      "Command": "Get-AzStackHciSBEVersion",
-      "Description": "Displays Azure Local Solution Bundle Extension version."
+      "Name": "Solution Version",
+      "Command": "Get-SolutionUpdateEnvironment",
+      "Description": "Displays Azure Local Solution version."
     },
+    {
+      "Name": "Solution Updates",
+      "Command": "Get-SolutionUpdate",
+      "Description": "Displays Azure Local Solution Updates."
+    },    
     {
       "Name": "Cluster Registration",
       "Command": "Get-AzureStackHCI",
@@ -103,7 +108,13 @@
       "Description": "Displays global ATC overrides."
     }
   ],
-
+  "Search": [
+    {
+      "Name": "Last xMins Logs",
+      "Command": "$xMins="15";Get-ChildItem C:\ -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge (Get-Date).AddMinutes(-$xMins) -and $_.Extension -match '\.(log|txt|out|err|trace)$' } | Sort-Object LastWriteTime -Descending | Select-Object FullName, LastWriteTime, Length | Format-Table -AutoSize",
+      "Description": "Find all logs that changed in the last X minutes"
+    }
+  ],
   "Storage Spaces Direct": [
     {
       "Name": "Storage Pools",
@@ -112,7 +123,7 @@
     },
     {
       "Name": "Physical Disks",
-      "Command": "Get-PhysicalDisk",
+      "Command": "Get-PhysicalDisk | sort deviceid",
       "Description": "Displays physical disks used by Storage Spaces."
     },
     {
