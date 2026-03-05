@@ -76,7 +76,7 @@
     },
     {
       "Name": "SBE Updates",
-      "Command": "Get-SolutionUpdate | Where-Object{$_.packagetype -eq "SBE"}",
+      "Command": "Get-SolutionUpdate | Where-Object{$_.packagetype -eq 'SBE'}",
       "Description": "Displays Azure Local Solution Builder Extention Updates."
     },    
     {
