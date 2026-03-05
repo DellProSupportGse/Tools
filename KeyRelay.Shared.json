@@ -75,22 +75,43 @@
       "Description": "Displays Azure Local Solution version."
     },
     {
+      "Name": "SBE Updates",
+      "Command": "Get-SolutionUpdate | Where-Object{$_.packagetype -eq "SBE"}",
+      "Description": "Displays Azure Local Solution Builder Extention Updates."
+    },    
+    {
       "Name": "Solution Updates",
       "Command": "Get-SolutionUpdate",
       "Description": "Displays Azure Local Solution Updates."
     },    
     {
-      "Name": "Cluster Registration",
+      "Name": "Azure Stack HCI Registration",
       "Command": "Get-AzureStackHCI",
       "Description": "Shows Azure Local registration status."
     },
+    {
+      "Name": "Action Plan Instances",
+      "Command": "Get-ActionPlanInstances | Select-Object Action*Name,InstanceId , Status,*Date*| Sort-Object EndDateTime | Format-Table",
+      "Description": "Shows Action Plan Instances Information."
+    },    
     {
       "Name": "HCI Cluster Info",
       "Command": "Get-AzStackHciCluster",
       "Description": "Displays Azure Local cluster details."
     }
   ],
-
+"Arc Agent": [
+    {
+      "Name": "Arc Show",
+      "Command": "& 'C:\Program Files\AzureConnectedMachineAgent\azcmagent.exe' show",
+      "Description": "Displays Arc Agent Version Information."
+    },
+  {
+      "Name": "Arc Check",
+      "Command": "& 'C:\Program Files\AzureConnectedMachineAgent\azcmagent.exe' check",
+      "Description": "Displays Arc Agent Connectivity/Gateway Information."
+    },
+  ],
   "Network ATC": [
     {
       "Name": "ATC Intents",
