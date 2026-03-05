@@ -110,7 +110,7 @@
       "Name": "Arc Check",
       "Command": "& 'C:\\Program Files\\AzureConnectedMachineAgent\\azcmagent.exe' check",
       "Description": "Displays Arc Agent Connectivity/Gateway Information."
-    },
+    }
   ],
   "Network ATC": [
     {
