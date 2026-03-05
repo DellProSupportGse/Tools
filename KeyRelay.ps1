@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.7.1"
+$APP_VERSION = "1.8"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -310,26 +310,29 @@ function Start-Typing {
 
     if ($global:IsTyping) { return }
 
-    $layoutMap = @{
-        "US"      = "en-US"
-        "German"  = "de-DE"
-        "UK"      = "en-GB"
-        "French"  = "fr-FR"
-        "Spanish" = "es-ES"
+    $targetCulture = $txtLayout.Text.Trim()
+
+    if ([string]::IsNullOrWhiteSpace($targetCulture)) {
+        $targetCulture = $global:OriginalKeyboardLayout
     }
-
-    $targetLayout = $cmbLayout.SelectedItem
-
-    if ([string]::IsNullOrWhiteSpace($targetLayout)) {
-        $targetLayout = "US"
-    }
-
-    $targetCulture = $layoutMap[$targetLayout]
 
     $restoreKeyboard = $false
 
     if ($targetCulture -and $targetCulture -ne $global:OriginalKeyboardLayout) {
-        Set-WinUserLanguageList $targetCulture -Force -WarningAction SilentlyContinue
+        try {
+            $lang = New-WinUserLanguageList $targetCulture
+            Set-WinUserLanguageList $lang -Force -WarningAction SilentlyContinue
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Invalid language code: $targetCulture",
+                "Keyboard Layout Error",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error
+            )
+            return
+        }
+
         Start-Sleep -Milliseconds 300
         $restoreKeyboard = $true
     }
@@ -644,24 +647,14 @@ $chkAltTab.SetBounds(475,45,250,25)
 $panelBottom.Controls.Add($chkAltTab)
 
 $lblLayout = New-Object Windows.Forms.Label
-$lblLayout.Text = "Target Keyboard"
-$lblLayout.SetBounds(510,10,110,25)
+$lblLayout.Text = "Target Lang (ex: fr-FR)"
+$lblLayout.SetBounds(480,10,150,25)
 
-$cmbLayout = New-Object Windows.Forms.ComboBox
-$cmbLayout.SetBounds(630,10,120,25)
-$cmbLayout.DropDownStyle = "DropDownList"
-$cmbLayout.Items.AddRange(@("US","German","UK","French","Spanish"))
+$txtLayout = New-Object Windows.Forms.TextBox
+$txtLayout.SetBounds(630,10,120,25)
+$txtLayout.Text = $global:OriginalKeyboardLayout
 
-switch ($global:OriginalKeyboardLayout) {
-    "de-DE" { $cmbLayout.SelectedItem = "German" }
-    "fr-FR" { $cmbLayout.SelectedItem = "French" }
-    "es-ES" { $cmbLayout.SelectedItem = "Spanish" }
-    "en-GB" { $cmbLayout.SelectedItem = "UK" }
-    default { $cmbLayout.SelectedItem = "US" }
-}
-
-
-$panelBottom.Controls.AddRange(@($lblLayout,$cmbLayout))
+$panelBottom.Controls.AddRange(@($lblLayout,$txtLayout))
 
 $btnType = New-Object Windows.Forms.Button
 $btnType.Text = "Type It"
