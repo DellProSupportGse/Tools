@@ -1,26 +1,170 @@
 {
-  "Cluster": [
+  "Windows OS": [
     {
-      "Name": "Cluster Name",
-      "Command": "Get-Cluster",
-      "Description": "Show the cluster name."
+      "Name": "OS Version",
+      "Command": "systeminfo | findstr /B /C:\"OS Name\" /C:\"OS Version\"",
+      "Description": "Displays the Windows Server OS version."
     },
+    {
+      "Name": "Installed Updates",
+      "Command": "Get-HotFix | Sort InstalledOn -Descending",
+      "Description": "Lists installed Windows updates."
+    },
+    {
+      "Name": "Reboot Pending Check",
+      "Command": "Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending",
+      "Description": "Checks if Windows has a pending reboot."
+    }
+  ],
+
+  "Failover Clustering": [
     {
       "Name": "Cluster Nodes",
       "Command": "Get-ClusterNode",
-      "Description": "Shows all nodes that are part of the cluster."
-    }
-  ],
-  "Networking": [
-    {
-      "Name": "IP Config",
-      "Command": "ipconfig /all",
-      "Description": "Displays full network adapter configuration."
+      "Description": "Displays all nodes in the cluster."
     },
     {
-      "Name": "iDRAC IP",
-      "Command": "Get-PcsvDevice | select IPv4Address",
-      "Description": "Displays the iDRAC IP on the node."
+      "Name": "Cluster Resources",
+      "Command": "Get-ClusterResource",
+      "Description": "Lists all cluster resources."
+    },
+    {
+      "Name": "Cluster Groups",
+      "Command": "Get-ClusterGroup",
+      "Description": "Displays cluster roles and ownership."
+    },
+    {
+      "Name": "Cluster Networks",
+      "Command": "Get-ClusterNetwork",
+      "Description": "Displays cluster network configuration."
+    },
+    {
+      "Name": "Cluster Validation",
+      "Command": "Test-Cluster",
+      "Description": "Runs full cluster validation tests."
+    }
+  ],
+
+  "Hyper-V": [
+    {
+      "Name": "List VMs",
+      "Command": "Get-VM",
+      "Description": "Lists all Hyper-V virtual machines."
+    },
+    {
+      "Name": "VM Status",
+      "Command": "Get-VM | Select Name, State, CPUUsage, MemoryAssigned",
+      "Description": "Shows VM health and usage."
+    },
+    {
+      "Name": "VM Network Adapters",
+      "Command": "Get-VMNetworkAdapter",
+      "Description": "Displays VM network adapter configuration."
+    },
+    {
+      "Name": "Virtual Switches",
+      "Command": "Get-VMSwitch",
+      "Description": "Lists Hyper-V virtual switches."
+    }
+  ],
+
+  "Azure Local": [
+    {
+      "Name": "SBE Version",
+      "Command": "Get-AzStackHciSBEVersion",
+      "Description": "Displays Azure Local Solution Bundle Extension version."
+    },
+    {
+      "Name": "Cluster Registration",
+      "Command": "Get-AzureStackHCI",
+      "Description": "Shows Azure Local registration status."
+    },
+    {
+      "Name": "HCI Cluster Info",
+      "Command": "Get-AzStackHciCluster",
+      "Description": "Displays Azure Local cluster details."
+    }
+  ],
+
+  "Network ATC": [
+    {
+      "Name": "ATC Intents",
+      "Command": "Get-NetIntent",
+      "Description": "Lists configured Network ATC intents."
+    },
+    {
+      "Name": "Intent Status",
+      "Command": "Get-NetIntentStatus",
+      "Description": "Displays status of Network ATC configuration."
+    },
+    {
+      "Name": "Global ATC Settings",
+      "Command": "Get-NetIntentStatus -GlobalOverride",
+      "Description": "Displays global ATC overrides."
+    }
+  ],
+
+  "Storage Spaces Direct": [
+    {
+      "Name": "Storage Pools",
+      "Command": "Get-StoragePool -IsPrimordial $False",
+      "Description": "Lists S2D storage pools."
+    },
+    {
+      "Name": "Physical Disks",
+      "Command": "Get-PhysicalDisk",
+      "Description": "Displays physical disks used by Storage Spaces."
+    },
+    {
+      "Name": "Virtual Disks",
+      "Command": "Get-VirtualDisk",
+      "Description": "Lists S2D virtual disks."
+    },
+    {
+      "Name": "Storage Jobs",
+      "Command": "Get-StorageJob",
+      "Description": "Displays active storage repair jobs."
+    }
+  ],
+
+  "Networking": [
+    {
+      "Name": "IP Configuration",
+      "Command": "ipconfig /all",
+      "Description": "Displays detailed network adapter configuration."
+    },
+    {
+      "Name": "Routing Table",
+      "Command": "route print",
+      "Description": "Displays the system routing table."
+    },
+    {
+      "Name": "Network Adapters",
+      "Command": "Get-NetAdapter",
+      "Description": "Lists all network adapters."
+    },
+    {
+      "Name": "NIC Advanced Settings",
+      "Command": "Get-NetAdapterAdvancedProperty",
+      "Description": "Displays advanced NIC settings."
+    }
+  ],
+
+  "Troubleshooting": [
+    {
+      "Name": "Event Log Errors",
+      "Command": "Get-EventLog -LogName System -EntryType Error -Newest 20",
+      "Description": "Shows the most recent system errors."
+    },
+    {
+      "Name": "Cluster Log",
+      "Command": "Get-ClusterLog -UseLocalTime",
+      "Description": "Generates cluster diagnostic logs."
+    },
+    {
+      "Name": "Top Processes",
+      "Command": "Get-Process | Sort CPU -Descending | Select -First 10",
+      "Description": "Displays top CPU consuming processes."
     }
   ]
 }
