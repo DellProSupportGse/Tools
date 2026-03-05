@@ -16,6 +16,11 @@
       "Name": "IP Config",
       "Command": "ipconfig /all",
       "Description": "Displays full network adapter configuration."
+    },
+    {
+      "Name": "iDRAC IP",
+      "Command": "Get-PcsvDevice | select IPv4Address",
+      "Description": "Displays the iDRAC IP on the node."
     }
   ]
 }
