@@ -93,11 +93,6 @@
       "Name": "Action Plan Instances",
       "Command": "Get-ActionPlanInstances | Select-Object Action*Name,InstanceId , Status,*Date*| Sort-Object EndDateTime | Format-Table",
       "Description": "Shows Action Plan Instances Information."
-    },    
-    {
-      "Name": "HCI Cluster Info",
-      "Command": "Get-AzStackHciCluster",
-      "Description": "Displays Azure Local cluster details."
     }
   ],
 "Arc Agent": [
@@ -138,6 +133,11 @@
 ],
   "Storage Spaces Direct": [
     {
+      "Name": "Smb Multi Channel (SBL)",
+      "Command": "Get-SmbMultichannelConnection -SmbInstance SBL",
+      "Description": "Lists S2D Storage Bus Links (SBL)."
+    },    
+    {
       "Name": "Storage Pools",
       "Command": "Get-StoragePool -IsPrimordial $False",
       "Description": "Lists S2D storage pools."
@@ -172,13 +172,23 @@
     },
     {
       "Name": "Network Adapters",
-      "Command": "Get-NetAdapter",
-      "Description": "Lists all network adapters."
+      "Command": "Get-NetAdapter | select Name, InterfaceDescription, ifIndex, Status, MacAddress, LinkSpeed, DriverVersion | ft",
+      "Description": "Lists all network adapters with driver version."
     },
     {
       "Name": "NIC Advanced Settings",
       "Command": "Get-NetAdapterAdvancedProperty",
       "Description": "Displays advanced NIC settings."
+    },
+    {
+      "Name": "RDMA Enabled",
+      "Command": "Get-NetAdapterRdma | sort Enabled",
+      "Description": "Displays RDMA Status."
+    },
+    {
+      "Name": "QOS Information",
+      "Command": "Get-NetAdapterQos | sort Enabled",
+      "Description": "Displays RDMA Status."
     }
   ],
 
