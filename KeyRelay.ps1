@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.8.2"
+$APP_VERSION = "1.8.3"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
