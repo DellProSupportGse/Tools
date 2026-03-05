@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.8.4"
+$APP_VERSION = "1.9"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -36,6 +36,7 @@ $global:IsTyping = $false
 $global:History  = @()
 $global:Settings  = @{}
 $PLACEHOLDER_TEXT = "Paste your command here that you would like to relay..."
+$SharedCommandsURL = "https://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.Shared.json"
 
 
 # =====================================================
@@ -203,6 +204,49 @@ function Load-CommandTree {
 
     $treeCommands.ExpandAll()
 }
+
+function Load-SharedCommands {
+
+    try {
+
+        $data = Invoke-RestMethod -Uri $SharedCommandsURL -UseBasicParsing
+
+        $treeShared.Nodes.Clear()
+
+        foreach ($category in $data.PSObject.Properties.Name | Sort-Object) {
+
+            $catNode = New-Object System.Windows.Forms.TreeNode
+            $catNode.Text = $category
+
+            foreach ($cmd in $data.$category) {
+
+                $child = New-Object System.Windows.Forms.TreeNode
+                $child.Text = $cmd.Name
+                $child.Tag  = $cmd.Command
+
+                if ($cmd.Description) {
+                    $child.ToolTipText = "$($cmd.Description)`n`nCommand:`n$($cmd.Command)"
+                }
+
+                $catNode.Nodes.Add($child)
+            }
+
+            $treeShared.Nodes.Add($catNode)
+        }
+
+        $treeShared.ExpandAll()
+
+    }
+    catch {
+
+        [System.Windows.Forms.MessageBox]::Show(
+            "Failed to load shared commands from GitHub.",
+            "KeyRelay"
+        )
+
+    }
+}
+
 
 # =====================================================
 # ADD COMMAND DIALOG
@@ -471,8 +515,19 @@ $tabRight = New-Object Windows.Forms.TabControl
 $tabRight.SetBounds(780,40,290,520)
 
 $tabCommands = New-Object Windows.Forms.TabPage
-$tabCommands.Text = "Commands"
+$tabCommands.Text = "My Commands"
 $tabCommands.Font = New-Object Drawing.Font("Consolas",10)
+
+$tabShared = New-Object Windows.Forms.TabPage
+$tabShared.Text = "Shared"
+$tabShared.Font = New-Object Drawing.Font("Consolas",10)
+
+$treeShared = New-Object Windows.Forms.TreeView
+$treeShared.Dock = "Fill"
+$treeShared.ShowNodeToolTips = $true
+
+$tabShared.Controls.Add($treeShared)
+
 
 $treeCommands = New-Object Windows.Forms.TreeView
 $treeCommands.Dock = "Fill"
@@ -487,7 +542,9 @@ $lstHistory.Dock = "Fill"
 $tabHistory.Controls.Add($lstHistory)
 
 $tabRight.TabPages.Add($tabCommands)
+$tabRight.TabPages.Add($tabShared)
 $tabRight.TabPages.Add($tabHistory)
+
 
 # =====================================================
 # CONTEXT MENU (Tree)
@@ -538,6 +595,16 @@ $treeCommands.Add_NodeMouseClick({
 
     }
 })
+
+$treeShared.Add_NodeMouseDoubleClick({
+param($sender,$e)
+
+if ($e.Node.Tag) {
+    $txtInput.Text = $e.Node.Tag
+}
+
+})
+
 
 # Edit Command (leaf)
 $menuEditCommand.Add_Click({
@@ -843,7 +910,11 @@ $form.Add_Closing({param($sender,$e)
 })
 
 
-$btnReload.Add_Click({ Load-CommandTree })
+$btnReload.Add_Click({
+    Load-CommandTree
+    Load-SharedCommands
+})
+
 $btnAdd.Add_Click({ Show-AddCommandDialog "" "" })
 
 $btnAddHist.Add_Click({
@@ -898,8 +969,10 @@ Refresh-HistoryList
 
 $form.Add_Shown({
 Load-CommandTree
+Load-SharedCommands
 $form.Activate()
 })
+
 
 [void]$form.ShowDialog()
 }
