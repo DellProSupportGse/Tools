@@ -1,10 +1,75 @@
 {
-    "_Tool Box": [
+  "_Tool Box": [
     {
       "Name": "BOILER",
-      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module=\"BOILER\";$repo=\"PowershellScripts\"\u0027+(new-object net.webclient).DownloadString(\u0027https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1\u0027));Invoke-BOILER",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="BOILER";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1\u0027));Invoke-BOILER",
       "Description": "Finds Windows Update Error in CBS Logs."
-    }
+    },
+    {
+      "Name": "DART",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="DART";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1\u0027));Invoke-DART",
+      "Description": "Installs Dell/MS Updates."
+    },
+    {
+      "Name": "FLEP",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="FLEP";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLEP.ps1\u0027));Invoke-FLEP",
+      "Description": "Filters Event Logs."
+    },
+    {
+      "Name": "FLCkr",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="FLCkr";$repo="PowershellScripts"\u0027+(new-object System.net.webclient).DownloadString(\u0027http\u0027+\u0027s://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1\u0027));Invoke-FLCkr",
+      "Description": "Looks up Mini Filter Drivers."
+    },
+    {
+      "Name": "LogCollector",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="LogCollector";$repo="PowershellScripts"\u0027+(new-object System.net.webclient).DownloadString(\u0027http\u0027+\u0027s://raw.githubusercontent.com/DellProSupportGse/Tools/main/LogCollector.ps1\u0027));Invoke-LogCollector",
+      "Description": "Make log collection easier."
+    },
+    {
+      "Name": "DriFT",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="RunDriFT";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027https://raw.githubusercontent.com/DellProSupportGse/source/main/drift.ps1\u0027));Invoke-RunDriFT",
+      "Description": "Driver and Firmware Tool."
+    },
+    {
+      "Name": "CluChk",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="RunCluChk";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchk.ps1\u0027));Invoke-RunCluChk",
+      "Description": "Cluster Checker."
+    },
+    {
+      "Name": "SLIC",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="RunSLIC";$repo="PowershellScripts"\u0027+(new-object net.webclient -Property @{ Encoding = [System.Text.Encoding]::UTF8 }).DownloadString(\u0027https://raw.githubusercontent.com/DellProSupportGse/source/main/slic.ps1\u0027));Invoke-SLIC",
+      "Description": "Switch Log InspeCtor."
+    },
+    {
+      "Name": "AzHCIUrlChecker",
+      "Command": "Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="AzHCIUrlChecker";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027http\u0027+\u0027s://raw.githubusercontent.com/DellProSupportGse/Tools/main/AzHCIUrlChecker.ps1\u0027));Invoke-AzHCIUrlChecker",
+      "Description": "Checks the URL Endpoints."
+    },
+    {
+      "Name": "APEX VM Log Collection",
+      "Command": "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && chmod 755 log_collect.sh && bash ./log_collect.sh",
+      "Description": "Collects the logs from APEX."
+    },
+    {
+      "Name": "KeyRelay",
+      "Command": "Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="KeyRelay";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027http\u0027+\u0027s://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.ps1\u0027));Invoke-KeyRelay",
+      "Description": "GUI tool to send text to applications "
+    },
+    {
+      "Name": "GetShowTech",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="GetShowTech";$repo="PowershellScripts"\u0027+(new-object System.net.webclient).DownloadString(\u0027http\u0027+\u0027s://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1\u0027));Invoke-GetShowTech",
+      "Description": "Tool to Collect Switch Logs from Dell Switches"
+    },
+    {
+      "Name": "Convert-Etl2Pcap",
+      "Command": "Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="Convert-Etl2Pcap";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027http\u0027+\u0027s://raw.githubusercontent.com/DellProSupportGse/Tools/main/Convert-Etl2Pcap.ps1\u0027));Invoke-ETL2PCAP",
+      "Description": "Converts Etl Network Traces to Pcap for Wireshark viewing"
+    },
+    {
+      "Name": "MakeIso",
+      "Command": "Echo MakeIso;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module="MakeIso";$repo="PowershellScripts"\u0027+(new-object net.webclient).DownloadString(\u0027http\u0027+\u0027s://raw.githubusercontent.com/DellProSupportGse/Tools/main/isomaker.ps1\u0027));Invoke-MakeISO",
+      "Description": "Makes and Iso from a folder."
+    }   
   ],
   "Windows OS": [
     {
