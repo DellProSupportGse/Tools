@@ -1,133 +1,140 @@
-# KeyRelay -- Quick Start
 
-This quick guide will help you start using **KeyRelay** in less than a
-minute.
+# KeyRelay Quick Start
 
-------------------------------------------------------------------------
+**Version:** KeyRelay v1.13
 
-# 1. Launch KeyRelay
+KeyRelay is a lightweight PowerShell GUI tool designed to send commands to applications that do not allow pasting, such as remote consoles or restricted terminals.
+
+---
+
+# 1. Download
+
+Download the latest version from the repository:
+
+https://github.com/DellProSupportGse/Tools
+
+Save the script locally:
+
+KeyRelay.ps1
+
+---
+
+# 2. Run KeyRelay
 
 Open PowerShell and run:
 
-``` powershell
-Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="KeyRelay";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.ps1'));Invoke-KeyRelay
+```powershell
+.\KeyRelay.ps1
+Invoke-KeyRelay
 ```
 
-The **KeyRelay GUI** will appear.
+---
 
-------------------------------------------------------------------------
+# 3. Basic Usage
 
-# 2. Enter a Command
+1. Paste your command into the editor.
+2. Set the Start Delay.
+3. Click **Type It**.
+4. Switch to the target window before the delay expires.
 
-Paste or type the command you want KeyRelay to relay into the **editor
-window**.
+KeyRelay will safely type the command into the target application.
 
-Example:
+---
 
-``` powershell
-Get-ClusterNode
+# 4. Command Tabs
+
+KeyRelay organizes commands using three tabs.
+
+| Tab | Description |
+|----|----|
+| My Commands | Your personal saved command library |
+| Shared | Commands downloaded from GitHub |
+| History | Recently executed commands |
+
+Double-click a command to insert it into the editor.
+
+---
+
+# 5. Search Commands
+
+Use the **Search** box to quickly filter commands.
+
+Search works across:
+
+- My Commands
+- Shared Commands
+- History
+
+Results update automatically as you type.
+
+---
+
+# 6. Add Your Own Commands
+
+Click **Add Command** and enter:
+
+- Category
+- Display Name
+- Command text
+
+Commands are stored locally in:
+
+Documents\KeyRelay\KeyRelay.commands.json
+
+---
+
+# 7. Add Commands From History
+
+Commands executed through KeyRelay are automatically saved.
+
+To save one permanently:
+
+1. Select a command in History
+2. Click **Add From History**
+3. Enter a name and category
+
+---
+
+# 8. Shared Commands
+
+KeyRelay downloads shared command libraries from GitHub.
+
+Repository:
+
+https://github.com/DellProSupportGse/Tools
+
+Shared commands include examples for:
+
+- Windows Server
+- Azure Local
+- Failover Clustering
+- Hyper-V
+- Network ATC
+
+Hover over a command to see its description.
+
+---
+
+# 9. Run Commands on Cluster Nodes
+
+Enable **Run on Cluster Nodes** to execute commands across all nodes in a Windows Failover Cluster.
+
+KeyRelay automatically wraps the command with:
+
+```powershell
+Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock { <command> }
 ```
 
-You can also load commands by:
+---
 
--   Double-clicking a command in the **Commands tab**
--   Double-clicking a previous command in the **History tab**
+# 10. Keyboard Layout Targeting
 
-------------------------------------------------------------------------
+Some remote consoles use different keyboard layouts.
 
-# 3. Configure Optional Settings
+You can specify a target layout such as:
 
-KeyRelay allows several optional controls to fine-tune typing behavior.
+- en-US
+- fr-FR
+- de-DE
 
-  -----------------------------------------------------------------------
-  Setting                  Description
-  ------------------------ ----------------------------------------------
-  Start Delay              Time before typing begins. Gives you time to
-                           switch windows.
-
-  Per-Key Delay            Delay between each character typed.
-
-  Between Lines            Delay between command lines.
-
-  Press Enter After Each   Automatically presses Enter after each line.
-  Line                     
-
-  Run on Cluster Nodes     Wraps the command using `Invoke-Command` for
-                           cluster execution.
-
-  Target Keyboard          Ensures characters are correct for different
-                           keyboard layouts.
-  -----------------------------------------------------------------------
-
-------------------------------------------------------------------------
-
-# 4. Switch to the Target Window
-
-After clicking **Type It**, switch to the application where the command
-should be typed.
-
-Common examples include:
-
--   RDP sessions
--   iDRAC / KVM consoles
--   Secure terminals
--   Training lab virtual machines
-
-The **Start Delay** gives you time to move focus to that window.
-
-------------------------------------------------------------------------
-
-# 5. Start Typing
-
-Click:
-
-    Type It
-
-KeyRelay will begin sending the command as simulated keyboard input.
-
-While typing:
-
--   **Type It button is disabled**
--   **STOP button is enabled**
-
-------------------------------------------------------------------------
-
-# 6. Stop Typing
-
-If you need to stop the relay process immediately, click:
-
-    STOP
-
-This cancels the typing operation safely.
-
-------------------------------------------------------------------------
-
-# Tips
-
-✔ Use a **Start Delay of 3--5 seconds** when switching into remote
-consoles.\
-✔ Increase **Per-Key Delay** if characters are missed in slow
-terminals.\
-✔ Save frequently used commands in the **Commands library**.\
-✔ Use **History** to quickly re-run recently used commands.
-
-------------------------------------------------------------------------
-
-# Where Files Are Stored
-
-KeyRelay stores its data in:
-
-    Documents\KeyRelay\
-
-Files created automatically:
-
--   `KeyRelay.commands.json`
--   `KeyRelay.history.json`
--   `KeyRelay.settings.json`
-
-------------------------------------------------------------------------
-
-# You're Ready
-
-You can now relay commands into environments where **paste is disabled
-or unreliable**.
+KeyRelay temporarily switches layouts before typing and restores the original layout afterward.
