@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.10"
+$APP_VERSION = "1.11"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -940,6 +940,27 @@ $chkEnter.Add_Leave({
         Save-Settings
 })
 $chkAltTab.Add_Leave({
+        $global:Settings.startDelay=[int]$inpStartDelay.Text
+        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+        $global:Settings.lineDelay=[int]$inpLineDelay.Text
+        $global:Settings.enterEach=$chkEnter.Checked
+        $global:Settings['TopMost']=$form.TopMost
+        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+        $global:Settings.AltTab=$chkAltTab.Checked
+        Save-Settings
+})
+
+
+$txtLayout.Add_Leave({
+        if (([Microsoft.InternationalSettings.Commands.WinUserLanguage]($txtLayout.Text)).ScriptName -eq $null) {
+           [System.Windows.Forms.MessageBox]::Show(
+                "Invalid language code: $($txtLayout.Text)",
+                "Keyboard Layout Error",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error
+            )
+           $txtLayout.Text = $global:OriginalKeyboardLayout
+        }
         $global:Settings.startDelay=[int]$inpStartDelay.Text
         $global:Settings.keyDelay=[int]$inpKeyDelay.Text
         $global:Settings.lineDelay=[int]$inpLineDelay.Text
