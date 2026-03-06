@@ -37,7 +37,7 @@
     },
     {
       "Name": "SLIC",
-      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunCluChk";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchk.ps1'));Invoke-RunCluChk",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunSLIC";$repo="PowershellScripts"'+(new-object net.webclient -Property @{ Encoding = [System.Text.Encoding]::UTF8 }).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/slic.ps1'));Invoke-SLIC",
       "Description": "Switch Log InspeCtor."
     },
     {
@@ -47,7 +47,7 @@
     },
     {
       "Name": "APEX VM Log Collection",
-      "Command": "Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="AzHCIUrlChecker";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/AzHCIUrlChecker.ps1'));Invoke-AzHCIUrlChecker",
+      "Command": "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && chmod 755 log_collect.sh && bash ./log_collect.sh",
       "Description": "Collects the logs from APEX."
     },
     {
@@ -173,7 +173,7 @@
       "Name": "Arc Show",
       "Command": "& 'C:\\Program Files\\AzureConnectedMachineAgent\\azcmagent.exe' show",
       "Description": "Displays Arc Agent Version Information."
-    },
+    }
   {
       "Name": "Arc Check",
       "Command": "& 'C:\\Program Files\\AzureConnectedMachineAgent\\azcmagent.exe' check",
