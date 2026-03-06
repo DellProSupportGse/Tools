@@ -1,4 +1,11 @@
 {
+    "_Tool Box": [
+    {
+      "Name": "BOILER",
+      "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="BOILER";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1'));Invoke-BOILER",
+      "Description": "Finds Windows Update Error in CBS Logs."
+    }
+  ],
   "Windows OS": [
     {
       "Name": "OS Version",
