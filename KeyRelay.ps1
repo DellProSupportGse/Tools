@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.13"
+$APP_VERSION = "1.13.1"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -233,7 +233,7 @@ function Load-SharedCommands {
             $catNode = New-Object System.Windows.Forms.TreeNode
             $catNode.Text = $category
 
-            foreach ($cmd in $data.$category) {
+            foreach ($cmd in ($data.$category | Sort-Object Name)) {
 
                 $child = New-Object System.Windows.Forms.TreeNode
                 $child.Text = $cmd.Name
@@ -594,6 +594,12 @@ $txtInput.Multiline = $true
 $txtInput.ScrollBars = "Vertical"
 $txtInput.Font = New-Object Drawing.Font("Consolas",14)
 $txtInput.SetBounds(12,40,750,470)
+$txtInput.Add_KeyDown({
+    if ($_.Control -and $_.KeyCode -eq 'A') {
+        $txtInput.SelectAll()
+        $_.SuppressKeyPress = $true
+    }
+})
 
 # Placeholder setup
 $txtInput.ForeColor = [System.Drawing.Color]::Black
