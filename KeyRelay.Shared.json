@@ -1,5 +1,5 @@
 {
-  "_Tool Box": [
+  "Tool Box": [
     {
       "Name": "BOILER",
       "Command": "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(\u0027$module=\"BOILER\";$repo=\"PowershellScripts\"\u0027+(new-object net.webclient).DownloadString(\u0027https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1\u0027));Invoke-BOILER",
