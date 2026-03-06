@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.12"
+$APP_VERSION = "1.13"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -161,6 +161,20 @@ function Load-Settings {
     (ConvertFrom-Json $raw).psobject.properties | Foreach { $global:Settings[$_.Name] = $_.Value }
 }
 
+function Save-CurrentSettings {
+
+    $global:Settings.startDelay=[int]$inpStartDelay.Text
+    $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+    $global:Settings.lineDelay=[int]$inpLineDelay.Text
+    $global:Settings.enterEach=$chkEnter.Checked
+    $global:Settings['TopMost']=$form.TopMost
+    $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+    $global:Settings.AltTab=$chkAltTab.Checked
+
+    Save-Settings
+
+}
+
 function Load-CommandTree {
 
     $treeCommands.Nodes.Clear()
@@ -209,7 +223,8 @@ function Load-SharedCommands {
 
     try {
 
-        $data = Invoke-RestMethod -Uri $SharedCommandsURL -UseBasicParsing
+        $data = Invoke-RestMethod -Uri ($SharedCommandsURL + "?t=$(Get-Date -Format yyyyMMddHHmmss)") -UseBasicParsing
+
 
         $treeShared.Nodes.Clear()
 
@@ -249,6 +264,8 @@ function Load-SharedCommands {
 
 function Perform-Search {
 
+    if ($txtSearch.Text -eq "Search commands...") { return }
+
     $query = $txtSearch.Text.ToLower()
 
     if ($tabRight.SelectedTab.Text -eq "My Commands") {
@@ -262,10 +279,13 @@ function Perform-Search {
             foreach ($child in @($node.Nodes)) {
 
                 if (-not $child.Text.ToLower().Contains($query) -and
-                    -not $child.Tag.ToLower().Contains($query)) {
+                    -not ($child.Tag -and $child.Tag.ToLower().Contains($query))) {
 
                     $node.Nodes.Remove($child)
 
+                }
+                else {
+                    $node.Expand()
                 }
 
             }
@@ -285,10 +305,13 @@ function Perform-Search {
             foreach ($child in @($node.Nodes)) {
 
                 if (-not $child.Text.ToLower().Contains($query) -and
-                    -not $child.Tag.ToLower().Contains($query)) {
+                    -not ($child.Tag -and $child.Tag.ToLower().Contains($query))) {
 
                     $node.Nodes.Remove($child)
 
+                }
+                else {
+                    $node.Expand()
                 }
 
             }
@@ -313,23 +336,6 @@ function Perform-Search {
 
 }
 
-# =====================================================
-# ADD GETWINDOWSTEXT TYPE
-# =====================================================
-
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
-
-public class User32 {
-    [DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-}
-"@
 
 # =====================================================
 # ADD COMMAND DIALOG
@@ -510,11 +516,6 @@ function Start-Typing {
 
         Start-Sleep -Seconds $startDelay
 
-        $sb = New-Object System.Text.StringBuilder 256
-        [User32]::GetWindowText(([User32]::GetForegroundWindow()), $sb, $sb.Capacity) | out-null
-        if ($sb.ToString() -eq $APP_TITLE) { Write-Warning "Did not switch to another window!!";$global:IsTyping=$false }
-
-        
         foreach ($line in $lines) {
 
             if (-not $global:IsTyping) { break }
@@ -595,7 +596,7 @@ $txtInput.Font = New-Object Drawing.Font("Consolas",14)
 $txtInput.SetBounds(12,40,750,470)
 
 # Placeholder setup
-$txtInput.ForeColor = [System.Drawing.Color]::Gray
+$txtInput.ForeColor = [System.Drawing.Color]::Black
 $txtInput.Text = $PLACEHOLDER_TEXT
 
 $lblSearch = New-Object Windows.Forms.Label
@@ -604,6 +605,8 @@ $lblSearch.SetBounds(780,545,60,25)
 
 $txtSearch = New-Object Windows.Forms.TextBox
 $txtSearch.SetBounds(840,543,230,25)
+$txtSearch.Text = "Search commands..."
+$txtSearch.ForeColor = [System.Drawing.Color]::Gray
 
 $tabRight = New-Object Windows.Forms.TabControl
 $tabRight.SetBounds(780,40,290,490)
@@ -645,6 +648,9 @@ $tabRight.TabPages.Add($tabHistory)
 
 $treeMenu = New-Object System.Windows.Forms.ContextMenuStrip
 
+$menuCopyCommand = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuCopyCommand.Text = "Copy Command"
+
 $menuEditCommand = New-Object System.Windows.Forms.ToolStripMenuItem
 $menuEditCommand.Text = "Edit Command"
 
@@ -655,11 +661,11 @@ $menuRemoveCategory = New-Object System.Windows.Forms.ToolStripMenuItem
 $menuRemoveCategory.Text = "Remove Category"
 
 $treeMenu.Items.AddRange(@(
+    $menuCopyCommand,
     $menuEditCommand,
     $menuRemoveCommand,
     $menuRemoveCategory
 ))
-
 
 $treeCommands.ContextMenuStrip = $treeMenu
 
@@ -746,6 +752,15 @@ $menuRemoveCategory.Add_Click({
         Load-CommandTree
     }
 })
+
+$menuCopyCommand.Add_Click({
+
+    if ($script:RightClickedNode -and $script:RightClickedNode.Tag) {
+        [System.Windows.Forms.Clipboard]::SetText($script:RightClickedNode.Tag)
+    }
+
+})
+
 
 Load-Settings
 if ($global:Settings.count -eq 0) {
@@ -883,6 +898,19 @@ $chkAltTab.Checked=[bool]$global:Settings.AltTab
 $btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
 
 # EVENTS
+$txtSearch.Add_GotFocus({
+    if ($txtSearch.Text -eq "Search commands...") {
+        $txtSearch.Text = ""
+        $txtSearch.ForeColor = [System.Drawing.Color]::Black
+    }
+})
+
+$txtSearch.Add_LostFocus({
+    if ([string]::IsNullOrWhiteSpace($txtSearch.Text)) {
+        $txtSearch.Text = "Search commands..."
+        $txtSearch.ForeColor = [System.Drawing.Color]::Gray
+    }
+})
 
 $txtSearch.Add_TextChanged({
     Perform-Search
@@ -922,75 +950,19 @@ $txtInput.Add_Leave({
     }
 })
 $inpKeyDelay.Add_Leave({
-        $global:Settings.startDelay=$inpStartDelay.Text
-        $global:Settings.keyDelay=$inpKeyDelay.Text
-        $global:Settings.lineDelay=$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 $inpStartDelay.Add_Leave({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 $inpLineDelay.Add_Leave({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 $chkEnter.Add_Leave({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 $chkAltTab.Add_Leave({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
-})
-
-
-$txtLayout.Add_Leave({
-        if (([Microsoft.InternationalSettings.Commands.WinUserLanguage]($txtLayout.Text)).ScriptName -eq $null) {
-           [System.Windows.Forms.MessageBox]::Show(
-                "Invalid language code: $($txtLayout.Text)",
-                "Keyboard Layout Error",
-                [System.Windows.Forms.MessageBoxButtons]::OK,
-                [System.Windows.Forms.MessageBoxIcon]::Error
-            )
-           $txtLayout.Text = $global:OriginalKeyboardLayout
-        }
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 
 $btnType.Add_Click({ [void](Start-Typing) })
@@ -1000,37 +972,16 @@ $btnStop.Add_Click({
 
 $btnClear.Add_Click({ $txtInput.Clear() })
 $btnExit.Add_Click({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 $form.Close() })
 
 $btnTop.Add_Click({
         $form.TopMost = -not $form.TopMost
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
         $btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
 })
 $form.Add_Closing({param($sender,$e)
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 
 
