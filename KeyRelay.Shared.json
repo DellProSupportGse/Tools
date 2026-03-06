@@ -1,4 +1,4 @@
- {
+{
   "Windows OS": [
     {
       "Name": "OS Version",
@@ -100,7 +100,7 @@
       "Name": "Arc Show",
       "Command": "& 'C:\\Program Files\\AzureConnectedMachineAgent\\azcmagent.exe' show",
       "Description": "Displays Arc Agent Version Information."
-    }
+    },
   {
       "Name": "Arc Check",
       "Command": "& 'C:\\Program Files\\AzureConnectedMachineAgent\\azcmagent.exe' check",
