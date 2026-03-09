@@ -142,9 +142,9 @@
 
   "Azure Local": [
     {
-      "Name": "Solution Version",
+      "Name": "Solution Environment",
       "Command": "Get-SolutionUpdateEnvironment",
-      "Description": "Displays Azure Local Solution version."
+      "Description": "Displays Azure Local Solution version information."
     },
     {
       "Name": "SBE Updates",
