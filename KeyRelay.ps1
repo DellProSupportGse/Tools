@@ -11,7 +11,7 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.13.1"
+$APP_VERSION = "1.13.2"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -674,6 +674,7 @@ $treeMenu.Items.AddRange(@(
 ))
 
 $treeCommands.ContextMenuStrip = $treeMenu
+$treeShared.ContextMenuStrip = $treeMenu
 
 $script:RightClickedNode = $null
 
@@ -687,12 +688,14 @@ $treeCommands.Add_NodeMouseClick({
 
         if ($e.Node.Tag) {
             # Leaf (command)
+            $menuCopyCommand.Visible = $true
             $menuEditCommand.Visible = $true
             $menuRemoveCommand.Visible = $true
             $menuRemoveCategory.Visible = $false
         }
         else {
             # Category
+            $menuCopyCommand.Visible = $false
             $menuEditCommand.Visible = $false
             $menuRemoveCommand.Visible = $false
             $menuRemoveCategory.Visible = $true
@@ -700,6 +703,33 @@ $treeCommands.Add_NodeMouseClick({
 
     }
 })
+
+$treeShared.Add_NodeMouseClick({
+    param($sender,$e)
+
+    if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
+
+        $treeShared.SelectedNode = $e.Node
+        $script:RightClickedNode = $e.Node
+
+        if ($e.Node.Tag) {
+            # Leaf (command)
+            $menuCopyCommand.Visible = $true
+            $menuEditCommand.Visible = $false
+            $menuRemoveCommand.Visible = $false
+            $menuRemoveCategory.Visible = $false
+        }
+        else {
+            # Category
+            $menuCopyCommand.Visible = $false
+            $menuEditCommand.Visible = $false
+            $menuRemoveCommand.Visible = $false
+            $menuRemoveCategory.Visible = $false
+        }
+
+    }
+})
+
 
 $treeShared.Add_NodeMouseDoubleClick({
 param($sender,$e)
