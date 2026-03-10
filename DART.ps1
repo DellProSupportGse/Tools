@@ -84,7 +84,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.61"
+$ver="1.62"
 $addtablefunction=${function:add-TableData1}
 Start-Job -Name "Telemetry" -ScriptBlock {
 ${function:add-TableData1} = $using:addtablefunction
@@ -410,7 +410,8 @@ $IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} 
                 $InFile="$MyTemp\ASHCI-Catalog.xml.gz"
                 IF ([System.Environment]::OSVersion.OSVersion -match "10.0.14393") {
                    Write-Host "Windows Server 2016 detected" -ForegroundColor Green
-                   $URL="https://dl.dell.com/FOLDER09682297M/1/ASHCI-Catalog.xml.gz"
+                   #$URL="https://dl.dell.com/FOLDER09682297M/1/ASHCI-Catalog.xml.gz"
+                   $URL="https://dl.dell.com/FOLDER07774224M/1/ASHCI-Catalog.xml.gz"
                 }
             }Else{
                 $ASHCI="NO"
