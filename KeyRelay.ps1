@@ -11,7 +11,68 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.12"
+# =====================================================
+# App Version
+# =====================================================
+$APP_VERSION = "1.13.3"
+
+# =====================================================
+# APP DATA FOLDER
+# =====================================================
+
+$DocumentsFolder = [Environment]::GetFolderPath("MyDocuments")
+$AppFolder = Join-Path $DocumentsFolder "KeyRelay"
+
+if (-not (Test-Path $AppFolder)) {
+    New-Item -ItemType Directory -Path $AppFolder | Out-Null
+}
+
+# =====================================================
+# TELEMETRY
+# =====================================================
+function Send-KeyRelayTelemetry {
+
+    try {
+
+        $RepoOwner = "DellProSupportGse"
+        $RepoName  = "keyrelay-telemetry"
+
+        $token = "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"
+
+       $Geo = Invoke-RestMethod `
+                -Uri "https://ipapi.co/json/" `
+                -Headers @{ "User-Agent" = "KeyRelay" }
+
+        $body = @{
+            event_type = "keyrelay_used"
+            client_payload = @{
+                version     = $APP_VERSION
+                country     = $Geo.country_code
+                region      = $Geo.region
+                timestamp   = (Get-Date).ToUniversalTime().ToString("o")
+            }
+        } | ConvertTo-Json -Depth 5
+
+        Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/$RepoOwner/$RepoName/dispatches" `
+            -Method POST `
+            -Headers @{
+                Authorization = "Bearer $token"
+                Accept = "application/vnd.github+json"
+                "X-GitHub-Api-Version"="2022-11-28"
+                "User-Agent" = "KeyRelay"
+            } `
+            -Body $body `
+            -ContentType "application/json"
+
+    }
+    catch {
+        Write-Host "Telemetry failed: $_"
+    }
+
+}
+
+Send-KeyRelayTelemetry
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -23,10 +84,6 @@ Add-Type -AssemblyName System.Drawing
 $APP_TITLE = "KeyRelay v$APP_VERSION - Relaying keystrokes where paste can't go.   By: Jim Gandy"
 
 $HIST_MAX  = 10
-
-$DocumentsFolder = [Environment]::GetFolderPath("MyDocuments")
-$AppFolder = Join-Path $DocumentsFolder "KeyRelay"
-if (-not (Test-Path $AppFolder)) { New-Item -ItemType Directory -Path $AppFolder | Out-Null }
 
 $HistoryPath = Join-Path $AppFolder "KeyRelay.history.json"
 $CommandPath = Join-Path $AppFolder "KeyRelay.commands.json"
@@ -161,6 +218,20 @@ function Load-Settings {
     (ConvertFrom-Json $raw).psobject.properties | Foreach { $global:Settings[$_.Name] = $_.Value }
 }
 
+function Save-CurrentSettings {
+
+    $global:Settings.startDelay=[int]$inpStartDelay.Text
+    $global:Settings.keyDelay=[int]$inpKeyDelay.Text
+    $global:Settings.lineDelay=[int]$inpLineDelay.Text
+    $global:Settings.enterEach=$chkEnter.Checked
+    $global:Settings['TopMost']=$form.TopMost
+    $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
+    $global:Settings.AltTab=$chkAltTab.Checked
+
+    Save-Settings
+
+}
+
 function Load-CommandTree {
 
     $treeCommands.Nodes.Clear()
@@ -209,7 +280,8 @@ function Load-SharedCommands {
 
     try {
 
-        $data = Invoke-RestMethod -Uri $SharedCommandsURL -UseBasicParsing
+        $data = Invoke-RestMethod -Uri ($SharedCommandsURL + "?t=$(Get-Date -Format yyyyMMddHHmmss)") -UseBasicParsing
+
 
         $treeShared.Nodes.Clear()
 
@@ -218,7 +290,7 @@ function Load-SharedCommands {
             $catNode = New-Object System.Windows.Forms.TreeNode
             $catNode.Text = $category
 
-            foreach ($cmd in $data.$category) {
+            foreach ($cmd in ($data.$category | Sort-Object Name)) {
 
                 $child = New-Object System.Windows.Forms.TreeNode
                 $child.Text = $cmd.Name
@@ -249,6 +321,8 @@ function Load-SharedCommands {
 
 function Perform-Search {
 
+    if ($txtSearch.Text -eq "Search commands...") { return }
+
     $query = $txtSearch.Text.ToLower()
 
     if ($tabRight.SelectedTab.Text -eq "My Commands") {
@@ -262,10 +336,13 @@ function Perform-Search {
             foreach ($child in @($node.Nodes)) {
 
                 if (-not $child.Text.ToLower().Contains($query) -and
-                    -not $child.Tag.ToLower().Contains($query)) {
+                    -not ($child.Tag -and $child.Tag.ToLower().Contains($query))) {
 
                     $node.Nodes.Remove($child)
 
+                }
+                else {
+                    $node.Expand()
                 }
 
             }
@@ -285,10 +362,13 @@ function Perform-Search {
             foreach ($child in @($node.Nodes)) {
 
                 if (-not $child.Text.ToLower().Contains($query) -and
-                    -not $child.Tag.ToLower().Contains($query)) {
+                    -not ($child.Tag -and $child.Tag.ToLower().Contains($query))) {
 
                     $node.Nodes.Remove($child)
 
+                }
+                else {
+                    $node.Expand()
                 }
 
             }
@@ -313,23 +393,6 @@ function Perform-Search {
 
 }
 
-# =====================================================
-# ADD GETWINDOWSTEXT TYPE
-# =====================================================
-
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
-
-public class User32 {
-    [DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-}
-"@
 
 # =====================================================
 # ADD COMMAND DIALOG
@@ -510,11 +573,6 @@ function Start-Typing {
 
         Start-Sleep -Seconds $startDelay
 
-        $sb = New-Object System.Text.StringBuilder 256
-        [User32]::GetWindowText(([User32]::GetForegroundWindow()), $sb, $sb.Capacity) | out-null
-        if ($sb.ToString() -eq $APP_TITLE) { Write-Warning "Did not switch to another window!!";$global:IsTyping=$false }
-
-        
         foreach ($line in $lines) {
 
             if (-not $global:IsTyping) { break }
@@ -593,9 +651,15 @@ $txtInput.Multiline = $true
 $txtInput.ScrollBars = "Vertical"
 $txtInput.Font = New-Object Drawing.Font("Consolas",14)
 $txtInput.SetBounds(12,40,750,470)
+$txtInput.Add_KeyDown({
+    if ($_.Control -and $_.KeyCode -eq 'A') {
+        $txtInput.SelectAll()
+        $_.SuppressKeyPress = $true
+    }
+})
 
 # Placeholder setup
-$txtInput.ForeColor = [System.Drawing.Color]::Gray
+$txtInput.ForeColor = [System.Drawing.Color]::Black
 $txtInput.Text = $PLACEHOLDER_TEXT
 
 $lblSearch = New-Object Windows.Forms.Label
@@ -604,6 +668,8 @@ $lblSearch.SetBounds(780,545,60,25)
 
 $txtSearch = New-Object Windows.Forms.TextBox
 $txtSearch.SetBounds(840,543,230,25)
+$txtSearch.Text = "Search commands..."
+$txtSearch.ForeColor = [System.Drawing.Color]::Gray
 
 $tabRight = New-Object Windows.Forms.TabControl
 $tabRight.SetBounds(780,40,290,490)
@@ -645,6 +711,9 @@ $tabRight.TabPages.Add($tabHistory)
 
 $treeMenu = New-Object System.Windows.Forms.ContextMenuStrip
 
+$menuCopyCommand = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuCopyCommand.Text = "Copy Command"
+
 $menuEditCommand = New-Object System.Windows.Forms.ToolStripMenuItem
 $menuEditCommand.Text = "Edit Command"
 
@@ -655,13 +724,14 @@ $menuRemoveCategory = New-Object System.Windows.Forms.ToolStripMenuItem
 $menuRemoveCategory.Text = "Remove Category"
 
 $treeMenu.Items.AddRange(@(
+    $menuCopyCommand,
     $menuEditCommand,
     $menuRemoveCommand,
     $menuRemoveCategory
 ))
 
-
 $treeCommands.ContextMenuStrip = $treeMenu
+$treeShared.ContextMenuStrip = $treeMenu
 
 $script:RightClickedNode = $null
 
@@ -675,12 +745,14 @@ $treeCommands.Add_NodeMouseClick({
 
         if ($e.Node.Tag) {
             # Leaf (command)
+            $menuCopyCommand.Visible = $true
             $menuEditCommand.Visible = $true
             $menuRemoveCommand.Visible = $true
             $menuRemoveCategory.Visible = $false
         }
         else {
             # Category
+            $menuCopyCommand.Visible = $false
             $menuEditCommand.Visible = $false
             $menuRemoveCommand.Visible = $false
             $menuRemoveCategory.Visible = $true
@@ -688,6 +760,33 @@ $treeCommands.Add_NodeMouseClick({
 
     }
 })
+
+$treeShared.Add_NodeMouseClick({
+    param($sender,$e)
+
+    if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
+
+        $treeShared.SelectedNode = $e.Node
+        $script:RightClickedNode = $e.Node
+
+        if ($e.Node.Tag) {
+            # Leaf (command)
+            $menuCopyCommand.Visible = $true
+            $menuEditCommand.Visible = $false
+            $menuRemoveCommand.Visible = $false
+            $menuRemoveCategory.Visible = $false
+        }
+        else {
+            # Category
+            $menuCopyCommand.Visible = $false
+            $menuEditCommand.Visible = $false
+            $menuRemoveCommand.Visible = $false
+            $menuRemoveCategory.Visible = $false
+        }
+
+    }
+})
+
 
 $treeShared.Add_NodeMouseDoubleClick({
 param($sender,$e)
@@ -746,6 +845,15 @@ $menuRemoveCategory.Add_Click({
         Load-CommandTree
     }
 })
+
+$menuCopyCommand.Add_Click({
+
+    if ($script:RightClickedNode -and $script:RightClickedNode.Tag) {
+        [System.Windows.Forms.Clipboard]::SetText($script:RightClickedNode.Tag)
+    }
+
+})
+
 
 Load-Settings
 if ($global:Settings.count -eq 0) {
@@ -883,6 +991,19 @@ $chkAltTab.Checked=[bool]$global:Settings.AltTab
 $btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
 
 # EVENTS
+$txtSearch.Add_GotFocus({
+    if ($txtSearch.Text -eq "Search commands...") {
+        $txtSearch.Text = ""
+        $txtSearch.ForeColor = [System.Drawing.Color]::Black
+    }
+})
+
+$txtSearch.Add_LostFocus({
+    if ([string]::IsNullOrWhiteSpace($txtSearch.Text)) {
+        $txtSearch.Text = "Search commands..."
+        $txtSearch.ForeColor = [System.Drawing.Color]::Gray
+    }
+})
 
 $txtSearch.Add_TextChanged({
     Perform-Search
@@ -922,75 +1043,19 @@ $txtInput.Add_Leave({
     }
 })
 $inpKeyDelay.Add_Leave({
-        $global:Settings.startDelay=$inpStartDelay.Text
-        $global:Settings.keyDelay=$inpKeyDelay.Text
-        $global:Settings.lineDelay=$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 $inpStartDelay.Add_Leave({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 $inpLineDelay.Add_Leave({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 $chkEnter.Add_Leave({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 $chkAltTab.Add_Leave({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
-})
-
-
-$txtLayout.Add_Leave({
-        if (([Microsoft.InternationalSettings.Commands.WinUserLanguage]($txtLayout.Text)).ScriptName -eq $null) {
-           [System.Windows.Forms.MessageBox]::Show(
-                "Invalid language code: $($txtLayout.Text)",
-                "Keyboard Layout Error",
-                [System.Windows.Forms.MessageBoxButtons]::OK,
-                [System.Windows.Forms.MessageBoxIcon]::Error
-            )
-           $txtLayout.Text = $global:OriginalKeyboardLayout
-        }
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 
 $btnType.Add_Click({ [void](Start-Typing) })
@@ -1000,37 +1065,16 @@ $btnStop.Add_Click({
 
 $btnClear.Add_Click({ $txtInput.Clear() })
 $btnExit.Add_Click({
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 $form.Close() })
 
 $btnTop.Add_Click({
         $form.TopMost = -not $form.TopMost
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
         $btnTop.Text = "Always On Top: " + ($(if($form.TopMost){"ON"}else{"OFF"}))
 })
 $form.Add_Closing({param($sender,$e)
-        $global:Settings.startDelay=[int]$inpStartDelay.Text
-        $global:Settings.keyDelay=[int]$inpKeyDelay.Text
-        $global:Settings.lineDelay=[int]$inpLineDelay.Text
-        $global:Settings.enterEach=$chkEnter.Checked
-        $global:Settings['TopMost']=$form.TopMost
-        $global:Settings.InvokeCluster=$chkInvokeCluster.Checked
-        $global:Settings.AltTab=$chkAltTab.Checked
-        Save-Settings
+    Save-CurrentSettings
 })
 
 
