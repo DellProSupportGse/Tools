@@ -14,7 +14,7 @@ Function Invoke-KeyRelay {
 # =====================================================
 # App Version
 # =====================================================
-$APP_VERSION = "1.13.3"
+$APP_VERSION = "1.13.4"
 
 # =====================================================
 # APP DATA FOLDER
@@ -37,7 +37,7 @@ function Send-KeyRelayTelemetry {
         $RepoOwner = "DellProSupportGse"
         $RepoName  = "keyrelay-telemetry"
 
-        $token = "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"
+        $token = ""
 
        $Geo = Invoke-RestMethod `
                 -Uri "https://ipapi.co/json/" `
