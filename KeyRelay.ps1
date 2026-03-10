@@ -34,41 +34,22 @@ function Send-KeyRelayTelemetry {
 
     try {
 
-        $RepoOwner = "DellProSupportGse"
-        $RepoName  = "keyrelay-telemetry"
-
-        $token = ""
-
-       $Geo = Invoke-RestMethod `
-                -Uri "https://ipapi.co/json/" `
-                -Headers @{ "User-Agent" = "KeyRelay" }
-
-        $body = @{
-            event_type = "keyrelay_used"
-            client_payload = @{
-                version     = $APP_VERSION
-                country     = $Geo.country_code
-                region      = $Geo.region
-                timestamp   = (Get-Date).ToUniversalTime().ToString("o")
-            }
-        } | ConvertTo-Json -Depth 5
+        $payload = @{
+            tool     = "KeyRelay"
+            version  = "1.13.4"
+            os   = (Get-CimInstance Win32_OperatingSystem).Caption
+            country  = ""
+            region   = ""
+            timestamp     = (Get-Date).ToString("s")
+        }
 
         Invoke-RestMethod `
-            -Uri "https://api.github.com/repos/$RepoOwner/$RepoName/dispatches" `
-            -Method POST `
-            -Headers @{
-                Authorization = "Bearer $token"
-                Accept = "application/vnd.github+json"
-                "X-GitHub-Api-Version"="2022-11-28"
-                "User-Agent" = "KeyRelay"
-            } `
-            -Body $body `
-            -ContentType "application/json"
+          -Uri "https://keyrelay-telemetry-fufugbc8bzece4df.canadacentral-01.azurewebsites.net/api/KeyRelayTelemetry" `
+          -Method POST `
+          -Body ($payload | ConvertTo-Json) `
+          -ContentType "application/json"
 
-    }
-    catch {
-        Write-Host "Telemetry failed: $_"
-    }
+    } catch {}
 
 }
 
