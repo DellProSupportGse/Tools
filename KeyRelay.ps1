@@ -11,7 +11,68 @@
 
 Function Invoke-KeyRelay {
 
-$APP_VERSION = "1.13.2"
+# =====================================================
+# App Version
+# =====================================================
+$APP_VERSION = "1.13.3"
+
+# =====================================================
+# APP DATA FOLDER
+# =====================================================
+
+$DocumentsFolder = [Environment]::GetFolderPath("MyDocuments")
+$AppFolder = Join-Path $DocumentsFolder "KeyRelay"
+
+if (-not (Test-Path $AppFolder)) {
+    New-Item -ItemType Directory -Path $AppFolder | Out-Null
+}
+
+# =====================================================
+# TELEMETRY
+# =====================================================
+function Send-KeyRelayTelemetry {
+
+    try {
+
+        $RepoOwner = "DellProSupportGse"
+        $RepoName  = "keyrelay-telemetry"
+
+        $token = "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"
+
+       $Geo = Invoke-RestMethod `
+                -Uri "https://ipapi.co/json/" `
+                -Headers @{ "User-Agent" = "KeyRelay" }
+
+        $body = @{
+            event_type = "keyrelay_used"
+            client_payload = @{
+                version     = $APP_VERSION
+                country     = $Geo.country_code
+                region      = $Geo.region
+                timestamp   = (Get-Date).ToUniversalTime().ToString("o")
+            }
+        } | ConvertTo-Json -Depth 5
+
+        Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/$RepoOwner/$RepoName/dispatches" `
+            -Method POST `
+            -Headers @{
+                Authorization = "Bearer $token"
+                Accept = "application/vnd.github+json"
+                "X-GitHub-Api-Version"="2022-11-28"
+                "User-Agent" = "KeyRelay"
+            } `
+            -Body $body `
+            -ContentType "application/json"
+
+    }
+    catch {
+        Write-Host "Telemetry failed: $_"
+    }
+
+}
+
+Send-KeyRelayTelemetry
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -23,10 +84,6 @@ Add-Type -AssemblyName System.Drawing
 $APP_TITLE = "KeyRelay v$APP_VERSION - Relaying keystrokes where paste can't go.   By: Jim Gandy"
 
 $HIST_MAX  = 10
-
-$DocumentsFolder = [Environment]::GetFolderPath("MyDocuments")
-$AppFolder = Join-Path $DocumentsFolder "KeyRelay"
-if (-not (Test-Path $AppFolder)) { New-Item -ItemType Directory -Path $AppFolder | Out-Null }
 
 $HistoryPath = Join-Path $AppFolder "KeyRelay.history.json"
 $CommandPath = Join-Path $AppFolder "KeyRelay.commands.json"
