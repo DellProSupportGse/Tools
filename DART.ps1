@@ -84,7 +84,7 @@ Function EndScript{
     Stop-Transcript
     break
 }
-$ver="1.62"
+$ver="1.64"
 $addtablefunction=${function:add-TableData1}
 Start-Job -Name "Telemetry" -ScriptBlock {
 ${function:add-TableData1} = $using:addtablefunction
@@ -409,9 +409,13 @@ $IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} 
                 $URL="https://downloads.dell.com/catalog/ASHCI-Catalog.xml.gz"
                 $InFile="$MyTemp\ASHCI-Catalog.xml.gz"
                 IF ([System.Environment]::OSVersion.OSVersion -match "10.0.14393") {
-                   Write-Host "Windows Server 2016 detected" -ForegroundColor Green
+                   Write-Host "Windows Server 2016 detected" -ForegroundColor Yellow
+                   Write-Host "Windows 2016 Ready Nodes can no longer be supported by DART or DSU."
+                   Write-Host "Please visit the following url for information on supported bios, driver and firmware versions:"
+                   Write-Host "https://dell.github.io/azurestack-docs/docs/hci/supportmatrix/archive/ws2016/"
+                   EndScript
                    #$URL="https://dl.dell.com/FOLDER09682297M/1/ASHCI-Catalog.xml.gz"
-                   $URL="https://dl.dell.com/FOLDER07774224M/1/ASHCI-Catalog.xml.gz"
+                   #$URL="https://dl.dell.com/FOLDER07774224M/1/ASHCI-Catalog.xml.gz"
                 }
             }Else{
                 $ASHCI="NO"
