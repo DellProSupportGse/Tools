@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.85"
+$Ver="1.86"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -117,87 +117,8 @@ Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector
 # Clean up
 IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
 try {Start-Job -Name "Telemetry" -ScriptBlock {
-function add-TableData1 {
-    [CmdletBinding()] 
-        param(
-            [Parameter(Mandatory = $true)]
-            [string] $tableName,
 
-            [Parameter(Mandatory = $true)]
-            [string] $PartitionKey,
-
-            [Parameter(Mandatory = $true)]
-            [string] $RowKey,
-
-            [Parameter(Mandatory = $true)]
-            [array] $data,
-            
-            [Parameter(Mandatory = $false)]
-            [array] $SasToken
-        )
-        $storageAccount = "gsetools"
-
-        # Allow only add and update access via the "Update" Access Policy on the CluChkTelemetryData table
-        # Ref: az storage table generate-sas --connection-string 'USE YOUR KEY' -n "CluChkTelemetryData" --policy-name "Update" 
-        If(-not($SasToken)){
-            $sasWriteToken = "?sv=2019-02-02&si=LogCollectorUpdate&sig=Jj%2FImBN5rknIuc3TnLf6141lZvHPMvlzJhHAS7CsWOU%3D&tn=LogCollectorTelemetryData"
-        }Else{$sasWriteToken=$SasToken}
-
-        $resource = "$tableName(PartitionKey='$PartitionKey',RowKey='$Rowkey')"
-
-        # should use $resource, not $tableNmae
-        $tableUri = "https://$storageAccount.table.core.windows.net/$resource$sasWriteToken"
-       # Write-Host   $tableUri 
-
-        # should be headers, because you use headers in Invoke-RestMethod
-        $headers = @{
-            Accept = 'application/json;odata=nometadata'
-        }
-
-        $body = $data | ConvertTo-Json
-        #This will write to the table
-        #write-host "Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json"
-try {
-$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
-} catch {
-#write-warning ("table $tableUri")
-#write-warning ("headers $headers")
-}
-
-}# End function add-TableData
-
-# Generating a unique report id to link telemetry data to report data
-    $CReportID=""
-    $CReportID=(new-guid).guid
-# Get the internet connection IP address by querying a public API
-    $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
-
-# Define the API endpoint URL
-    $geourl = "http://ip-api.com/json/$internetIp"
-
-# Invoke the API to determine Geolocation
-    $response = Invoke-RestMethod $geourl
-
-$data = @{
-    Region=$env:UserDomain
-    Version=$Ver
-    ReportID=$CReportID  
-    country=$response.country
-    counrtyCode=$response.countryCode
-    georegion=$response.region
-    regionName=$response.regionName
-    city=$response.city
-    zip=$response.zip
-    lat=$response.lat
-    lon=$response.lon
-    timezone=$response.timezone
-}
-$RowKey=(new-guid).guid
-$PartitionKey="LogCollector"
-add-TableData1 -TableName "LogCollectorTelemetryData" -PartitionKey $PartitionKey -RowKey $RowKey -data $data
-#endregion End of Telemetry data
 } | Out-Null} catch {}
-
 $text = @"
 v$Ver
   _                 ___     _ _        _           
@@ -208,13 +129,147 @@ v$Ver
 "@
 Write-Host $text
 Write-Host ""
-Write-Host "We are committed to providing the best possible customer"
-Write-Host "experience. To do so, we would like to collect some "
-Write-Host "information about your usage of our service."
+#region Telemetry Information
+# =====================================================
+$uploadToAzure=$True
+IF($uploadToAzure){
+
+    Write-Host "Logging Telemetry Information..."
+
+    function Add-TableData {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory=$true)]
+            [string]$TableName,
+
+            [Parameter(Mandatory=$true)]
+            [string]$PartitionKey,
+
+            [Parameter(Mandatory=$true)]
+            [hashtable]$Data
+        )
+
+        if (-not $uploadToAzure) { return }
+
+        $RowKey = [guid]::NewGuid().Guid
+        
+        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/?sv=2024-11-04&ss=t&srt=so&sp=a&se=2028-03-11T21:32:20Z&st=2026-03-11T12:17:20Z&spr=https&sig=zYIhaiCnIiphMZLI38Uj6AcJ1WLJOKe4KRMl4WzX818%3D'
+
+        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
+
+        $headers = @{
+            "Accept"       = "application/json;odata=nometadata"
+            "Content-Type" = "application/json"
+            "x-ms-version" = "2019-02-02"
+        }
+
+        $Data["PartitionKey"] = $PartitionKey
+        $Data["RowKey"]       = $RowKey
+
+        $body = $Data | ConvertTo-Json -Depth 5
+
+        $maxRetries = 3
+        $attempt = 0
+        $success = $false
+
+        while (-not $success -and $attempt -lt $maxRetries) {
+
+            try {
+                Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
+                $success = $true
+                Write-Indent "Telemetry recorded successfully" 1 Green
+            }
+            catch {
+                $attempt++
+
+                if ($attempt -lt $maxRetries) {
+                    Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
+                    Start-Sleep -Seconds 2
+                }
+                else {
+                    Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
+                }
+            }
+        }
+    }
+
+    function Write-Indent {
+        param(
+            [string]$Message,
+            [int]$Level = 1,
+            [string]$Color = "Gray"
+        )
+
+        $prefix = "  " * $Level
+        Write-Host "$prefix$Message" -ForegroundColor $Color
+    }
+
+    # Unique report id
+    $CReportID = [guid]::NewGuid().Guid
+
+
+    Write-Indent "Resolving Geo Location..."
+
+    try {
+        if (-not $global:GeoCache) {
+            $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+        }
+
+        $response = $global:GeoCache
+
+        if ($response.success -eq $true) {
+
+            $country     = $response.country
+            $countryCode = $response.country_code
+            $region      = $response.region
+            $city        = $response.city
+            $latitude    = $response.latitude
+            $longitude   = $response.longitude
+            $timezone    = $response.timezone.id
+
+            Write-Indent "Country: $country" 2
+            Write-Indent "Region : $region" 2
+        }
+    }
+    catch {
+        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+    }
+
+    $data = @{
+        Region       = $region
+        Version      = $Ver
+        ReportID     = $CReportID
+        country      = $country
+        countryCode  = $countryCode
+        geoRegion    = $region
+        city         = $city
+        lat          = $latitude
+        lon          = $longitude
+        timezone     = $timezone
+        Timestamp = (Get-Date).ToUniversalTime().ToString("o")
+        HostOS = [System.Environment]::OSVersion.VersionString
+        PSVersion = $PSVersionTable.PSVersion.ToString()
+    }
+
+    # We use tool name for this value
+    $PartitionKey = "LogCollector"
+
+    Add-TableData `
+        -TableName "LogCollectorTelemetryData" `
+        -PartitionKey $PartitionKey `
+        -Data $data 
+
+}
+#endregion
+
+Write-Host "To assist with troubleshooting, this tool will collect environment"
+Write-Host "information (such as hostnames, IP addresses, and diagnostic logs)"
+Write-Host "and attach it to your support case."
 Write-Host ""
-Write-Host "Do you consent to provide environment information "
-Write-Host "(such as hostnames, IP Addresses, etc.) to improve the "
-Write-Host "customer experience?"
+Write-Host "This data helps support engineers diagnose issues faster."
+Write-Host ""
+# =====================================================
+Write-Host "Do you allow this information to be collected and attached?"
 $consent = (Read-Host "(Y/[N]) ").ToUpper()
 if ($consent -eq "Y") {
 # Collect data to improve customer experience
@@ -234,6 +289,7 @@ if ($consent -eq "Y") {
   $consent = "N"
  # Do not collect data
  Write-Host "We respect your decision. Your privacy is important to us."
+ Write-Host "Logs will be only stored locally."
 }
 #only collect personal data when $consent eq 'Y'
 Write-Host ""
@@ -242,9 +298,9 @@ $Global:CaseNumber =$null
 $Global:CaseSrId=$null
 $x=0
  Do {
-    try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
-    $x++
     If ($consent -eq "Y") {
+        try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
+        $x++
         try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases.id} catch {}
         If (!($Global:CaseSrId)) {Write-Host "Invalid Case Number. Please try again" -ForegroundColor Yellow}
     } else {If (!($Global:CaseNumber)) {$Global:CaseNumber="99999999999"}}
