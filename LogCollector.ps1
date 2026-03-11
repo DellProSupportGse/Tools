@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.83"
+$Ver="1.84"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -318,9 +318,9 @@ Function ShowMenu{
         }
     }
     IF($selection -match 1){
-        If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor Yellow "This module MUST be run locally on a cluster node";EndScript}
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
-        Write-Host "Collecting Azure Local logs (SDDC)..."
+        If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor Yellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
+        Write-Host "Collecting Azure Local/HCI/S2D logs (SDDC)..."
         $Global:CollectSDDC = "Y"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'))
         Invoke-RunSDDC -confirm:$False -CaseNumber $CaseNumber
