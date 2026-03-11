@@ -116,7 +116,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector_$DateTime.log"
 # Clean up
 IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
-Start-Job -Name "Telemetry" -ScriptBlock {
+try {Start-Job -Name "Telemetry" -ScriptBlock {
 function add-TableData1 {
     [CmdletBinding()] 
         param(
@@ -196,7 +196,7 @@ $RowKey=(new-guid).guid
 $PartitionKey="LogCollector"
 add-TableData1 -TableName "LogCollectorTelemetryData" -PartitionKey $PartitionKey -RowKey $RowKey -data $data
 #endregion End of Telemetry data
-} | Out-Null
+} | Out-Null} catch {}
 
 $text = @"
 v$Ver
@@ -323,7 +323,7 @@ Function ShowMenu{
     }
     IF($selection -match 1){
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
-        If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor Yellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
+        If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
         Write-Host "Collecting Azure Local/HCI/S2D logs (SDDC)..."
         $Global:CollectSDDC = "Y"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'))
