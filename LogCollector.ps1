@@ -196,7 +196,7 @@ $RowKey=(new-guid).guid
 $PartitionKey="LogCollector"
 add-TableData1 -TableName "LogCollectorTelemetryData" -PartitionKey $PartitionKey -RowKey $RowKey -data $data
 #endregion End of Telemetry data
-}
+} | Out-Null
 
 $text = @"
 v$Ver
