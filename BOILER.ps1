@@ -10,86 +10,146 @@
        Invoke-BOILER
 #>
 Function Invoke-BOILER{
-Write-Host "Logging Telemetry Information..."
-function add-TableData1 {
-    [CmdletBinding()] 
+#region Opening Banner and menu
+$Ver="1.36"
+
+# =====================================================
+#region Telemetry Information
+# =====================================================
+$uploadToAzure=$True
+IF($uploadToAzure){
+
+    Write-Host "Logging Telemetry Information..."
+
+    function Add-TableData {
+        [CmdletBinding()]
         param(
-            [Parameter(Mandatory = $true)]
-            [string] $tableName,
+            [Parameter(Mandatory=$true)]
+            [string]$TableName,
 
-            [Parameter(Mandatory = $true)]
-            [string] $PartitionKey,
+            [Parameter(Mandatory=$true)]
+            [string]$PartitionKey,
 
-            [Parameter(Mandatory = $true)]
-            [string] $RowKey,
-
-            [Parameter(Mandatory = $true)]
-            [array] $data,
-            
-            [Parameter(Mandatory = $false)]
-            [array] $SasToken
+            [Parameter(Mandatory=$true)]
+            [hashtable]$Data
         )
-        $storageAccount = "gsetools"
 
-        # Allow only add and update access via the "Update" Access Policy on the CluChkTelemetryData table
-        # Ref: az storage table generate-sas --connection-string 'USE YOUR KEY' -n "CluChkTelemetryData" --policy-name "Update" 
-        If(-not($SasToken)){
-            $sasWriteToken = "?sv=2019-02-02&si=BOILERTelemetryData-1863C024043&sig=R7x%2B%2BHEeiBpcvp6hnjCH5CJjotOT1qzgcW8c8Qcr7sY%3D&tn=BOILERTelemetryData"
-        }Else{$sasWriteToken=$SasToken}
+        if (-not $uploadToAzure) { return }
 
-        $resource = "$tableName(PartitionKey='$PartitionKey',RowKey='$Rowkey')"
+        $RowKey = [guid]::NewGuid().Guid
+        
+        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/?sv=2024-11-04&ss=t&srt=so&sp=a&se=2028-03-11T21:32:20Z&st=2026-03-11T12:17:20Z&spr=https&sig=zYIhaiCnIiphMZLI38Uj6AcJ1WLJOKe4KRMl4WzX818%3D'
 
-        # should use $resource, not $tableNmae
-        $tableUri = "https://$storageAccount.table.core.windows.net/$resource$sasWriteToken"
-       # Write-Host   $tableUri 
+        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
 
-        # should be headers, because you use headers in Invoke-RestMethod
         $headers = @{
-            Accept = 'application/json;odata=nometadata'
+            "Accept"       = "application/json;odata=nometadata"
+            "Content-Type" = "application/json"
+            "x-ms-version" = "2019-02-02"
         }
 
-        $body = $data | ConvertTo-Json
-        #This will write to the table
-        #write-host "Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json"
-try {
-$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
-} catch {
-#write-warning ("table $tableUri")
-#write-warning ("headers $headers")
-}
+        $Data["PartitionKey"] = $PartitionKey
+        $Data["RowKey"]       = $RowKey
 
-}# End function add-TableData
+        $body = $Data | ConvertTo-Json -Depth 5
+
+        $maxRetries = 3
+        $attempt = 0
+        $success = $false
+
+        while (-not $success -and $attempt -lt $maxRetries) {
+
+            try {
+                Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
+                $success = $true
+                Write-Indent "Telemetry recorded successfully" 1 Green
+            }
+            catch {
+                $attempt++
+
+                if ($attempt -lt $maxRetries) {
+                    Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
+                    Start-Sleep -Seconds 2
+                }
+                else {
+                    Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
+                }
+            }
+        }
+    }
+
+    function Write-Indent {
+        param(
+            [string]$Message,
+            [int]$Level = 1,
+            [string]$Color = "Gray"
+        )
+
+        $prefix = "  " * $Level
+        Write-Host "$prefix$Message" -ForegroundColor $Color
+    }
+
+    # Unique report id
+    $CReportID = [guid]::NewGuid().Guid
+
+
+    Write-Indent "Resolving Geo Location..."
+
+    try {
+        if (-not $global:GeoCache) {
+            $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+        }
+
+        $response = $global:GeoCache
+
+        if ($response.success -eq $true) {
+
+            $country     = $response.country
+            $countryCode = $response.country_code
+            $region      = $response.region
+            $city        = $response.city
+            $latitude    = $response.latitude
+            $longitude   = $response.longitude
+            $timezone    = $response.timezone.id
+
+            Write-Indent "Country: $country" 2
+            Write-Indent "Region : $region" 2
+        }
+    }
+    catch {
+        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+    }
+
+    $data = @{
+        Region       = $region
+        Version      = $Ver
+        ReportID     = $CReportID
+        country      = $country
+        countryCode  = $countryCode
+        geoRegion    = $region
+        city         = $city
+        lat          = $latitude
+        lon          = $longitude
+        timezone     = $timezone
+        Timestamp = (Get-Date).ToUniversalTime().ToString("o")
+        HostOS = [System.Environment]::OSVersion.VersionString
+        PSVersion = $PSVersionTable.PSVersion.ToString()
+    }
+
+    # We use tool name for this value
+    $PartitionKey = "Boiler"
+
+    Add-TableData `
+        -TableName "BOILERTelemetryData" `
+        -PartitionKey $PartitionKey `
+        -Data $data 
+
+}
+#endregion
+
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\BOILER\BOILER_$DateTime.log"
-#region Opening Banner and menu
-$Ver="1.35"
-# Get the internet connection IP address by querying a public API
-    $internetIp = Invoke-RestMethod -Uri "https://api.ipify.org?format=json" | Select-Object -ExpandProperty ip
 
-# Define the API endpoint URL
-    $geourl = "http://ip-api.com/json/$internetIp"
-
-# Invoke the API to determine Geolocation
-    $response = Invoke-RestMethod $geourl
-
-$data = @{
-    Region=$env:UserDomain
-    Version=$Ver
-    ReportID=$CReportID  
-    country=$response.country
-    counrtyCode=$response.countryCode
-    georegion=$response.region
-    regionName=$response.regionName
-    city=$response.city
-    zip=$response.zip
-    lat=$response.lat
-    lon=$response.lon
-    timezone=$response.timezone
-}
-$RowKey=(new-guid).guid
-$PartitionKey="BOILER"
-add-TableData1 -TableName "BOILERTelemetryData" -PartitionKey $PartitionKey -RowKey $RowKey -data $data
-#endregion End of Telemetry data
 Clear-Host
 $text = @"
 v$Ver
