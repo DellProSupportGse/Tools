@@ -14,7 +14,7 @@ Function Invoke-KeyRelay {
 # =====================================================
 # App Version
 # =====================================================
-$APP_VERSION = "1.13.4"
+$APP_VERSION = "1.14"
 
 # =====================================================
 # APP DATA FOLDER
@@ -27,33 +27,138 @@ if (-not (Test-Path $AppFolder)) {
     New-Item -ItemType Directory -Path $AppFolder | Out-Null
 }
 
+#region Telemetry Information
 # =====================================================
-# TELEMETRY
-# =====================================================
-function Send-KeyRelayTelemetry {
+$uploadToAzure=$True
+IF($uploadToAzure){
 
-    try {
+    Write-Host "Logging Telemetry Information..."
 
-        $payload = @{
-            tool     = "KeyRelay"
-            version  = "1.13.4"
-            os   = (Get-CimInstance Win32_OperatingSystem).Caption
-            country  = ""
-            region   = ""
-            timestamp     = (Get-Date).ToString("s")
+    function Add-TableData {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory=$true)]
+            [string]$TableName,
+
+            [Parameter(Mandatory=$true)]
+            [string]$PartitionKey,
+
+            [Parameter(Mandatory=$true)]
+            [hashtable]$Data
+        )
+
+        if (-not $uploadToAzure) { return }
+
+        $RowKey = [guid]::NewGuid().Guid
+        
+        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/?sv=2024-11-04&ss=t&srt=so&sp=a&se=2028-03-11T21:32:20Z&st=2026-03-11T12:17:20Z&spr=https&sig=zYIhaiCnIiphMZLI38Uj6AcJ1WLJOKe4KRMl4WzX818%3D'
+
+        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
+
+        $headers = @{
+            "Accept"       = "application/json;odata=nometadata"
+            "Content-Type" = "application/json"
+            "x-ms-version" = "2019-02-02"
         }
 
-        Invoke-RestMethod `
-          -Uri "https://keyrelay-telemetry-fufugbc8bzece4df.canadacentral-01.azurewebsites.net/api/KeyRelayTelemetry" `
-          -Method POST `
-          -Body ($payload | ConvertTo-Json) `
-          -ContentType "application/json"
+        $Data["PartitionKey"] = $PartitionKey
+        $Data["RowKey"]       = $RowKey
 
-    } catch {}
+        $body = $Data | ConvertTo-Json -Depth 5
+
+        $maxRetries = 3
+        $attempt = 0
+        $success = $false
+
+        while (-not $success -and $attempt -lt $maxRetries) {
+
+            try {
+                Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
+                $success = $true
+                Write-Indent "Telemetry recorded successfully" 1 Green
+            }
+            catch {
+                $attempt++
+
+                if ($attempt -lt $maxRetries) {
+                    Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
+                    Start-Sleep -Seconds 2
+                }
+                else {
+                    Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
+                }
+            }
+        }
+    }
+
+    function Write-Indent {
+        param(
+            [string]$Message,
+            [int]$Level = 1,
+            [string]$Color = "Gray"
+        )
+
+        $prefix = "  " * $Level
+        Write-Host "$prefix$Message" -ForegroundColor $Color
+    }
+
+    # Unique report id
+    $CReportID = [guid]::NewGuid().Guid
+
+
+    Write-Indent "Resolving Geo Location..."
+
+    try {
+        if (-not $global:GeoCache) {
+            $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+        }
+
+        $response = $global:GeoCache
+
+        if ($response.success -eq $true) {
+
+            $country     = $response.country
+            $countryCode = $response.country_code
+            $region      = $response.region
+            $city        = $response.city
+            $latitude    = $response.latitude
+            $longitude   = $response.longitude
+            $timezone    = $response.timezone.id
+
+            Write-Indent "Country: $country" 2
+            Write-Indent "Region : $region" 2
+        }
+    }
+    catch {
+        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+    }
+
+    $data = @{
+        Region       = $region
+        Version      = $APP_VERSION
+        ReportID     = $CReportID
+        country      = $country
+        countryCode  = $countryCode
+        geoRegion    = $region
+        city         = $city
+        lat          = $latitude
+        lon          = $longitude
+        timezone     = $timezone
+        Timestamp = (Get-Date).ToUniversalTime().ToString("o")
+        HostOS = [System.Environment]::OSVersion.VersionString
+        PSVersion = $PSVersionTable.PSVersion.ToString()
+    }
+
+    # We use tool name for this value
+    $PartitionKey = "KeyRelay"
+
+    Add-TableData `
+        -TableName "KeyRelayTelemetryData" `
+        -PartitionKey $PartitionKey `
+        -Data $data 
 
 }
-
-Send-KeyRelayTelemetry
+#endregion
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
