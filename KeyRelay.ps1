@@ -14,7 +14,7 @@ Function Invoke-KeyRelay {
 # =====================================================
 # App Version
 # =====================================================
-$APP_VERSION = "1.14"
+$APP_VERSION = "1.15"
 
 # =====================================================
 # APP DATA FOLDER
@@ -479,6 +479,23 @@ function Perform-Search {
 
 }
 
+# =====================================================
+# ADD GETWINDOWSTEXT TYPE
+# =====================================================
+
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public class User32 {
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+}
+"@
 
 # =====================================================
 # ADD COMMAND DIALOG
@@ -658,6 +675,10 @@ function Start-Typing {
     try {
 
         Start-Sleep -Seconds $startDelay
+
+        $sb = New-Object System.Text.StringBuilder 256
+        [User32]::GetWindowText(([User32]::GetForegroundWindow()), $sb, $sb.Capacity) | out-null
+        if ($sb.ToString() -eq $APP_TITLE) { Write-Warning "Did not switch to another window!!";$global:IsTyping=$false }
 
         foreach ($line in $lines) {
 
