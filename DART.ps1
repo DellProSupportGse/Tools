@@ -24,67 +24,152 @@ Function Invoke-DART {
     [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False,
     $param)
 
+    $ver="1.65"
+
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
 $Global:IgnoreChecks=$IgnoreChecks
 $Global:IgnoreVersion=$IgnoreVersion
+# =====================================================
 #region Telemetry Information
-Write-Host "Logging Telemetry Information..."
-function add-TableData1 {
-    [CmdletBinding()] 
+# =====================================================
+$uploadToAzure=$True
+IF($uploadToAzure){
+
+    Write-Host "Logging Telemetry Information..."
+
+    function Add-TableData {
+        [CmdletBinding()]
         param(
-            [Parameter(Mandatory = $true)]
-            [string] $tableName,
+            [Parameter(Mandatory=$true)]
+            [string]$TableName,
 
-            [Parameter(Mandatory = $true)]
-            [string] $PartitionKey,
+            [Parameter(Mandatory=$true)]
+            [string]$PartitionKey,
 
-            [Parameter(Mandatory = $true)]
-            [string] $RowKey,
-
-            [Parameter(Mandatory = $true)]
-            [array] $data,
-            
-            [Parameter(Mandatory = $false)]
-            [array] $SasToken
+            [Parameter(Mandatory=$true)]
+            [hashtable]$Data
         )
-        $storageAccount = "gsetools"
 
-        # Allow only add and update access via the "Update" Access Policy on the CluChkTelemetryData table
-        # Ref: az storage table generate-sas --connection-string 'USE YOUR KEY' -n "CluChkTelemetryData" --policy-name "Update" 
-        If(-not($SasToken)){
-            $sasWriteToken = "?sv=2019-02-02&si=DARTTelemetryData-18639860967&sig=L%2BGfTGIZYhIiR3PxHO%2BQvnpYaAR9VAusu3g3Zb%2BPkqw%3D&tn=DARTTelemetryData"
-        }Else{$sasWriteToken=$SasToken}
+        if (-not $uploadToAzure) { return }
 
-        $resource = "$tableName(PartitionKey='$PartitionKey',RowKey='$Rowkey')"
+        $RowKey = [guid]::NewGuid().Guid
+        
+        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/DARTTelemetryData?sv=2019-02-02&spr=https&st=2026-03-27T18%3A02%3A49Z&se=2028-03-28T18%3A02%3A00Z&sp=a&sig=JO4zo4jRLM11IrnZFPuFNXYhUQJywKfSX6E47Bdtp%2Bg%3D&tn=DARTTelemetryData'
 
-        # should use $resource, not $tableNmae
-        $tableUri = "https://$storageAccount.table.core.windows.net/$resource$sasWriteToken"
-       # Write-Host   $tableUri 
+        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
 
-        # should be headers, because you use headers in Invoke-RestMethod
         $headers = @{
-            Accept = 'application/json;odata=nometadata'
+            "Accept"       = "application/json;odata=nometadata"
+            "Content-Type" = "application/json"
+            "x-ms-version" = "2019-02-02"
         }
 
-        $body = $data | ConvertTo-Json
-        #This will write to the table
-        #write-host "Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json"
-try {
-$item = Invoke-RestMethod -Method PUT -Uri $tableUri -Headers $headers -Body $body -ContentType application/json
-} catch {
-#write-warning ("table $tableUri")
-#write-warning ("headers $headers")
-}
+        $Data["PartitionKey"] = $PartitionKey
+        $Data["RowKey"]       = $RowKey
 
-}# End function add-TableData
+        $body = $Data | ConvertTo-Json -Depth 5
+
+        $maxRetries = 3
+        $attempt = 0
+        $success = $false
+
+        while (-not $success -and $attempt -lt $maxRetries) {
+
+            try {
+                Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
+                $success = $true
+                Write-Indent "Telemetry recorded successfully" 1 Green
+            }
+            catch {
+                $attempt++
+
+                if ($attempt -lt $maxRetries) {
+                    Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
+                    Start-Sleep -Seconds 2
+                }
+                else {
+                    Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
+                }
+            }
+        }
+    }
+
+    function Write-Indent {
+        param(
+            [string]$Message,
+            [int]$Level = 1,
+            [string]$Color = "Gray"
+        )
+
+        $prefix = "  " * $Level
+        Write-Host "$prefix$Message" -ForegroundColor $Color
+    }
+
+    # Unique report id
+    $CReportID = [guid]::NewGuid().Guid
+
+
+    Write-Indent "Resolving Geo Location..."
+
+    try {
+        if (-not $global:GeoCache) {
+            $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+        }
+
+        $response = $global:GeoCache
+
+        if ($response.success -eq $true) {
+
+            $country     = $response.country
+            $countryCode = $response.country_code
+            $region      = $response.region
+            $city        = $response.city
+            $latitude    = $response.latitude
+            $longitude   = $response.longitude
+            $timezone    = $response.timezone.id
+
+            Write-Indent "Country: $country" 2
+            Write-Indent "Region : $region" 2
+        }
+    }
+    catch {
+        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+    }
+
+    $data = @{
+        Region       = $region
+        Version      = $Ver
+        ReportID     = $CReportID
+        country      = $country
+        countryCode  = $countryCode
+        geoRegion    = $region
+        city         = $city
+        lat          = $latitude
+        lon          = $longitude
+        timezone     = $timezone
+        Timestamp = (Get-Date).ToUniversalTime().ToString("o")
+        HostOS = [System.Environment]::OSVersion.VersionString
+        PSVersion = $PSVersionTable.PSVersion.ToString()
+    }
+
+    # We use tool name for this value
+    $PartitionKey = "Boiler"
+
+    Add-TableData `
+        -TableName "BOILERTelemetryData" `
+        -PartitionKey $PartitionKey `
+        -Data $data 
+
+}
+#endregion
     
 
 Function EndScript{ 
     Stop-Transcript
     break
 }
-$ver="1.64"
+
 $addtablefunction=${function:add-TableData1}
 Start-Job -Name "Telemetry" -ScriptBlock {
 ${function:add-TableData1} = $using:addtablefunction
