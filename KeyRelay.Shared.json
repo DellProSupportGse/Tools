@@ -1,4 +1,10 @@
 {
+    "_Helper": [
+    {
+      "Name": "Check Keyboard Lang",
+      "Command": "Add-Type -AssemblyName System.Windows.Forms;([System.Windows.Forms.InputLanguage]::DefaultInputLanguage).Culture.Name",
+      "Description": "Finds the language the keyboard is using."
+    },
   "Tool Box": [
     {
       "Name": "BOILER",
