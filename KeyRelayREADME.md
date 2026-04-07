@@ -1,7 +1,6 @@
-
 # KeyRelay
 
-**Version:** KeyRelay v1.13
+Version: KeyRelay v1.16
 
 KeyRelay is a PowerShell GUI tool designed to send commands or text into applications that do not support paste operations.
 
@@ -13,9 +12,9 @@ This tool is especially useful when working with:
 - Restricted remote shells
 - Secure administrative terminals
 
-KeyRelay safely types commands using a configurable typing engine.
+KeyRelay safely types commands using a configurable typing engine and includes command libraries, history tracking, selective send, preview mode, and PowerShell-aware editing enhancements.
 
----
+* * *
 
 # Features
 
@@ -31,8 +30,13 @@ KeyRelay safely types commands using a configurable typing engine.
 - Keyboard layout targeting
 - JSON-based configuration storage
 - Always-on-top window option
+- Selective send of highlighted text
+- Preview Before Typing mode
+- Automatic reset of Run on Cluster Nodes after each run
+- Built-in GitHub issue link for bug reporting
+- PowerShell Tab completion in the editor
 
----
+* * *
 
 # Command Libraries
 
@@ -44,11 +48,11 @@ Your personal command library stored locally.
 
 Location:
 
-Documents\KeyRelay\KeyRelay.commands.json
+`Documents\KeyRelay\KeyRelay.commands.json`
 
 Categories help organize commands.
 
----
+* * *
 
 ## Shared Commands
 
@@ -56,7 +60,7 @@ Commands can be downloaded dynamically from GitHub.
 
 Repository:
 
-https://github.com/DellProSupportGse/Tools
+`https://github.com/DellProSupportGse/Tools`
 
 Shared commands include examples for:
 
@@ -68,7 +72,7 @@ Shared commands include examples for:
 
 Descriptions are displayed using tooltips.
 
----
+* * *
 
 # Search
 
@@ -82,20 +86,22 @@ Search works across:
 
 Results update automatically while typing.
 
----
+* * *
 
 # Command Editor
 
 Commands can be managed directly from the interface.
 
-Right-click a command in **My Commands** to access:
+Right-click a command in My Commands to access:
 
 - Copy Command
 - Edit Command
 - Remove Command
 - Remove Category
 
----
+The main editor also supports PowerShell Tab completion for faster command authoring.
+
+* * *
 
 # Typing Engine
 
@@ -107,11 +113,31 @@ Configurable options include:
 |---|---|
 | Start Delay | Time before typing begins |
 | Per-Key Delay | Delay between characters |
-| Line Delay | Delay between command lines |
+| Between Lines | Delay between command lines |
+| Press Enter After Each Line | Sends Enter after each line |
+| Target Lang | Temporarily switches keyboard layout while typing |
 
-Typing can be cancelled using the **STOP** button.
+Typing can be cancelled using the STOP button.
 
----
+## Selective Send
+
+If text is highlighted in the main editor, KeyRelay will type only the selected portion.
+
+If nothing is selected, KeyRelay types the entire editor contents.
+
+## Preview Before Typing
+
+When enabled, Preview Before Typing shows the exact text that will be sent before typing begins.
+
+The preview indicates:
+
+- whether the full editor or only the selected text will be sent
+- whether Run on Cluster Nodes wrapping will be applied
+- whether Enter After Each Line is enabled
+
+This helps prevent accidental sends.
+
+* * *
 
 # Cluster Mode
 
@@ -120,44 +146,4 @@ When enabled, KeyRelay executes commands across all nodes in a Windows Failover 
 Commands are wrapped with:
 
 ```powershell
-Invoke-Command -ComputerName (Get-ClusterNode).Name
-```
-
----
-
-# Keyboard Layout Support
-
-KeyRelay supports typing into systems using different keyboard layouts.
-
-Example layouts:
-
-- en-US
-- de-DE
-- fr-FR
-- es-ES
-
-KeyRelay temporarily switches layouts during typing and restores the original layout afterward.
-
----
-
-# Configuration Files
-
-KeyRelay stores its configuration files in:
-
-Documents\KeyRelay
-
-Files:
-
-- KeyRelay.commands.json
-- KeyRelay.history.json
-- KeyRelay.settings.json
-
----
-
-# Contributing
-
-Contributions and improvements are welcome.
-
-Submit issues or command packs via:
-
-https://github.com/DellProSupportGse/Tools
+Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock { ... }
