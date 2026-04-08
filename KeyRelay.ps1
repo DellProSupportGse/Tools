@@ -14,12 +14,11 @@ Function Invoke-KeyRelay {
 # =====================================================
 # App Version
 # =====================================================
-$APP_VERSION = "1.16"
+$APP_VERSION = "1.17"
 
 # =====================================================
 # APP DATA FOLDER
 # =====================================================
-
 $DocumentsFolder = [Environment]::GetFolderPath("MyDocuments")
 $AppFolder = Join-Path $DocumentsFolder "KeyRelay"
 
@@ -29,7 +28,7 @@ if (-not (Test-Path $AppFolder)) {
 
 #region Telemetry Information
 # =====================================================
-$uploadToAzure = $True
+$uploadToAzure = $true
 $script:TelemetrySuccessShown = $false
 
 if ($uploadToAzure) {
@@ -110,9 +109,7 @@ if ($uploadToAzure) {
         Write-Host "$prefix$Message" -ForegroundColor $Color
     }
 
-    # Unique report id
     $CReportID = [guid]::NewGuid().Guid
-
     Write-Indent "Resolving Geo Location..."
 
     try {
@@ -155,7 +152,6 @@ if ($uploadToAzure) {
         PSVersion   = $PSVersionTable.PSVersion.ToString()
     }
 
-    # We use tool name for this value
     $PartitionKey = "KeyRelay"
 
     Add-TableData `
@@ -173,7 +169,6 @@ try { Add-Type -AssemblyName System.Management.Automation } catch {}
 # =====================================================
 # CONFIG
 # =====================================================
-
 $script:TabCompletions = $null
 $script:TabCompletionIndex = -1
 $script:LastTabInput = $null
@@ -189,7 +184,6 @@ $SettingsPath = Join-Path $AppFolder "KeyRelay.settings.json"
 $global:IsTyping = $false
 $global:History  = @()
 $global:Settings = @{}
-$global:Settings.PreviewBeforeTyping = $false
 
 $PLACEHOLDER_TEXT  = "Paste your command here that you would like to relay..."
 $SharedCommandsURL = "https://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.Shared.json"
@@ -197,14 +191,11 @@ $SharedCommandsURL = "https://raw.githubusercontent.com/DellProSupportGse/Tools/
 # =====================================================
 # KEYBOARD LAYOUT DETECTION
 # =====================================================
-
-Add-Type -AssemblyName System.Windows.Forms
 $global:OriginalKeyboardLayout = ([System.Windows.Forms.InputLanguage]::DefaultInputLanguage).Culture.Name
 
 # =====================================================
 # HISTORY
 # =====================================================
-
 function Save-History {
     $global:History | ConvertTo-Json -Depth 5 | Set-Content $HistoryPath
 }
@@ -237,8 +228,16 @@ function Maybe-AddToHistory($text) {
 }
 
 # =====================================================
-# COMMAND JSON
+# COMMAND JSON HELPERS
 # =====================================================
+function ConvertTo-Array {
+    param($InputObject)
+
+    if ($null -eq $InputObject) { return @() }
+    if ($InputObject -is [System.Array]) { return @($InputObject) }
+    if ($InputObject -is [System.Collections.IEnumerable] -and $InputObject -isnot [string]) { return @($InputObject) }
+    return @($InputObject)
+}
 
 function Ensure-CommandFile {
     if (-not (Test-Path $CommandPath)) {
@@ -247,7 +246,11 @@ function Ensure-CommandFile {
                 @{
                     Name = "Storage"
                     Children = @(
-                        @{ Name = "Get Storage Pools"; Command = "Get-StoragePool -IsPrimordial `$False" }
+                        @{
+                            Name        = "Get Storage Pools"
+                            Command     = "Get-StoragePool -IsPrimordial `$False"
+                            Description = "Lists non-primordial storage pools."
+                        }
                     )
                 }
             )
@@ -257,20 +260,97 @@ function Ensure-CommandFile {
     }
 }
 
-function Add-CommandToJson {
-    param($category, $name, $commandText)
+function Normalize-CommandJson {
+    param($JsonObject)
 
+    $normalized = @{
+        Commands = @()
+    }
+
+    if ($null -eq $JsonObject) {
+        return $normalized
+    }
+
+    $categories = ConvertTo-Array $JsonObject.Commands
+
+    foreach ($category in $categories) {
+        if (-not $category) { continue }
+        if (-not $category.Name) { continue }
+
+        $newCategory = @{
+            Name     = [string]$category.Name
+            Children = @()
+        }
+
+        $children = ConvertTo-Array $category.Children
+        foreach ($child in $children) {
+            if (-not $child) { continue }
+            if (-not $child.Name -or -not $child.Command) { continue }
+
+            $newCategory.Children += @{
+                Name        = [string]$child.Name
+                Command     = [string]$child.Command
+                Description = [string]$child.Description
+            }
+        }
+
+        $normalized.Commands += $newCategory
+    }
+
+    return $normalized
+}
+
+function Get-CommandJson {
     Ensure-CommandFile
-    $json = Get-Content $CommandPath -Raw | ConvertFrom-Json
+    $raw = Get-Content $CommandPath -Raw
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+        return Normalize-CommandJson @{ Commands = @() }
+    }
+
+    $json = $raw | ConvertFrom-Json
+    return Normalize-CommandJson $json
+}
+
+function Save-CommandJson {
+    param($JsonObject)
+
+    $normalized = Normalize-CommandJson $JsonObject
+    $normalized | ConvertTo-Json -Depth 20 | Set-Content $CommandPath
+}
+
+function Add-CommandToJson {
+    param(
+        [string]$category,
+        [string]$name,
+        [string]$commandText,
+        [string]$description = ""
+    )
+
+    $json = Get-CommandJson
     $cat = $json.Commands | Where-Object { $_.Name -eq $category }
 
     if (-not $cat) {
-        $cat = @{ Name = $category; Children = @() }
+        $cat = @{
+            Name     = $category
+            Children = @()
+        }
         $json.Commands += $cat
     }
 
-    $cat.Children += @{ Name = $name; Command = $commandText }
-    $json | ConvertTo-Json -Depth 20 | Set-Content $CommandPath
+    $existing = $cat.Children | Where-Object { $_.Name -eq $name } | Select-Object -First 1
+    if ($existing) {
+        $existing.Command = $commandText
+        $existing.Description = $description
+    }
+    else {
+        $cat.Children += @{
+            Name        = $name
+            Command     = $commandText
+            Description = $description
+        }
+    }
+
+    Save-CommandJson $json
 }
 
 function Remove-CommandFromJson {
@@ -278,7 +358,7 @@ function Remove-CommandFromJson {
 
     if (-not (Test-Path $CommandPath)) { return }
 
-    $json = Get-Content $CommandPath -Raw | ConvertFrom-Json
+    $json = Get-CommandJson
     $category = $json.Commands | Where-Object { $_.Name -eq $categoryName }
 
     if ($category -and $category.Children) {
@@ -287,7 +367,7 @@ function Remove-CommandFromJson {
         )
     }
 
-    $json | ConvertTo-Json -Depth 20 | Set-Content $CommandPath
+    Save-CommandJson $json
 }
 
 function Remove-CategoryFromJson {
@@ -295,14 +375,146 @@ function Remove-CategoryFromJson {
 
     if (-not (Test-Path $CommandPath)) { return }
 
-    $json = Get-Content $CommandPath -Raw | ConvertFrom-Json
+    $json = Get-CommandJson
     $json.Commands = @(
         $json.Commands | Where-Object { $_.Name -ne $categoryName }
     )
 
-    $json | ConvertTo-Json -Depth 20 | Set-Content $CommandPath
+    Save-CommandJson $json
 }
 
+function Merge-CommandLibraries {
+    param(
+        $BaseJson,
+        $ImportedJson
+    )
+
+    $base = Normalize-CommandJson $BaseJson
+    $incoming = Normalize-CommandJson $ImportedJson
+
+    foreach ($importCategory in (ConvertTo-Array $incoming.Commands)) {
+
+        $existingCategory = $base.Commands | Where-Object { $_.Name -eq $importCategory.Name } | Select-Object -First 1
+
+        if (-not $existingCategory) {
+            $base.Commands += @{
+                Name     = $importCategory.Name
+                Children = @()
+            }
+            $existingCategory = $base.Commands | Where-Object { $_.Name -eq $importCategory.Name } | Select-Object -First 1
+        }
+
+        foreach ($importChild in (ConvertTo-Array $importCategory.Children)) {
+            $existingChild = $existingCategory.Children | Where-Object { $_.Name -eq $importChild.Name } | Select-Object -First 1
+
+            if ($existingChild) {
+                $existingChild.Command = $importChild.Command
+                $existingChild.Description = $importChild.Description
+            }
+            else {
+                $existingCategory.Children += @{
+                    Name        = $importChild.Name
+                    Command     = $importChild.Command
+                    Description = $importChild.Description
+                }
+            }
+        }
+    }
+
+    return $base
+}
+
+function Export-CommandsToFile {
+    $dialog = New-Object System.Windows.Forms.SaveFileDialog
+    $dialog.Title = "Export My Commands"
+    $dialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
+    $dialog.FileName = "KeyRelay.commands.export.json"
+
+    if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+    try {
+        $json = Get-CommandJson
+        $json | ConvertTo-Json -Depth 20 | Set-Content $dialog.FileName
+        [System.Windows.Forms.MessageBox]::Show(
+            "Commands exported successfully.",
+            "KeyRelay",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        )
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Failed to export commands.`n`n$($_.Exception.Message)",
+            "KeyRelay",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        )
+    }
+}
+
+function Import-CommandsFromFile {
+    $dialog = New-Object System.Windows.Forms.OpenFileDialog
+    $dialog.Title = "Import My Commands"
+    $dialog.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
+
+    if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+    try {
+        $raw = Get-Content $dialog.FileName -Raw
+        if ([string]::IsNullOrWhiteSpace($raw)) {
+            throw "Selected file is empty."
+        }
+
+        $imported = $raw | ConvertFrom-Json
+        $normalizedImport = Normalize-CommandJson $imported
+
+        if ((ConvertTo-Array $normalizedImport.Commands).Count -eq 0) {
+            throw "Selected file does not contain a valid Commands structure."
+        }
+
+        $choice = [System.Windows.Forms.MessageBox]::Show(
+            "Yes = Merge imported commands into existing My Commands.`nNo = Replace existing My Commands.`nCancel = Abort import.",
+            "Import My Commands",
+            [System.Windows.Forms.MessageBoxButtons]::YesNoCancel,
+            [System.Windows.Forms.MessageBoxIcon]::Question
+        )
+
+        switch ($choice) {
+            ([System.Windows.Forms.DialogResult]::Yes) {
+                $existing = Get-CommandJson
+                $merged = Merge-CommandLibraries -BaseJson $existing -ImportedJson $normalizedImport
+                Save-CommandJson $merged
+            }
+            ([System.Windows.Forms.DialogResult]::No) {
+                Save-CommandJson $normalizedImport
+            }
+            default {
+                return
+            }
+        }
+
+        Load-CommandTree
+
+        [System.Windows.Forms.MessageBox]::Show(
+            "Commands imported successfully.",
+            "KeyRelay",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        )
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Failed to import commands.`n`n$($_.Exception.Message)",
+            "KeyRelay",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        )
+    }
+}
+
+# =====================================================
+# SETTINGS
+# =====================================================
 function Save-Settings {
     $global:Settings | ConvertTo-Json -Depth 5 | Set-Content $SettingsPath
 }
@@ -320,24 +532,23 @@ function Load-Settings {
 }
 
 function Save-CurrentSettings {
-    $global:Settings.startDelay    = [int]$inpStartDelay.Text
-    $global:Settings.keyDelay      = [int]$inpKeyDelay.Text
-    $global:Settings.lineDelay     = [int]$inpLineDelay.Text
-    $global:Settings.enterEach     = $chkEnter.Checked
-    $global:Settings.TopMost       = $form.TopMost
-    $global:Settings.InvokeCluster = $chkInvokeCluster.Checked
-    $global:Settings.AltTab        = $chkAltTab.Checked
-    $global:Settings.PreviewBeforeTyping = $chkPreview.Checked
+    $global:Settings.startDelay           = [int]$inpStartDelay.Text
+    $global:Settings.keyDelay             = [int]$inpKeyDelay.Text
+    $global:Settings.lineDelay            = [int]$inpLineDelay.Text
+    $global:Settings.enterEach            = $chkEnter.Checked
+    $global:Settings.TopMost              = $form.TopMost
+    $global:Settings.InvokeCluster        = $chkInvokeCluster.Checked
+    $global:Settings.AltTab               = $chkAltTab.Checked
+    $global:Settings.PreviewBeforeTyping  = $chkPreview.Checked
 
     Save-Settings
 }
 
+# =====================================================
+# TREE LOADERS
+# =====================================================
 function Load-CommandTree {
     $treeCommands.Nodes.Clear()
-
-    # -----------------------------------------------------
-    # Built-in Helper Commands
-    # -----------------------------------------------------
 
     $helperNode = New-Object System.Windows.Forms.TreeNode
     $helperNode.Text = "Helpers"
@@ -345,12 +556,12 @@ function Load-CommandTree {
     $checkLangNode = New-Object System.Windows.Forms.TreeNode
     $checkLangNode.Text = "Check Language Culture"
     $checkLangNode.Tag  = "Add-Type -AssemblyName System.Windows.Forms;([System.Windows.Forms.InputLanguage]::DefaultInputLanguage).Culture.Name"
+    $checkLangNode.ToolTipText = "Shows the current Windows input language culture."
 
     $helperNode.Nodes.Add($checkLangNode) | Out-Null
     $treeCommands.Nodes.Add($helperNode) | Out-Null
 
-    Ensure-CommandFile
-    $json = Get-Content $CommandPath -Raw | ConvertFrom-Json
+    $json = Get-CommandJson
     $sortedCategories = $json.Commands | Sort-Object Name
 
     foreach ($category in $sortedCategories) {
@@ -365,6 +576,15 @@ function Load-CommandTree {
                 $childNode = New-Object System.Windows.Forms.TreeNode
                 $childNode.Text = $child.Name
                 $childNode.Tag  = $child.Command
+
+                $desc = [string]$child.Description
+                if (-not [string]::IsNullOrWhiteSpace($desc)) {
+                    $childNode.ToolTipText = "$desc`n`nCommand:`n$($child.Command)"
+                }
+                else {
+                    $childNode.ToolTipText = "Command:`n$($child.Command)"
+                }
+
                 $catNode.Nodes.Add($childNode) | Out-Null
             }
         }
@@ -376,6 +596,7 @@ function Load-CommandTree {
 function Load-SharedCommands {
     try {
         $data = Invoke-RestMethod -Uri ($SharedCommandsURL + "?t=$(Get-Date -Format yyyyMMddHHmmss)") -UseBasicParsing
+
         $treeShared.Nodes.Clear()
 
         foreach ($category in $data.PSObject.Properties.Name | Sort-Object) {
@@ -390,8 +611,11 @@ function Load-SharedCommands {
                 if ($cmd.Description) {
                     $child.ToolTipText = "$($cmd.Description)`n`nCommand:`n$($cmd.Command)"
                 }
+                else {
+                    $child.ToolTipText = "Command:`n$($cmd.Command)"
+                }
 
-                $catNode.Nodes.Add($child)
+                $catNode.Nodes.Add($child) | Out-Null
             }
 
             $treeShared.Nodes.Add($catNode)
@@ -419,7 +643,8 @@ function Perform-Search {
         foreach ($node in $treeCommands.Nodes) {
             foreach ($child in @($node.Nodes)) {
                 if (-not $child.Text.ToLower().Contains($query) -and
-                    -not ($child.Tag -and $child.Tag.ToLower().Contains($query))) {
+                    -not ($child.Tag -and $child.Tag.ToLower().Contains($query)) -and
+                    -not ($child.ToolTipText -and $child.ToolTipText.ToLower().Contains($query))) {
                     $node.Nodes.Remove($child)
                 }
                 else {
@@ -435,7 +660,8 @@ function Perform-Search {
         foreach ($node in $treeShared.Nodes) {
             foreach ($child in @($node.Nodes)) {
                 if (-not $child.Text.ToLower().Contains($query) -and
-                    -not ($child.Tag -and $child.Tag.ToLower().Contains($query))) {
+                    -not ($child.Tag -and $child.Tag.ToLower().Contains($query)) -and
+                    -not ($child.ToolTipText -and $child.ToolTipText.ToLower().Contains($query))) {
                     $node.Nodes.Remove($child)
                 }
                 else {
@@ -458,7 +684,6 @@ function Perform-Search {
 # =====================================================
 # ADD GETWINDOWSTEXT TYPE
 # =====================================================
-
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -474,14 +699,13 @@ public class User32 {
 "@
 
 # =====================================================
-# ADD COMMAND DIALOG
+# ADD / EDIT COMMAND DIALOG
 # =====================================================
-
 function Show-AddCommandDialog {
     param(
         [string]$defaultCommand = "",
         [string]$defaultName = "",
-        [bool]$restoreTopMost = $false
+        [string]$defaultDescription = ""
     )
 
     Ensure-CommandFile
@@ -493,8 +717,8 @@ function Show-AddCommandDialog {
     }
 
     $dialog = New-Object Windows.Forms.Form
-    $dialog.Text = "Add New Command"
-    $dialog.Size = New-Object Drawing.Size(560, 510)
+    $dialog.Text = "Add / Edit Command"
+    $dialog.Size = New-Object Drawing.Size(620, 610)
     $dialog.StartPosition = "CenterParent"
     $dialog.AutoScaleMode = "None"
 
@@ -503,26 +727,38 @@ function Show-AddCommandDialog {
     $lblCat.SetBounds(20, 20, 120, 25)
 
     $cmbCat = New-Object Windows.Forms.ComboBox
-    $cmbCat.SetBounds(150, 20, 360, 28)
+    $cmbCat.SetBounds(150, 20, 420, 28)
     $cmbCat.DropDownStyle = "DropDown"
 
-    $json = Get-Content $CommandPath -Raw | ConvertFrom-Json
-    foreach ($c in $json.Commands) { $cmbCat.Items.Add($c.Name) | Out-Null }
+    $json = Get-CommandJson
+    foreach ($c in $json.Commands | Sort-Object Name) {
+        $cmbCat.Items.Add($c.Name) | Out-Null
+    }
 
     $lblName = New-Object Windows.Forms.Label
     $lblName.Text = "Display Name:"
-    $lblName.SetBounds(20, 65, 120, 25)
+    $lblName.SetBounds(20, 60, 120, 25)
 
     $txtName = New-Object Windows.Forms.TextBox
-    $txtName.SetBounds(150, 65, 360, 28)
+    $txtName.SetBounds(150, 60, 420, 28)
     $txtName.Text = $defaultName
+
+    $lblDesc = New-Object Windows.Forms.Label
+    $lblDesc.Text = "Description:"
+    $lblDesc.SetBounds(20, 100, 120, 25)
+
+    $txtDesc = New-Object Windows.Forms.TextBox
+    $txtDesc.SetBounds(150, 100, 420, 90)
+    $txtDesc.Multiline = $true
+    $txtDesc.ScrollBars = "Vertical"
+    $txtDesc.Text = $defaultDescription
 
     $lblCmd = New-Object Windows.Forms.Label
     $lblCmd.Text = "Command:"
-    $lblCmd.SetBounds(20, 110, 120, 25)
+    $lblCmd.SetBounds(20, 205, 120, 25)
 
     $txtCmd = New-Object Windows.Forms.TextBox
-    $txtCmd.SetBounds(20, 140, 490, 260)
+    $txtCmd.SetBounds(20, 235, 550, 280)
     $txtCmd.Multiline = $true
     $txtCmd.ScrollBars = "Vertical"
     $txtCmd.Font = New-Object Drawing.Font("Consolas", 14)
@@ -530,19 +766,24 @@ function Show-AddCommandDialog {
 
     $btnSave = New-Object Windows.Forms.Button
     $btnSave.Text = "Save"
-    $btnSave.SetBounds(300, 410, 90, 35)
+    $btnSave.SetBounds(380, 525, 90, 35)
 
     $btnCancel = New-Object Windows.Forms.Button
     $btnCancel.Text = "Cancel"
-    $btnCancel.SetBounds(400, 410, 90, 35)
+    $btnCancel.SetBounds(480, 525, 90, 35)
 
     $btnSave.Add_Click({
         if (-not $cmbCat.Text -or -not $txtName.Text -or -not $txtCmd.Text) {
-            [System.Windows.Forms.MessageBox]::Show("All fields required.")
+            [System.Windows.Forms.MessageBox]::Show("Category, Display Name, and Command are required.")
             return
         }
 
-        Add-CommandToJson $cmbCat.Text $txtName.Text $txtCmd.Text
+        Add-CommandToJson `
+            -category $cmbCat.Text `
+            -name $txtName.Text `
+            -commandText $txtCmd.Text `
+            -description $txtDesc.Text
+
         Load-CommandTree
         $dialog.Close()
     })
@@ -552,17 +793,22 @@ function Show-AddCommandDialog {
     $dialog.Controls.AddRange(@(
         $lblCat, $cmbCat,
         $lblName, $txtName,
+        $lblDesc, $txtDesc,
         $lblCmd, $txtCmd,
         $btnSave, $btnCancel
     ))
 
-    $dialog.ShowDialog()
+    [void]$dialog.ShowDialog()
+
+    if ($previousTopMost) {
+        $form.TopMost = $true
+        $btnTop.Text = "Always On Top: ON"
+    }
 }
 
 # =====================================================
 # TAB COMPLETION
 # =====================================================
-
 function Reset-EditorTabCompletion {
     $script:TabCompletions = $null
     $script:TabCompletionIndex = -1
@@ -626,30 +872,8 @@ function Invoke-EditorTabCompletion {
 }
 
 # =====================================================
-# TYPING ENGINE
+# PREVIEW
 # =====================================================
-
-function Send-CharacterSafe {
-    param($text, $delay)
-
-    $specialChars = '+^%~(){}'
-
-    foreach ($char in $text.ToCharArray()) {
-        if (-not $global:IsTyping) { break }
-
-        $translated = $char
-
-        if ($specialChars.Contains($translated)) {
-            [System.Windows.Forms.SendKeys]::SendWait("{$translated}")
-        }
-        else {
-            [System.Windows.Forms.SendKeys]::SendWait($translated)
-        }
-
-        Start-Sleep -Milliseconds $delay
-    }
-}
-
 function Show-TypingPreview {
     param(
         [string]$TextToSend,
@@ -662,7 +886,7 @@ function Show-TypingPreview {
     $clusterText = if ($UsingClusterWrap) { "Yes" } else { "No" }
     $enterText = if ($PressEnterEachLine) { "Yes" } else { "No" }
 
-$previewMessage = @"
+    $previewMessage = @"
 About to send:
 
 Scope: $scopeText
@@ -684,6 +908,30 @@ Continue?
     )
 
     return ($result -eq [System.Windows.Forms.DialogResult]::Yes)
+}
+
+# =====================================================
+# TYPING ENGINE
+# =====================================================
+function Send-CharacterSafe {
+    param($text, $delay)
+
+    $specialChars = '+^%~(){}'
+
+    foreach ($char in $text.ToCharArray()) {
+        if (-not $global:IsTyping) { break }
+
+        $translated = $char
+
+        if ($specialChars.Contains($translated)) {
+            [System.Windows.Forms.SendKeys]::SendWait("{$translated}")
+        }
+        else {
+            [System.Windows.Forms.SendKeys]::SendWait($translated)
+        }
+
+        Start-Sleep -Milliseconds $delay
+    }
 }
 
 function Start-Typing {
@@ -752,6 +1000,7 @@ function Start-Typing {
         if (-not $continueTyping) { return }
     }
 
+    Add-TableData -TableName "KeyRelayTelemetryData" -PartitionKey $PartitionKey -Data $data -ShowSuccessOnce $true
     Maybe-AddToHistory $text
 
     $startDelay = [int]$inpStartDelay.Text
@@ -795,7 +1044,6 @@ function Start-Typing {
             Set-WinUserLanguageList $global:OriginalKeyboardLayout -Force -WarningAction SilentlyContinue
         }
 
-        # Reset Run on Cluster Nodes after every run
         if ($chkInvokeCluster.Checked) {
             $chkInvokeCluster.Checked = $false
             Save-CurrentSettings
@@ -809,18 +1057,29 @@ function Start-Typing {
 # =====================================================
 # GUI
 # =====================================================
-
 $form = New-Object Windows.Forms.Form
 $form.Text = $APP_TITLE
-$form.Size = New-Object Drawing.Size(1100, 800)
+$form.Size = New-Object Drawing.Size(1100, 830)
 $form.StartPosition = "CenterScreen"
 $form.AutoScaleMode = "None"
 
 # =====================================================
 # MENU BAR
 # =====================================================
-
 $menuStrip = New-Object System.Windows.Forms.MenuStrip
+
+$menuFile = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuFile.Text = "File"
+$menuFile.Font = New-Object Drawing.Font("Consolas", 9)
+
+$menuImportCommands = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuImportCommands.Text = "Import My Commands"
+
+$menuExportCommands = New-Object System.Windows.Forms.ToolStripMenuItem
+$menuExportCommands.Text = "Export My Commands"
+
+$menuFile.DropDownItems.Add($menuImportCommands) | Out-Null
+$menuFile.DropDownItems.Add($menuExportCommands) | Out-Null
 
 $menuHelp = New-Object System.Windows.Forms.ToolStripMenuItem
 $menuHelp.Text = "Help"
@@ -832,13 +1091,17 @@ $menuDocs.Text = "Documentation"
 $menuQuick = New-Object System.Windows.Forms.ToolStripMenuItem
 $menuQuick.Text = "Quick Start"
 
-$menuHelp.DropDownItems.Add($menuDocs)
-$menuHelp.DropDownItems.Add($menuQuick)
+$menuHelp.DropDownItems.Add($menuDocs) | Out-Null
+$menuHelp.DropDownItems.Add($menuQuick) | Out-Null
 
-$menuStrip.Items.Add($menuHelp)
+$menuStrip.Items.Add($menuFile) | Out-Null
+$menuStrip.Items.Add($menuHelp) | Out-Null
 
 $form.MainMenuStrip = $menuStrip
 $form.Controls.Add($menuStrip)
+
+$menuImportCommands.Add_Click({ Import-CommandsFromFile })
+$menuExportCommands.Add_Click({ Export-CommandsToFile })
 
 $menuDocs.Add_Click({
     Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/KeyRelayREADME.md"
@@ -857,7 +1120,6 @@ $txtInput.AcceptsTab = $true
 
 $txtInput.Add_PreviewKeyDown({
     param($sender, $e)
-
     if ($e.KeyCode -eq [System.Windows.Forms.Keys]::Tab) {
         $e.IsInputKey = $true
     }
@@ -890,7 +1152,6 @@ $txtInput.Add_TextChanged({
     Reset-EditorTabCompletion
 })
 
-# Placeholder setup
 $txtInput.ForeColor = [System.Drawing.Color]::Gray
 $txtInput.Text = $PLACEHOLDER_TEXT
 
@@ -918,10 +1179,11 @@ $treeShared = New-Object Windows.Forms.TreeView
 $treeShared.Dock = "Fill"
 $treeShared.ShowNodeToolTips = $true
 
-$tabShared.Controls.Add($treeShared)
-
 $treeCommands = New-Object Windows.Forms.TreeView
 $treeCommands.Dock = "Fill"
+$treeCommands.ShowNodeToolTips = $true
+
+$tabShared.Controls.Add($treeShared)
 $tabCommands.Controls.Add($treeCommands)
 
 $tabHistory = New-Object Windows.Forms.TabPage
@@ -932,14 +1194,13 @@ $lstHistory = New-Object Windows.Forms.ListBox
 $lstHistory.Dock = "Fill"
 $tabHistory.Controls.Add($lstHistory)
 
-$tabRight.TabPages.Add($tabCommands)
-$tabRight.TabPages.Add($tabShared)
-$tabRight.TabPages.Add($tabHistory)
+$tabRight.TabPages.Add($tabCommands) | Out-Null
+$tabRight.TabPages.Add($tabShared) | Out-Null
+$tabRight.TabPages.Add($tabHistory) | Out-Null
 
 # =====================================================
-# CONTEXT MENU (Tree)
+# CONTEXT MENU
 # =====================================================
-
 $treeMenu = New-Object System.Windows.Forms.ContextMenuStrip
 
 $menuCopyCommand = New-Object System.Windows.Forms.ToolStripMenuItem
@@ -1025,8 +1286,19 @@ $menuEditCommand.Add_Click({
     $categoryName = $script:RightClickedNode.Parent.Text
     $commandText  = $script:RightClickedNode.Tag
 
+    $json = Get-CommandJson
+    $category = $json.Commands | Where-Object { $_.Name -eq $categoryName } | Select-Object -First 1
+    $command = $null
+    if ($category) {
+        $command = $category.Children | Where-Object { $_.Name -eq $commandName } | Select-Object -First 1
+    }
+
     Remove-CommandFromJson $categoryName $commandName
-    Show-AddCommandDialog $commandText $commandName
+
+    Show-AddCommandDialog `
+        -defaultCommand $commandText `
+        -defaultName $commandName `
+        -defaultDescription ([string]$command.Description)
 })
 
 $menuRemoveCommand.Add_Click({
@@ -1063,20 +1335,26 @@ $menuCopyCommand.Add_Click({
     }
 })
 
+# =====================================================
+# DEFAULT SETTINGS
+# =====================================================
 Load-Settings
 if ($global:Settings.Count -eq 0) {
     $global:Settings = @{}
-    $global:Settings.startDelay    = 4
-    $global:Settings.keyDelay      = 35
-    $global:Settings.lineDelay     = 120
-    $global:Settings.enterEach     = $true
-    $global:Settings.TopMost       = $false
-    $global:Settings.InvokeCluster = $false
-    $global:Settings.AltTab        = $false
+    $global:Settings.startDelay          = 4
+    $global:Settings.keyDelay            = 35
+    $global:Settings.lineDelay           = 120
+    $global:Settings.enterEach           = $true
+    $global:Settings.TopMost             = $false
+    $global:Settings.InvokeCluster       = $false
+    $global:Settings.AltTab              = $false
+    $global:Settings.PreviewBeforeTyping = $false
     Save-Settings
 }
 
-# Right Buttons
+# =====================================================
+# RIGHT BUTTONS
+# =====================================================
 $btnReload = New-Object Windows.Forms.Button
 $btnReload.Text = "Reload Commands"
 $btnReload.SetBounds(780, 580, 290, 30)
@@ -1093,9 +1371,11 @@ $btnClearHist = New-Object Windows.Forms.Button
 $btnClearHist.Text = "Clear History"
 $btnClearHist.SetBounds(780, 685, 290, 30)
 
-# Bottom panel
+# =====================================================
+# BOTTOM PANEL
+# =====================================================
 $panelBottom = New-Object Windows.Forms.Panel
-$panelBottom.SetBounds(12, 530, 750, 200)
+$panelBottom.SetBounds(12, 530, 750, 230)
 
 $lblStart = New-Object Windows.Forms.Label
 $lblStart.Text = "Start Delay (sec)"
@@ -1126,10 +1406,6 @@ $chkEnter.Text = "Press Enter After Each Line"
 $chkEnter.Checked = $true
 $chkEnter.SetBounds(10, 45, 250, 25)
 
-$chkPreview = New-Object Windows.Forms.CheckBox
-$chkPreview.Text = "Preview Before Typing"
-$chkPreview.SetBounds(10,70,180,25)
-
 $chkInvokeCluster = New-Object Windows.Forms.CheckBox
 $chkInvokeCluster.Text = "Run on Cluster Nodes"
 $chkInvokeCluster.SetBounds(265, 45, 170, 25)
@@ -1137,6 +1413,10 @@ $chkInvokeCluster.SetBounds(265, 45, 170, 25)
 $chkAltTab = New-Object Windows.Forms.CheckBox
 $chkAltTab.Text = "Select Previous Window on Type It"
 $chkAltTab.SetBounds(475, 45, 250, 25)
+
+$chkPreview = New-Object Windows.Forms.CheckBox
+$chkPreview.Text = "Preview Before Typing"
+$chkPreview.SetBounds(10, 70, 180, 25)
 
 $lblLayout = New-Object Windows.Forms.Label
 $lblLayout.Text = "Target Lang (ex: fr-FR)"
@@ -1153,24 +1433,24 @@ $txtLayout.AutoCompleteCustomSource.AddRange($options)
 
 $btnType = New-Object Windows.Forms.Button
 $btnType.Text = "Type It"
-$btnType.SetBounds(10, 90, 100, 35)
+$btnType.SetBounds(10, 105, 100, 35)
 
 $btnStop = New-Object Windows.Forms.Button
 $btnStop.Text = "STOP"
-$btnStop.SetBounds(120, 90, 100, 35)
+$btnStop.SetBounds(120, 105, 100, 35)
 $btnStop.Enabled = $false
 
 $btnClear = New-Object Windows.Forms.Button
 $btnClear.Text = "Clear Editor"
-$btnClear.SetBounds(230, 90, 120, 35)
+$btnClear.SetBounds(230, 105, 120, 35)
 
 $btnTop = New-Object Windows.Forms.Button
 $btnTop.Text = "Always On Top: OFF"
-$btnTop.SetBounds(370, 90, 180, 35)
+$btnTop.SetBounds(370, 105, 180, 35)
 
 $btnExit = New-Object Windows.Forms.Button
 $btnExit.Text = "Exit"
-$btnExit.SetBounds(560, 90, 100, 35)
+$btnExit.SetBounds(560, 105, 100, 35)
 
 $lnkIssue = New-Object System.Windows.Forms.LinkLabel
 $lnkIssue.Text = "Found a bug? Open a GitHub issue"
@@ -1190,11 +1470,10 @@ $panelBottom.Controls.AddRange(@(
     $lblStart, $inpStartDelay,
     $lblKey, $inpKeyDelay,
     $lblLine, $inpLineDelay,
-    $chkEnter, $chkInvokeCluster, $chkAltTab,
+    $chkEnter, $chkInvokeCluster, $chkAltTab, $chkPreview,
     $lblLayout, $txtLayout,
     $btnType, $btnStop, $btnClear, $btnTop, $btnExit,
     $lnkIssue
-    $chkPreview
 ))
 
 $form.Controls.AddRange(@(
@@ -1204,21 +1483,23 @@ $form.Controls.AddRange(@(
     $panelBottom
 ))
 
-$inpStartDelay.Text = $global:Settings.startDelay.ToString()
-$inpKeyDelay.Text   = $global:Settings.keyDelay.ToString()
-$inpLineDelay.Text  = $global:Settings.lineDelay.ToString()
-$chkEnter.Checked   = [bool]$global:Settings.enterEach
-$form.TopMost       = [bool]$global:Settings.TopMost
-$chkInvokeCluster.Checked = [bool]$global:Settings.InvokeCluster
-$chkAltTab.Checked        = [bool]$global:Settings.AltTab
-$chkPreview.Checked = [bool]$global:Settings.PreviewBeforeTyping
+# =====================================================
+# APPLY SETTINGS TO CONTROLS
+# =====================================================
+$inpStartDelay.Text         = $global:Settings.startDelay.ToString()
+$inpKeyDelay.Text           = $global:Settings.keyDelay.ToString()
+$inpLineDelay.Text          = $global:Settings.lineDelay.ToString()
+$chkEnter.Checked           = [bool]$global:Settings.enterEach
+$form.TopMost               = [bool]$global:Settings.TopMost
+$chkInvokeCluster.Checked   = [bool]$global:Settings.InvokeCluster
+$chkAltTab.Checked          = [bool]$global:Settings.AltTab
+$chkPreview.Checked         = [bool]$global:Settings.PreviewBeforeTyping
 
 $btnTop.Text = "Always On Top: " + ($(if ($form.TopMost) { "ON" } else { "OFF" }))
 
 # =====================================================
 # EVENTS
 # =====================================================
-
 $txtSearch.Add_GotFocus({
     if ($txtSearch.Text -eq "Search commands...") {
         $txtSearch.Text = ""
@@ -1264,13 +1545,13 @@ $txtInput.Add_Leave({
 $inpKeyDelay.Add_Leave({ Save-CurrentSettings })
 $inpStartDelay.Add_Leave({ Save-CurrentSettings })
 $inpLineDelay.Add_Leave({ Save-CurrentSettings })
+
 $chkEnter.Add_CheckedChanged({ Save-CurrentSettings })
 $chkAltTab.Add_CheckedChanged({ Save-CurrentSettings })
 $chkInvokeCluster.Add_CheckedChanged({ Save-CurrentSettings })
 $chkPreview.Add_CheckedChanged({ Save-CurrentSettings })
 
 $btnType.Add_Click({
-    Add-TableData -TableName "KeyRelayTelemetryData" -PartitionKey $PartitionKey -Data $data -ShowSuccessOnce $true
     [void](Start-Typing)
 })
 
@@ -1304,7 +1585,7 @@ $btnReload.Add_Click({
 })
 
 $btnAdd.Add_Click({
-    Show-AddCommandDialog "" ""
+    Show-AddCommandDialog "" "" ""
 })
 
 $btnAddHist.Add_Click({
@@ -1315,7 +1596,7 @@ $btnAddHist.Add_Click({
 
     $cmd = $global:History[$lstHistory.SelectedIndex]
     $defaultName = ($cmd -split "`r?`n")[0]
-    Show-AddCommandDialog $cmd $defaultName
+    Show-AddCommandDialog $cmd $defaultName ""
 })
 
 $btnClearHist.Add_Click({
