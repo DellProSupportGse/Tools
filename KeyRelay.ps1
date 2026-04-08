@@ -14,7 +14,7 @@ Function Invoke-KeyRelay {
 # =====================================================
 # App Version
 # =====================================================
-$APP_VERSION = "1.17"
+$APP_VERSION = "1.17.1"
 
 # =====================================================
 # APP DATA FOLDER
@@ -591,6 +591,7 @@ function Load-CommandTree {
     }
 
     $treeCommands.ExpandAll()
+    $treeCommands.Sort()
 }
 
 function Load-SharedCommands {
@@ -622,6 +623,7 @@ function Load-SharedCommands {
         }
 
         $treeShared.ExpandAll()
+        $treeShared.Sort()
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show(
@@ -1178,10 +1180,12 @@ $tabShared.Font = New-Object Drawing.Font("Consolas", 10)
 $treeShared = New-Object Windows.Forms.TreeView
 $treeShared.Dock = "Fill"
 $treeShared.ShowNodeToolTips = $true
+$treeShared.Sorted = $true
 
 $treeCommands = New-Object Windows.Forms.TreeView
 $treeCommands.Dock = "Fill"
 $treeCommands.ShowNodeToolTips = $true
+$treeCommands.Sorted = $true
 
 $tabShared.Controls.Add($treeShared)
 $tabCommands.Controls.Add($treeCommands)
