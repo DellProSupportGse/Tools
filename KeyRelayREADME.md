@@ -1,6 +1,6 @@
 # KeyRelay
 
-Version: KeyRelay v1.16
+Version: KeyRelay v1.17
 
 KeyRelay is a PowerShell GUI tool designed to send commands or text into applications that do not support paste operations.
 
@@ -12,9 +12,9 @@ This tool is especially useful when working with:
 - Restricted remote shells
 - Secure administrative terminals
 
-KeyRelay safely types commands using a configurable typing engine and includes command libraries, history tracking, selective send, preview mode, and PowerShell-aware editing enhancements.
+KeyRelay safely types commands using a configurable typing engine and includes command libraries, history tracking, selective send, preview mode, PowerShell-aware editing enhancements, command descriptions, and import/export support.
 
-* * *
+---
 
 # Features
 
@@ -35,8 +35,10 @@ KeyRelay safely types commands using a configurable typing engine and includes c
 - Automatic reset of Run on Cluster Nodes after each run
 - Built-in GitHub issue link for bug reporting
 - PowerShell Tab completion in the editor
+- Command descriptions in My Commands
+- Import and export support for My Commands
 
-* * *
+---
 
 # Command Libraries
 
@@ -44,7 +46,7 @@ KeyRelay supports multiple command sources.
 
 ## My Commands
 
-Your personal command library stored locally.
+Your personal command library is stored locally.
 
 Location:
 
@@ -52,7 +54,13 @@ Location:
 
 Categories help organize commands.
 
-* * *
+Each command in **My Commands** can now include:
+
+- Display name
+- Description
+- Command text
+
+Descriptions are shown as tooltips in the **My Commands** tree to make it easier to understand what each command does before sending it.
 
 ## Shared Commands
 
@@ -72,7 +80,7 @@ Shared commands include examples for:
 
 Descriptions are displayed using tooltips.
 
-* * *
+---
 
 # Search
 
@@ -86,7 +94,13 @@ Search works across:
 
 Results update automatically while typing.
 
-* * *
+For command libraries, search can match against:
+
+- Command name
+- Command text
+- Description text
+
+---
 
 # Command Editor
 
@@ -99,51 +113,28 @@ Right-click a command in My Commands to access:
 - Remove Command
 - Remove Category
 
+The Add / Edit Command dialog supports:
+
+- Category
+- Display Name
+- Description
+- Command text
+
 The main editor also supports PowerShell Tab completion for faster command authoring.
 
-* * *
+## PowerShell Tab Completion
 
-# Typing Engine
+KeyRelay includes PowerShell-aware tab completion inside the command editor.
 
-KeyRelay uses the Windows SendKeys API to simulate typing.
+Pressing **Tab** will:
 
-Configurable options include:
+- Auto-complete cmdlets, parameters, and variables
+- Cycle through multiple matches on repeated Tab presses
+- Replace only the current token being typed
 
-| Setting | Description |
-|---|---|
-| Start Delay | Time before typing begins |
-| Per-Key Delay | Delay between characters |
-| Between Lines | Delay between command lines |
-| Press Enter After Each Line | Sends Enter after each line |
-| Target Lang | Temporarily switches keyboard layout while typing |
+Example:
 
-Typing can be cancelled using the STOP button.
-
-## Selective Send
-
-If text is highlighted in the main editor, KeyRelay will type only the selected portion.
-
-If nothing is selected, KeyRelay types the entire editor contents.
-
-## Preview Before Typing
-
-When enabled, Preview Before Typing shows the exact text that will be sent before typing begins.
-
-The preview indicates:
-
-- whether the full editor or only the selected text will be sent
-- whether Run on Cluster Nodes wrapping will be applied
-- whether Enter After Each Line is enabled
-
-This helps prevent accidental sends.
-
-* * *
-
-# Cluster Mode
-
-When enabled, KeyRelay executes commands across all nodes in a Windows Failover Cluster.
-
-Commands are wrapped with:
+Typing:
 
 ```powershell
-Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock { ... }
+Get-NetAdap
