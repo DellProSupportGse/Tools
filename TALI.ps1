@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.1"
+    $ver="0.2"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -380,6 +380,7 @@ v$ver
     $disksInMaint= Test-NodesUpDisksinMaintMode
     If ($disksInMaint)  {
         If ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Taking disks out of maintenance mode. Est Time is less than five minutes" -ForegroundColor Cyan
             $disksFixed=foreach ($disk in $disksInMaint) {
                 try {
                     $disk | Get-PhysicalDisk | Disable-StorageMaintenanceMode -ErrorAction Stop
@@ -426,6 +427,7 @@ v$ver
     Write-Host ""
     If (Test-ClusterShutdownTime) {
         if ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Fixing cluster shutdown timeout. Est Time is less than one minute" -ForegroundColor Cyan
             (Get-Cluster).ShutdownTimeoutInMinutes=1440
             If (Test-ClusterShutdownTime) {Write-ToHost "Fix setting cluster shutdown timeout to 1440 minutes failed!!!" -Level 4 -Checkmark 4}
         } else {
@@ -435,6 +437,7 @@ v$ver
     Write-Host ""
     If (Test-InvalidCAUReports) {
         if ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Removing invalid CAU reports. Est Time is less than one minute" -ForegroundColor Cyan
             Invoke-Command -ComputerName $nodes -ScriptBlock {Remove-Item C:\Windows\Cluster\Reports\CauReport-00000101000000.xml -ErrorAction SilentlyContinue -Force}
             If (Test-InvalidCAUReports) {Write-ToHost "Fix removing invalid CAU reports failed!!!" -Level 4 -Checkmark 4}
         } else {
@@ -445,6 +448,7 @@ v$ver
     $FailedComputeIntents=Test-NetworkDirectOnComputeIntents
     If ($FailedComputeIntents) {
         if ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Fixing Invalid compute intent settings. Est Time is less than one minute" -ForegroundColor Cyan
             Foreach ($FailedComIntent in $FailedComputeIntents) {
                 $AdapOver=(Get-NetIntent -Name "$($FailedComIntent.IntentName)").AdapterAdvancedParametersOverride
                 $AdapOver.NetworkDirect=0
