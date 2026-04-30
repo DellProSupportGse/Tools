@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.2"
+    $ver="0.3"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -53,7 +53,6 @@ param(
         If ($failedNetIntent.Progress -gt "") {
            Foreach ($failedIntent in $failedNetIntent) {
                Write-ToHost "Net Intent $($failedIntent.Name) on Node $($failedIntent.Host) FAILED" -Checkmark 3 -Level 3
-               return $true
            }
         } else {
            Write-ToHost "Net Intent check successful" -Checkmark 1 -Level 1
@@ -264,12 +263,14 @@ v$ver
             }
             Foreach ($failedIntent in $failedNetIntent) {
                 if ($failedIntent.IntentName -le "") {
-                     Set-NetIntentRetryState -NodeName $failedIntent.Host -GlobalOverrides -Wait
+                     Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -GlobalOverrides -Wait
                 } else {
-                     Set-NetIntentRetryState -NodeName $failedIntent.Host -Name $failedIntent.IntentName -Wait
+                     Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -Name "$($failedIntent.IntentName)" -Wait
                 }
             }
             Sleep 5
+            $GetNetIntentStatus=Get-NetIntentStatus
+            $GetNetIntentGlobalStatus=Get-NetIntentStatus -GlobalOverrides
             $failedNetIntent=Test-NetIntents
             If ($failedNetIntent) {Write-ToHost "Fix Net Intents FAILED!!!" -Level 4 -Checkmark 4}
         } else {
