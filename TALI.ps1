@@ -221,8 +221,7 @@ param(
             # Resolve pool once
             $pool = if ($StoragePoolName) {
                 Get-StoragePool -FriendlyName $StoragePoolName -ErrorAction Stop
-            }
-            else {
+            } else {
                 Get-StoragePool | Where-Object IsPrimordial -eq $false | Select-Object -First 1
             }
 
@@ -230,11 +229,9 @@ param(
                 throw "No storage pool found."
             }
 
-            $poolName = $pool.FriendlyName
-
             # Single-pass data collection
-            $physicalDisks = Get-PhysicalDisk -StoragePoolFriendlyName $poolName
-            $vDisks        = Get-VirtualDisk -StoragePoolFriendlyName $poolName
+            $physicalDisks = $pool | Get-PhysicalDisk
+            $vDisks        = $pool | Get-VirtualDisk
             $nodeCount     = (Get-ClusterNode).Count
 
             # Core metrics
@@ -247,8 +244,7 @@ param(
 
                 $multiplier = if ($copies -in 1..3) {
                     $copies
-                }
-                else {
+                } else {
                     2
                 }
 
@@ -258,13 +254,17 @@ param(
             # Failure reserve rule
             $failureReserve = if ($totalDiskCount -lt 11) {
                 $largestDisk
-            }
-            else {
+            } else {
                 $largestDisk * $nodeCount
             }
 
             # Survivable capacity
             $usableCapacity = $pool.Size - $pool.Reserved - $failureReserve
+            if ($totalAllocatedMax -gt $usableCapacity) {
+                Write-ToHost "If volumes are fully used, there will not be enough space for disk repairs." -Checkmark 2 -Level 2
+            } else {
+                Write-ToHost "Storage Pool space looks good"
+            }
 
             return ($totalAllocatedMax -gt $usableCapacity)
         }
@@ -402,11 +402,11 @@ param(
         $delta = $nMinusOneCapacity - $vmTotal
 
         if ($delta -ge 0) {
-            Write-ToHost "Cluster is N-1 SAFE (headroom: $delta bytes)" -Level 1 -Checkmark 1
+            Write-ToHost "Cluster is N-1 safe for memory (headroom: $([int]($delta/1gb)) GB)" -Level 1 -Checkmark 1
             return $false   # PASS
         }
         else {
-            Write-ToHost "Cluster is NOT N-1 SAFE (shortfall: $([math]::Abs($delta)) bytes)" -Level 3 -Checkmark 3
+            Write-ToHost "Cluster is NOT N-1 SAFE (shortfall: $([int]([math]::Abs($delta)/1gb)) GB)" -Level 3 -Checkmark 3
             return $true    # FAIL
         }
     }
