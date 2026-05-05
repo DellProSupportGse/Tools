@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.33"
+    $ver="0.34"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -1053,11 +1053,11 @@ v$ver
         }
     }
     Write-Host ""
-    If (Test-Test-AzLocalMemoryNMinusOne) {
+    If (Test-AzLocalMemoryNMinusOne) {
         Write-Host "Recommendation: Lower total VM assigned memory to avoid node pause/drain issues"
     }
     Write-Host ""
-    If (Test-Test-AzLocalCpuNMinusOneOvercommit) {
+    If (Test-AzLocalCpuNMinusOneOvercommit) {
         Write-Host "Recommendation: Lower total vCPU assignment to avoid node pause/drain issues"
     }
     Write-Host ""
