@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.34"
+    $ver="0.35"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -236,7 +236,15 @@ param(
 
             # Core metrics
             $largestDisk     = ($physicalDisks | Measure-Object Size -Maximum).Maximum
-            $totalAllocatedMax = ($vDisks | Measure-Object Size -Sum).Sum
+            $totalAllocatedMax = ($vDisks | ForEach-Object {
+                $copies = $_.NumberOfDataCopies
+                $multiplier = if ($copies -in 1..3) {
+                    $copies
+                } else {
+                    2
+                }
+                $_.Size * $multiplier
+            } | Measure-Object -Sum).Sum
             $totalDiskCount   = $physicalDisks.Count
             $maxFootprint = ($vDisks | ForEach-Object {
 
@@ -261,7 +269,7 @@ param(
             # Survivable capacity
             $usableCapacity = $pool.Size - $pool.Reserved - $failureReserve
             if ($totalAllocatedMax -gt $usableCapacity) {
-                Write-ToHost "If volumes are fully used, there will not be enough space for disk repairs." -Checkmark 2 -Level 2
+                Write-ToHost "If volumes are filled, there will not be enough space for disk repairs. $([int](($usableCapacity-$totalAllocatedMax)/1gb)) GB" -Checkmark 2 -Level 2
             } else {
                 Write-ToHost "Storage Pool space looks good"
             }
@@ -976,7 +984,7 @@ v$ver
         }
     }
     Write-Host ""
-    #$nonWindowsGroups = Test-AzLocalVmMigrationFailures
+    $nonWindowsGroups = Test-AzLocalVmMigrationFailures
     if ($nonWindowsGroups) {
         If ($FixErrors -or $FixWarningsAlso) {
             # 6. Show candidates
