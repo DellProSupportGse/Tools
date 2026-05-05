@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.32"
+    $ver="0.33"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -279,7 +279,7 @@ param(
             [string]$StoragePoolName
         )
 
-        Write-Host "Testing Virtual Disk ThinProvisioningAlertThreshold"
+        Write-Host "Testing Virtual Disk Thin Provisioning Alert Threshold"
 
         try {
             $pool = if ($StoragePoolName) {
@@ -539,6 +539,7 @@ param(
         }
     }
     Function Test-AzureLocalNodeServices {
+        Write-Host "Checking per node services vital to Azure local..."
         $FailedServices=Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock {
             param($ServiceList)
             $FailedServices=@()
@@ -555,14 +556,15 @@ param(
         }
         return $FailedServices
     }
-    Test-DiskLatencyOutlier {
+    Function Test-DiskLatencyOutlier {
+        Write-Host "Looking at physical disk latency in the past week..."
         try {
             #Sample 2: Fire, fire, latency outlier
             #Ref: https://learn.microsoft.com/en-us/windows-server/storage/storage-spaces/performance-history-scripting#sample-2-fire-fire-latency-outlier
             $Cluster = Get-cluster
             $ClusterNodes = Get-ClusterNode -Cluster $Cluster -ErrorAction SilentlyContinue
-            $o=@()
-            $o += Invoke-Command $ClusterNodes.Name {
+            $TotalProblemDrives=@()
+            $TotalProblemDrives += Invoke-Command $ClusterNodes.Name {
                 Function Format-Latency {
                 Param (
                 $RawValue
@@ -624,9 +626,10 @@ param(
                         If ($Deviation -Gt 3) {
                             $FoundOutlier = $True
                             [PSCustomerObject] @{
-                                "SerialNumber"  = $_.SerialNumber
-                                "MediaType"     = $_.MediaType
+                                "SerialNumber"   = $_.SerialNumber
+                                "MediaType"      = $_.MediaType
                                 "PSComputerName" = "$env:COMPUTERNAME"
+                                "Deviation"       = $Deviation
                             }
                         }
                     }
@@ -634,10 +637,85 @@ param(
 
                 $ProblemDrives
             }
-            return $o | Sort-Object PsComputerName
-            } catch { #Show-Warning("Unable to get latency outlier Data.  `nError="+$_.Exception.Message)
+            $TotalProblemDrives = $TotalProblemDrives | Sort PSComputerName
+            if ($TotalProblemDrives) {
+                Foreach ($disk in $TotalProblemDrives) {
+                    Write-ToHost "Node $($disk.PSComputerName) with SN $($disk.SerialNumber) with Deviation of $($disk.Deviation) may need to be reseated" -Level 2 -Checkmark 2
+                }
+                return $true
+            } else {
+                Write-ToHost "All physical disks passed"
+                return $false
+            }
+            } catch { Show-Warning "Unable to get latency outlier Data.  `nError="+$_.Exception.Message
             }
     }
+    function Test-AzLocalClusterDiskEndurance {
+        [CmdletBinding()]
+        param()
+
+        $nodes = Get-ClusterNode
+        $allResults = @()
+        Write-Host "Checking disk endurance and media failures"
+
+        foreach ($node in $nodes) {
+            $nodeName = $node.Name
+
+            $results = Invoke-Command -ComputerName $nodeName -ScriptBlock {
+                $disks = Get-PhysicalDisk
+                $reliability = $disks | Get-StorageReliabilityCounter
+
+                foreach ($disk in $disks) {
+                    $rel = $reliability | Where-Object { $_.DeviceId -eq $disk.DeviceId }
+
+                    $percentageUsed = $rel.PercentageUsed
+                    $mediaErrors    = $rel.MediaErrors
+                    $predictFail    = $rel.PredictFailure
+
+                    # --- ACTION LOGIC ---
+
+                    # 1. SMART failure indicators → Reseat
+                    if ($mediaErrors -gt 0 -or $predictFail -eq $true) {
+                        [PSCustomObject]@{
+                            Node     = $env:COMPUTERNAME
+                            Action   = "Reseat"
+                            Disk     = $disk.FriendlyName
+                            Serial   = $disk.SerialNumber
+                            Details  = "SMART failure indicators detected"
+                        }
+                        continue
+                    }
+
+                    # 2. Endurance nearing end-of-life (≥98%) → Replace
+                    if ($percentageUsed -ge 98) {
+                        [PSCustomObject]@{
+                            Node     = $env:COMPUTERNAME
+                            Action   = "Purchase"
+                            Disk     = $disk.FriendlyName
+                            Serial   = $disk.SerialNumber
+                            Details  = "Endurance used: $percentageUsed%"
+                        }
+                        continue
+                    }
+                }
+            }
+
+            $allResults += $results
+        }
+        if ($allResults) {
+            Foreach ($badDisks in ($allResults | ? Action -eq "Purchase")) {
+                Write-ToHost "Disk(s) with SN $($badDisks.SerialNumber) and $($badDsisks.Details) have reached end of life and need(s) to be purchased and replaced" -Level 3 -Checkmark 3
+            }
+            Foreach ($badDisks in ($allResults | ? Action -eq "Reseat")) {
+                Write-ToHost "Disk(s) with SN $($badDisks.SerialNumber) may need to be reseated and/or the host rebooted" -Level 2 -Checkmark 2
+            }
+        } else {
+            Write-ToHost "All physical disks are operating normally"
+        }
+
+        return $allResults
+    }
+
     #endregion Test Scripts
 
     # Main Process
@@ -654,6 +732,7 @@ v$ver
                       by: Tommy Paulk
 "@
     If ($FixErrors -or $FixWarningsAlso) {Write-Warning "Fix commands are in beta and SHOULD NOT be used without proper guidance";sleep 5}
+    If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
     Write-Host ""
     If ((Get-Job -Name "SUJob" -ErrorAction SilentlyContinue).count) {
@@ -772,7 +851,6 @@ v$ver
                     return $false
                 }
             }}
-            #$IdracReboots
             if ($IdracReboots.Contains($true)) {Invoke-Command -ComputerName $failediDracRedfish[$IdracReboots.IndexOf($true)].PSComputerName -ScriptBlock {
                $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*").DHCPServer
                Write-Host "Waiting for iDrac with ip $iDracIP to shutdown"
@@ -795,7 +873,7 @@ v$ver
     }
     Write-Host ""
     If ((Test-OsBootTimeOver99Days)){
-        Write-host "Recommendation: Manually Pause,Drain and Resume with failback these node(s) to avoid update issues"
+        Write-host "Recommendation: Manually Pause/Drain, Reboot and Resume with failback these node(s) to avoid update issues"
     }
     Write-Host ""
     $nonCompliant=Test-HWTimeout
@@ -898,6 +976,7 @@ v$ver
             Write-Host "Recommendation: Remove Network Direct setting on compute intents"
         }
     }
+    Write-Host ""
     #$nonWindowsGroups = Test-AzLocalVmMigrationFailures
     if ($nonWindowsGroups) {
         If ($FixErrors -or $FixWarningsAlso) {
@@ -924,6 +1003,7 @@ v$ver
         }
         Write-Host "Recommendation: Some non-Windows VMs such as $($nonWindowsGroups.Name -join ',') may need to have their priority set to 1000 (Low) to avoid migration issues. This will have those VMs use Quick Migrate instead"        
     }
+    Write-Host ""
     $AzureLocalServices = @(
         "himds", 
         "WssdService", 
@@ -949,6 +1029,43 @@ v$ver
             Write-Host "Recommendation: Start $(($FailedServices.Name | Sort -Unique) -join ',') on ALL nodes"
         }
     }
+    Write-Host ""
+    If (Test-AzLocalOverProvisionedVirtualDisks) {
+        Write-Host "Recommendation: Make sure Storage Pool space does not run below best practice levels"
+    }
+    Write-Host ""
+    $failed=Test-AzLocalThinProvisioningUtilization
+    if ($failed.CurrentPercent -lt 99) {$failed.CurrentPercent=$failed.CurrentPercent+1}
+    if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
+    If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
+        if ($FixErrors -or $FixWarningsAlso) {
+            If ($FixWarningsAlso -and !($FixErrors) -and $failed.MaxPercent -lt 100) {
+                Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
+                Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
+            }
+            If ($FixErrors) {
+                Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
+                Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
+            }
+            If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4}
+        } else {
+            Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)"
+        }
+    }
+    Write-Host ""
+    If (Test-Test-AzLocalMemoryNMinusOne) {
+        Write-Host "Recommendation: Lower total VM assigned memory to avoid node pause/drain issues"
+    }
+    Write-Host ""
+    If (Test-Test-AzLocalCpuNMinusOneOvercommit) {
+        Write-Host "Recommendation: Lower total vCPU assignment to avoid node pause/drain issues"
+    }
+    Write-Host ""
+    $ProblemDrives=Test-DiskLatencyOutlier
+    If ($ProblemDrives) {
+        Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
+    }
+    Write-Host ""
     Stop-Transcript -ErrorAction SilentlyContinue
 }
 
