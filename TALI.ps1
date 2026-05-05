@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.31"
+    $ver="0.32"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -215,6 +215,7 @@ param(
         param(
             [string]$StoragePoolName
         )
+        Write-Host "Testing for Over Provisioned Virtual Disks on Storage Pool"
 
         try {
             # Resolve pool once
@@ -268,7 +269,8 @@ param(
             return ($totalAllocatedMax -gt $usableCapacity)
         }
         catch {
-            return $true
+            Write-ToHost "Could not determine Over Provisioned Virtual Disks on Storage Pool" -Checkmark 2 -Level 2
+            return $false
         }
     }
     function Test-AzLocalThinProvisioningUtilization {
@@ -509,28 +511,30 @@ param(
         }
         # 4. Resolve VM objects and filter NON-Windows only
         $nonWindowsGroups += foreach ($group in $clusterGroups) {
-            $vm = Get-VM -Name $group.Name -ErrorAction SilentlyContinue
-            if ($vm -and (Get-ClusterGroup -Name $group.NamPriority) -gt 1000) {
-                $isWindows = (
-                    $vm.OperatingSystem -match "Windows" -or
-                    $vm.GuestOperatingSystem -match "Windows"
-                )
-                if (-not $isWindows) {
-                    $group
+            $vm = Get-VM -ComputerName $nodes -Name $group.Name -ErrorAction SilentlyContinue | ? State -eq "Running"
+            $VmWmi = gwmi -namespace root\virtualization\v2 -query "Select * From Msvm_ComputerSystem Where ElementName='$(($vm).Name)'" -ComputerName $vm.PSComputerName
+            $Kvp = gwmi -namespace root\virtualization\v2 -query "Associators of {$VmWmi} Where AssocClass=Msvm_SystemDevice ResultClass=Msvm_KvpExchangeComponent" -ComputerName $vm.PSComputerName
+            $OSPlatformId=$Kvp.GuestIntrinsicExchangeItems | %{
+                $xml = [xml]$_
+                if ($xml.INSTANCE.PROPERTY | Where-Object { $_.Name -eq 'Name' -and $_.VALUE -eq 'OSPlatformId' }) {
+                    ($xml.INSTANCE.PROPERTY | Where-Object { $_.Name -eq 'Data' }).VALUE
                 }
+            } 
+            if ($vm -and (Get-ClusterGroup -Name $group.Name).Priority -gt 1000 -and $OSPlatformId -ne 2) {
+                $group
             }
         }
         if ($nonWindowsGroups) {
-            Write-ToHost "VMs with repeated migration / failback failures detected" -Level 2 -Checkmark 2
+            Write-ToHost "Non-Windows VMs with repeated migration / failback failures detected" -Level 2 -Checkmark 2
 
             foreach ($vm in $nonWindowsGroups) {
-                Write-ToHost "VM '$($vm.Name)' failed $($vm.Count) times" -Level 2
+                Write-ToHost "Non-Windows VM '$($vm.Name)' failed $($vm.Count) times" -Level 2
             }
 
             return $nonWindowsGroups
         }
         else {
-            Write-ToHost "No VMs exceeded failure threshold (>2) in last 7 days" -Level 1 -Checkmark 1
+            Write-ToHost "No Non-Windows VMs exceeded failure threshold (>200% of average) in last 7 days" -Level 1 -Checkmark 1
             return
         }
     }
@@ -586,7 +590,7 @@ param(
                 $Output = $HDD | ForEach-Object {
                     $Iops = $_ | Get-ClusterPerf -PhysicalDiskSeriesName "PhysicalDisk.Iops.Total" -TimeFrame "LastWeek"
                     $AvgIops = ($Iops | Measure-Object -Property Value -Average).Average
-                    If ($AvgIops -Gt 0) { # Exclude idle or nearly idle drives
+                    If ($AvgIops -Gt 1) { # Exclude idle or nearly idle drives
                         $Latency = $_ | Get-ClusterPerf -PhysicalDiskSeriesName "PhysicalDisk.Latency.Average" -TimeFrame "LastWeek" 
                         $AvgLatency = ($Latency | Measure-Object -Property Value -Average).Average
                         [PsCustomObject]@{
@@ -918,7 +922,7 @@ v$ver
             $nonWindowsGroups = Test-AzLocalVmMigrationFailures
             if ($nonWindowsGroups) {Write-ToHost "Fix change high failure non-Windows VM migration priority to 1000 failed!!!" -Level 4 -Checkmark 4}
         }
-        Write-Host "Recommendation: Some non-Windows VMs such as $($nonWindowsGroups.Name -join ',') may need to have their priority set to 1000 (Low) to avoid migration issues. This will have those VMs Quick Migrate instead"        
+        Write-Host "Recommendation: Some non-Windows VMs such as $($nonWindowsGroups.Name -join ',') may need to have their priority set to 1000 (Low) to avoid migration issues. This will have those VMs use Quick Migrate instead"        
     }
     $AzureLocalServices = @(
         "himds", 
