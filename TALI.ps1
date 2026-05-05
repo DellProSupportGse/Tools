@@ -472,7 +472,7 @@ param(
         $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
             param($startTime, $eventIds)
 
-            Get-WinEvent -FilterHashtable @{
+            Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
                 LogName   = 'Microsoft-Windows-FailoverClustering/Operational'
                 Id        = $eventIds
                 StartTime = $startTime
