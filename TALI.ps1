@@ -284,8 +284,7 @@ param(
         try {
             $pool = if ($StoragePoolName) {
                 Get-StoragePool -FriendlyName $StoragePoolName -ErrorAction SilentlyContinue
-            }
-            else {
+            } else {
                 Get-StoragePool | Where-Object IsPrimordial -eq $false | Select-Object -First 1
             }
 
@@ -299,7 +298,7 @@ param(
                     $threshold = $pool.ThinProvisioningAlertThreshold
                 }
 
-                $vDisks = Get-VirtualDisk -StoragePoolFriendlyName $poolName
+                $vDisks = $pool | Get-VirtualDisk
 
                 $currentFootprint = ($vDisks | Measure-Object FootprintOnPool -Sum).Sum
 
@@ -321,8 +320,8 @@ param(
                 $usableCapacity = $pool.Size - $pool.Reserved
 
                 if ($usableCapacity -gt 0) {
-                    $currentPercent = ($currentFootprint / $usableCapacity) * 100
-                    $maxPercent     = ($maxFootprint / $usableCapacity) * 100
+                    $currentPercent = [int](($currentFootprint / $usableCapacity) * 100)
+                    $maxPercent     = [int](($maxFootprint / $usableCapacity) * 100)
                 }
                 else {
                     $currentPercent = 101	
@@ -331,12 +330,12 @@ param(
 
                 if ($currentPercent -gt $threshold) {
                     Write-ToHost (
-                        "CURRENT thin provisioning exceeds threshold: $currentPercent% (Threshold: $threshold%)"
+                        "CURRENT thin provisioning usage exceeds threshold: $currentPercent% (Threshold: $threshold%)"
                     ) -Level 3 -Checkmark 3
                 } 
                 if ($maxPercent -gt $threshold) {
                      Write-ToHost (
-                         "WARNING: MAX thin provisioning exceeds threshold: $maxPercent% (Threshold: $threshold%)"
+                         "WARNING: MAX thin provisioning usage exceeds threshold: $maxPercent% (Threshold: $threshold%)"
                      ) -Level 2 -Checkmark 2
                 }
 
