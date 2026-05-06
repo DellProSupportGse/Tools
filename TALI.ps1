@@ -732,6 +732,7 @@ param(
             return
         }
         If ((Get-SolutionUpdate).State -eq "InstallationFailed") {
+            Write-Host "Getting CAU report after failled SU/SBE installation"
             # 1. Get all CAU XML reports and find the latest one
             $AllReports = Invoke-Command -Computername $nodes {
                  Get-ChildItem -Path "$ReportPath\CauReport*.xml"
