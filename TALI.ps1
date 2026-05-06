@@ -733,20 +733,12 @@ param(
         }
         If ((Get-SolutionUpdate).State -eq "InstallationFailed") {
             Write-Host "Getting CAU report after failled SU/SBE installation"
-            # 1. Get all CAU XML reports and find the latest one
-            $AllReports = Invoke-Command -Computername $nodes {
-                 Get-ChildItem -Path "$ReportPath\CauReport*.xml"
-            }
-            $AllReports | Sort Name -Unique | Sort-Object LastWriteTime -Descending
+            $AllReports = Invoke-Command -Computername $nodes {Get-ChildItem -Path "$ReportPath\CauReport*.xml"}
+            $AllReports | Sort-Object LastWriteTime -Descending | Sort Name -Unique
             $LatestFile = $AllReports[0]
             $TimeCutoff = $LatestFile.LastWriteTime.AddHours(-24)
-
-            # 2. Filter for files between Latest and Latest-24hrs
             $TargetFiles = $AllReports | Where-Object { $_.LastWriteTime -ge $TimeCutoff }
-
-            Write-Host "Auditing reports from: $($TimeCutoff.ToString()) to $($LatestFile.LastWriteTime.ToString())" -ForegroundColor Cyan
-            Write-Host "Files to scan: $($TargetFiles.Count)"
-
+            Write-Host "Auditing reports from: $($TimeCutoff.ToString()) to $($LatestFile.LastWriteTime.ToString())"
             $ErrorReport = foreach ($File in $TargetFiles) {
                 try {
                     [xml]$xml = Get-Content -Path $File.FullName -ErrorAction Stop
