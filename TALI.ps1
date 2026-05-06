@@ -742,10 +742,8 @@ param(
             $ErrorReport = foreach ($File in $TargetFiles) {
                 try {
                     [xml]$xml = Get-Content -Path $File.FullName -ErrorAction Stop
-            
                     # Navigate to the individual node status entries
                     $NodeEntries = $xml.RunReport.ClusterNodeStatus.NodeStatus
-
                     foreach ($Node in $NodeEntries) {
                         # Only grab entries with actual error records or non-success status
                         # Status 3 = Succeeded, so we look for anything else
