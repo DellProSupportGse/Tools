@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.35"
+    $ver="0.36"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -661,7 +661,6 @@ param(
         [CmdletBinding()]
         param()
 
-        $nodes = Get-ClusterNode
         $allResults = @()
         Write-Host "Checking disk endurance and media failures"
 
@@ -682,7 +681,7 @@ param(
                     # --- ACTION LOGIC ---
 
                     # 1. SMART failure indicators → Reseat
-                    if ($mediaErrors -gt 0 -or $predictFail -eq $true) {
+                    if ($mediaErrors -gt 10 -or $predictFail -eq $true) {
                         [PSCustomObject]@{
                             Node     = $env:COMPUTERNAME
                             Action   = "Reseat"
@@ -722,6 +721,66 @@ param(
 
         return $allResults
     }
+    function Test-CauErrorAudit {
+        [CmdletBinding()]
+        param(
+            [string]$ReportPath = "C:\Windows\Cluster\Reports"
+        )
+
+        if (-not (Test-Path $ReportPath)) {
+            Write-Error "CAU Report directory not found at $ReportPath"
+            return
+        }
+        If ((Get-SolutionUpdate).State -eq "InstallationFailed") {
+            # 1. Get all CAU XML reports and find the latest one
+            $AllReports = Invoke-Command -Computername $nodes {
+                 Get-ChildItem -Path "$ReportPath\CauReport*.xml"
+            }
+            $AllReports | Sort Name -Unique | Sort-Object LastWriteTime -Descending
+            $LatestFile = $AllReports[0]
+            $TimeCutoff = $LatestFile.LastWriteTime.AddHours(-24)
+
+            # 2. Filter for files between Latest and Latest-24hrs
+            $TargetFiles = $AllReports | Where-Object { $_.LastWriteTime -ge $TimeCutoff }
+
+            Write-Host "Auditing reports from: $($TimeCutoff.ToString()) to $($LatestFile.LastWriteTime.ToString())" -ForegroundColor Cyan
+            Write-Host "Files to scan: $($TargetFiles.Count)"
+
+            $ErrorReport = foreach ($File in $TargetFiles) {
+                try {
+                    [xml]$xml = Get-Content -Path $File.FullName -ErrorAction Stop
+            
+                    # Navigate to the individual node status entries
+                    $NodeEntries = $xml.RunReport.ClusterNodeStatus.NodeStatus
+
+                    foreach ($Node in $NodeEntries) {
+                        # Only grab entries with actual error records or non-success status
+                        # Status 3 = Succeeded, so we look for anything else
+                        if ($null -ne $Node.ErrorRecord -and $Node.ErrorRecord -ne "") {
+                            [PSCustomObject]@{
+                                ReportFile = $File.Name
+                                FileDate   = $File.LastWriteTime
+                                Node       = $Node.NodeName
+                                Phase      = $Node.CurrentUpdatePhase
+                                Error      = $Node.ErrorRecord
+                            }
+                        }
+                    }
+                }
+                catch {
+                    Write-Warning "Could not parse $($File.Name): $($_.Exception.Message)"
+                }
+            }
+            $ErrorReport=$ErrorReport | Sort-Object FileDate -Descending
+            if ($null -eq $ErrorReport) {
+                Write-ToHost "No errors found in the last 24 hours of reports."
+                return $false
+            } else {
+               Write-ToHost (($ErrorReport | Sort-Object FileDate -Descending | fl *) -join '`r`n') -Level 3 -Checkmark 3
+               return $true
+            }
+        }
+}
 
     #endregion Test Scripts
 
@@ -1081,6 +1140,10 @@ v$ver
         Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
     }
     Write-Host ""
+    Write-Host "Waiting for Get Solution Update command to time out"
+    While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
+    Write-Host "."
+
     Stop-Transcript -ErrorAction SilentlyContinue
 }
 
