@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.36"
+    $ver="0.37"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -473,30 +473,31 @@ param(
             param($startTime, $eventIds)
 
             Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
-                LogName   = 'Microsoft-Windows-FailoverClustering/Operational'
+                LogName   = 'System'
                 Id        = $eventIds
                 StartTime = $startTime
-            } | Select-Object TimeCreated, Id, Message, MachineName
+            } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
 
         } -ArgumentList $startTime, $eventIds
 
         if (-not $events) {
-            Write-ToHost "No migration or failback failures detected in last 7 days" -Level 1 -Checkmark 1
+            Write-ToHost "No migration or failback failures detected in last 7 days"
             return
         }
 
         # Extract VM names
         $vmFailures = foreach ($event in $events) {
-            if ($event.Message -match "Virtual Machine\s+'([^']+)'") {
+            $match=[regex]::Match($event.message,"'Virtual Machine\s(.*?)'")
+            if ($match.Success) {
                 [PSCustomObject]@{
-                    VMName = $matches[1]
+                    VMName = $match.groups[1].value
                     Node   = $event.MachineName
                 }
             }
         }
 
         if (-not $vmFailures) {
-            Write-ToHost "No VM-specific failures identified in event logs" -Level 1 -Checkmark 1
+            Write-ToHost "No VM-specific failures identified in event logs"
             return
         }
 
