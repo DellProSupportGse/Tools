@@ -1132,9 +1132,9 @@ v$ver
         Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
     }
     Write-Host ""
-    Write-Host "Waiting for Get Solution Update command to time out"
-    While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
-    Write-Host "."
+    #Write-Host "Waiting for Get Solution Update command to time out"
+    #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
+    #Write-Host "."
 
     Stop-Transcript -ErrorAction SilentlyContinue
 }
