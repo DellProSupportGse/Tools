@@ -388,7 +388,7 @@ param(
         $clusterNodes = (Get-ClusterNode).Name
 
         # VM memory demand (cluster-wide)
-        $vmTotal = (Get-VM -ComputerName $clusterNodes |
+        $vmTotal = (Get-VM -ComputerName $clusterNodes | ? State -eq Running |
             Measure-Object MemoryAssigned -Sum).Sum
 
         # Node memory capacities
@@ -426,7 +426,7 @@ param(
         $clusterNodes = (Get-ClusterNode).Name
 
         # Total VM vCPU demand (cluster-wide)
-        $vmVcpus = (Get-VM -ComputerName $clusterNodes |
+        $vmVcpus = (Get-VM -ComputerName $clusterNodes | ? State -eq Running |
             Measure-Object ProcessorCount -Sum).Sum
 
         # Logical processors per node
@@ -734,21 +734,22 @@ param(
         }
         If ((Get-SolutionUpdate).State -eq "InstallationFailed") {
             Write-Host "Getting CAU report after failled SU/SBE installation"
-            $AllReports = Invoke-Command -Computername $nodes {Get-ChildItem -Path "$ReportPath\CauReport*.xml"}
-            $AllReports | Sort-Object LastWriteTime -Descending | Sort Name -Unique
+            $AllReports = Invoke-Command -Computername $nodes {Get-ChildItem -Path "$using:ReportPath" -Filter "CauReport*.xml"}
+            #$AllReports | Sort-Object LastWriteTime -Descending | Sort Name -Unique
+            $AllReports = $AllReports | Group-Object -Property Name | %{$_.Group | sort LastWriteTime,PSComputerName -Descending | Select -First 1} | Sort LastWriteTime -Descending
             $LatestFile = $AllReports[0]
             $TimeCutoff = $LatestFile.LastWriteTime.AddHours(-24)
             $TargetFiles = $AllReports | Where-Object { $_.LastWriteTime -ge $TimeCutoff }
             Write-Host "Auditing reports from: $($TimeCutoff.ToString()) to $($LatestFile.LastWriteTime.ToString())"
             $ErrorReport = foreach ($File in $TargetFiles) {
                 try {
-                    [xml]$xml = Get-Content -Path $File.FullName -ErrorAction Stop
+                    [xml]$xml = Invoke-Command -ComputerName $File.PSComputerName {Get-Content -Path $using:File.FullName -ErrorAction Stop}
                     # Navigate to the individual node status entries
-                    $NodeEntries = $xml.RunReport.ClusterNodeStatus.NodeStatus
+                    $NodeEntries = $xml.CauReport.ClusterResult.NodeResults.list.noderesult
                     foreach ($Node in $NodeEntries) {
                         # Only grab entries with actual error records or non-success status
                         # Status 3 = Succeeded, so we look for anything else
-                        if ($null -ne $Node.ErrorRecord -and $Node.ErrorRecord -ne "") {
+                        if ($null -ne $Node.Errorrecorddata.nil) {
                             [PSCustomObject]@{
                                 ReportFile = $File.Name
                                 FileDate   = $File.LastWriteTime
