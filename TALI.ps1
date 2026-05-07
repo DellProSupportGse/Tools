@@ -168,7 +168,7 @@ param(
         }
         $nonCompliant = @()
         if ($CSTIM -lt 1440) {
-            $nonCompliant+=$nodeResources | ? {$_.mem -ge 1tb} 
+            $nonCompliant+=$nodeResources | ? {$_.Memory -ge 1tb} 
         }
         If ($nonCompliant) {
             Write-ToHost "Cluster shutdown time in minutes is less than 1440 with nodes having at least 1TB of memory" -Checkmark 3 -Level 3
