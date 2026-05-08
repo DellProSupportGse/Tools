@@ -4,9 +4,10 @@ param(
     [switch]$FixErrors,
     [switch]$FixWarningsAlso,
     [switch]$ErrorOnlyCheck,
-    [switch]$ApproveAllFixesAutomatically
+    [switch]$ApproveAllFixesAutomatically,
+    [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.38"
+    $ver="0.4"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -15,7 +16,18 @@ param(
     # Check if script running in a remote Powershell session
     if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This script is not supported using a remote powershell session. Please run locally";Break}
     # Check if script is running on a cluster node
-    If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null -or !(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue)) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a Dell Azure Local cluster node.";Break}
+    If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a cluster node.";Break}
+    #Get-ClusterStorageSpacesDirect
+    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue -and $IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node"}
+    if (!((Get-ClusterStorageSpacesDirect).State -eq 'Enabled')) {
+        Write-Host "Script must be run locally on an S2d cluster node" -ForegroundColor DarkYellow
+        break
+    }
+    if ($IgnoreAzureLocalRequired) {
+        Write-Host "Running on a non-Azure Local cluster. Fix scripts will be disabled" -ForegroundColor Yellow
+        $FixErrors=$false
+        $FixWarningsAlso=$false
+    }
     Function Write-ToHost {
     param(
         [string]$Message,
@@ -302,8 +314,8 @@ param(
             if ($pool) {
                 $poolName = $pool.FriendlyName
 
-                if ($pool.ThinProvisioningAlertThreshold) {
-                    $threshold = $pool.ThinProvisioningAlertThreshold
+                if ($pool.ThinProvisioningAlertThresholds) {
+                    $threshold = $pool.ThinProvisioningAlertThresholds
                 }
 
                 $vDisks = $pool | Get-VirtualDisk
@@ -1144,7 +1156,6 @@ v$ver
         Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
     }
     Write-Host ""
-    Test-GetHealthFault
     If (Test-GetHealthFault) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
