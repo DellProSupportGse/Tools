@@ -6,7 +6,7 @@ param(
     [switch]$ErrorOnlyCheck,
     [switch]$ApproveAllFixesAutomatically
 )
-    $ver="0.37"
+    $ver="0.38"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -630,7 +630,7 @@ param(
                         $_.AvgLatencyPopulation = Format-Latency $u
                         $_.Deviation = Format-StandardDeviation $Deviation
                         $_.RawDeviation = $Deviation
-                        # If distribution is Normal, expect >99% within 3 devations
+                        # If distribution is Normal, expect >99% within 3 deviations
                         If ($Deviation -Gt 3) {
                             $FoundOutlier = $True
                             [PSCustomerObject] @{
@@ -648,7 +648,7 @@ param(
             $TotalProblemDrives = $TotalProblemDrives | Sort PSComputerName
             if ($TotalProblemDrives) {
                 Foreach ($disk in $TotalProblemDrives) {
-                    Write-ToHost "Node $($disk.PSComputerName) with SN $($disk.SerialNumber) with Deviation of $($disk.Deviation) may need to be reseated" -Level 2 -Checkmark 2
+                    Write-ToHost "Node $($disk.PSComputerName) with SN $($disk.SerialNumber) with deviation of $($disk.Deviation) may need to be reseated" -Level 2 -Checkmark 2
                 }
                 return $true
             } else {
@@ -727,7 +727,7 @@ param(
         param(
             [string]$ReportPath = "C:\Windows\Cluster\Reports"
         )
-
+        Write-Host "Testing recent failures in CAU reports over the last 24 hours since last update attempt..."
         if (-not (Test-Path $ReportPath)) {
             Write-Error "CAU Report directory not found at $ReportPath"
             return
@@ -766,7 +766,7 @@ param(
             }
             $ErrorReport=$ErrorReport | Sort-Object FileDate -Descending
             if ($null -eq $ErrorReport) {
-                Write-ToHost "No errors found in the last 24 hours of reports."
+                Write-ToHost "No errors found in the last 24 hours of reports since last update attempt."
                 return $false
             } else {
                Write-ToHost (($ErrorReport | Sort-Object FileDate -Descending | fl *) -join '`r`n') -Level 3 -Checkmark 3
@@ -774,6 +774,17 @@ param(
             }
         }
 }
+    function Test-GetHealthFault {
+        try {
+            Write-Host "Testing that Get-HealthFault command works"
+            Get-HealthFault 2>$null
+            Write-ToHost "Get-HealthFault command succeeded"
+            return $false
+        } catch {
+            Write-ToHost "Get-HealthFault command failed" -Level 3 -Checkmark 3
+            return $true
+        }
+    }
 
     #endregion Test Scripts
 
@@ -1133,6 +1144,19 @@ v$ver
         Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
     }
     Write-Host ""
+    Test-GetHealthFault
+    If (Test-GetHealthFault) {
+        if ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
+            Invoke-Command -ComputerName $nodes -ScriptBlock {
+                Restart-Service Winmgmt -Force
+            }
+            Sleep 5
+            If (Test-GetHealthFault) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4}
+        } else {
+            Write-Host "Recommendation: Restart Winmgmt service on ALL nodes"
+        }
+    }
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
     #Write-Host "."
