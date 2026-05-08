@@ -1120,7 +1120,7 @@ v$ver
     $failed=Test-AzLocalThinProvisioningUtilization
     if ($failed.CurrentPercent -lt 99) {$failed.CurrentPercent=$failed.CurrentPercent+1}
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
-    If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
+    If ([int]($failed.CurrentPercent) -gt [int]($failed.Threshold) -or [int]($failed.MaxPercent) -gt [int]($failed.Threshold)) {
         if ($FixErrors -or $FixWarningsAlso) {
             If ($FixErrors -and $failed.CurrentPercent -lt 100) {
                 Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
