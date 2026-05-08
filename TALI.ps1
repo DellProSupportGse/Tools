@@ -245,6 +245,7 @@ param(
             $physicalDisks = $pool | Get-PhysicalDisk
             $vDisks        = $pool | Get-VirtualDisk
             $nodeCount     = (Get-ClusterNode).Count
+            if ($nodeCount -gt 4) {$nodeCount = 4}
 
             # Core metrics
             $largestDisk     = ($physicalDisks | Measure-Object Size -Maximum).Maximum
