@@ -20,7 +20,7 @@ param(
     #Get-ClusterStorageSpacesDirect
     if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue -and $IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node"}
     if (!((Get-ClusterStorageSpacesDirect).State -eq 'Enabled')) {
-        Write-Host "Script must be run locally on an S2d cluster node"
+        Write-Host "Script must be run locally on an S2d cluster node" -ForegroundColor DarkYellow
         break
     }
     if ($IgnoreAzureLocalRequired) {
