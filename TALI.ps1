@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.39"
+    $ver="0.4"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -314,8 +314,8 @@ param(
             if ($pool) {
                 $poolName = $pool.FriendlyName
 
-                if ($pool.ThinProvisioningAlertThreshold) {
-                    $threshold = $pool.ThinProvisioningAlertThreshold
+                if ($pool.ThinProvisioningAlertThresholds) {
+                    $threshold = $pool.ThinProvisioningAlertThresholds
                 }
 
                 $vDisks = $pool | Get-VirtualDisk
@@ -1156,7 +1156,6 @@ v$ver
         Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
     }
     Write-Host ""
-    Test-GetHealthFault
     If (Test-GetHealthFault) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
