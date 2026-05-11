@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.41"
+    $ver="0.42"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -798,6 +798,41 @@ param(
             return $true
         }
     }
+    function Test-MismatchedPSModules {
+    #Get-WinEvent -LogName AzStackHciEnvironmentChecker
+        $startTime = (Get-Date).AddHours(-24)
+        $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
+            param($startTime)
+            Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
+                LogName   = 'AzStackHciEnvironmentChecker'
+                Id        = '17203'
+                StartTime = $startTime
+            } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
+        } -ArgumentList $startTime
+        $badModules=@()
+        Foreach ($event in $events) {
+            if ($event.Message -like "Checking version of PS module*") {
+                if ($event.Message -match "'([^']+)'.*?'([^']+)'.*?'([^']+)'.*?'([^']+)'") {
+                    if (((Get-InstalledModule -Name $matches[1] -AllVersions).Version -gt [version]$matches[4]).count -gt 0) {
+                        $badModules += [PSCustomObject]@{
+                            ModuleName      = $matches[1]
+                            NodeName        = $matches[2]
+                            InstalledVersion = [version]$matches[3]
+                            RequiredVersion  = [version]$matches[4]
+                        }
+                    }
+                }
+            }
+        }
+        if ($badModules) {
+            $badModules | ft
+            Write-ToHost "Mismatched PS modules found" -Level 3 -Checkmark 3
+        } else {
+            Write-ToHost "No mismatched PS modules found"
+        }
+        return $badModules
+    }
+
 
     #endregion Test Scripts
 
@@ -1168,6 +1203,11 @@ v$ver
         } else {
             Write-Host "Recommendation: Restart Winmgmt service on ALL nodes"
         }
+    }
+    Write-Host ""
+    $badModules=Test-MismatchedPSModules
+    If ($badModules) {
+        Write-Host "Recommendation: Install proper PS modules for solution version"
     }
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
