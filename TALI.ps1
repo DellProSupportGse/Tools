@@ -316,7 +316,7 @@ param(
                 $poolName = $pool.FriendlyName
 
                 if ($pool.ThinProvisioningAlertThresholds) {
-                    $threshold = $pool.ThinProvisioningAlertThresholds
+                    $threshold = $pool.ThinProvisioningAlertThresholds[0]
                 }
 
                 $vDisks = $pool | Get-VirtualDisk
