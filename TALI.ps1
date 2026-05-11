@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.4"
+    $ver="0.41"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -48,7 +48,7 @@ param(
         While ($dtime -lt 12 -and $SUJob.State -eq "Running") {Write-Host "." -NoNewline;$dtime++;$testSU+=Receive-Job -Name "SUJob";sleep 5}
     	Write-Host "."
 	    $testSU+=Receive-Job -Name "SUJob"
-        If ($dtime -lt 12 -and $testSU.resourceid -gt "") {
+        If ($dtime -lt 12 -and ($testSU.resourceid -gt "" -or ($testSU -le "" -and $SUJob.State -eq "Completed"))) {
             Write-ToHost "Get Solution Update command successful" -Checkmark 1 -Level 1
             return $false
         } else {
