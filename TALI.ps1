@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.42"
+    $ver="0.43"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -1207,7 +1207,20 @@ v$ver
     Write-Host ""
     $badModules=Test-MismatchedPSModules
     If ($badModules) {
-        Write-Host "Recommendation: Install proper PS modules for solution version"
+        if ($FixError -or $FixWarningsAlso) {
+            Foreach ($badModule in $badModules) {
+                Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
+                      Get-InstalledModule -Name $badModule.ModuleName -AllVersions | Where-Object { $_.Version -ne $badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $badModule.ModuleName -RequiredVersion $_.Version -Force }
+                }
+
+                if (-not ((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version -match $badModule.RequiredVersion)) {
+                      Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force
+                }
+            }
+            if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
+        } else {
+            Write-Host "Recommendation: Install proper PS modules for solution version"
+        }
     }
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
