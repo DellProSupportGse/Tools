@@ -1218,8 +1218,9 @@ v$ver
                 }
             }
             if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
-        } else {
-            Write-Host "Recommendation: Install proper PS modules for solution version"
+            } else {
+                Write-Host "Recommendation: Install proper PS modules for solution version"
+            }
         }
     }
     #Write-Host "Waiting for Get Solution Update command to time out"
