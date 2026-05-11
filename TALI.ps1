@@ -799,7 +799,7 @@ param(
         }
     }
     function Test-MismatchedPSModules {
-    #Get-WinEvent -LogName AzStackHciEnvironmentChecker
+        Write-Host "Testing for mismatched PS module errors"
         $startTime = (Get-Date).AddHours(-24)
         $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
             param($startTime)
@@ -827,7 +827,7 @@ param(
         $badModules=$badModules | Group-Object -Property NodeName,ModuleName | %{$_.Group | sort ModuleName | Select -First 1} | sort ModuleName -Descending
         if ($badModules.count) {
             Foreach ($badModule in $badModules) {
-                Write-Host "Module $($badModule.ModuleName) needs to be version $($badModule.RequiredVersion) but has version $($badModule.InstalledVersion) installed"
+                Write-Host "On Node $($badModule.NodeName), module $($badModule.ModuleName) needs to be version $($badModule.RequiredVersion) but has version $($badModule.InstalledVersion) installed"
             }
             Write-ToHost "Mismatched PS modules found" -Level 3 -Checkmark 3
         } else {
@@ -1195,21 +1195,21 @@ v$ver
         Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
     }
     Write-Host ""
-    If (Test-GetHealthFault -eq $true) {
+    If ((Test-GetHealthFault) -eq $true) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
             Invoke-Command -ComputerName $nodes -ScriptBlock {
                 Restart-Service Winmgmt -Force
             }
             Sleep 5
-            If (Test-GetHealthFault -eq $true) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4}
+            If ((Test-GetHealthFault) -eq $true) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4}
         } else {
             Write-Host "Recommendation: Restart Winmgmt service on ALL nodes"
         }
     }
     Write-Host ""
     $badModules=Test-MismatchedPSModules
-    If ($badModules) {
+    If ($badModules.count) {
         if ($FixError -or $FixWarningsAlso) {
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
