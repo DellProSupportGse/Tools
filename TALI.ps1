@@ -1160,15 +1160,20 @@ v$ver
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
     If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
         if ($FixErrors -or $FixWarningsAlso) {
+            $changed=$false
             If ($FixErrors -and $failed.CurrentPercent -lt 100 -and $failed.CurrentPercent -gt $failed.Threshold) {
                 Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
                 Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
+                $changed=$true
             }
             If ($FixWarningsAlso -and !($FixErrors) -and $failed.MaxPercent -lt 100) {
                 Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
                 Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
+                $changed=$true
             }
-            If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4}
+            if ($changed) {
+                If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4}
+            }
         } else {
             If ($failed.CurrentPercent -gt $failed.Threshold) {
                 Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)"
