@@ -1,8 +1,20 @@
+<#
+    .Synopsis
+       GetHyperVBottlenecks.ps1
+    .DESCRIPTION
+       Detects bottlenecks in a Hyper-V environment
+    .EXAMPLES
+       Invoke-GetHyperVBottlenecks
+    .Author
+       Jim Gandy
+#>
 function Invoke-GetHyperVBottlenecks {
 
-param(
-    [string]$ClusterName = $env:COMPUTERNAME
-)
+    param(
+        [string]$ClusterName = $env:COMPUTERNAME
+    )
+
+$ver="1.1"
 
 $RequestedCounters = @(
     '\Hyper-V Hypervisor Logical Processor(_Total)\% Total Run Time'
