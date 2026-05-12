@@ -14,7 +14,17 @@ function Invoke-GetHyperVBottlenecks {
         [string]$ClusterName = $env:COMPUTERNAME
     )
 
-$ver="1.1"
+$ver="1.2"
+$text = @"
+v$Ver
+   ___     _     _  _                      __   __  ___      _   _   _                 _       
+  / __|___| |_  | || |_  _ _ __  ___ _ _   \ \ / / | _ ) ___| |_| |_| |___ _ _  ___ __| |__ ___
+ | (_ / -_)  _| | __ | || | '_ \/ -_) '_| __\ V /  | _ \/ _ \  _|  _| / -_) ' \/ -_) _| / /(_-<
+  \___\___|\__| |_||_|\_, | .__/\___|_|      \_/   |___/\___/\__|\__|_\___|_||_\___\__|_\_\/__/
+                      |__/|_|                                                                  
+                                                                By: Jim Gandy
+    Simple Hyper-V Perf Bottleneck Detector
+"@
 
 $RequestedCounters = @(
     '\Hyper-V Hypervisor Logical Processor(_Total)\% Total Run Time'
