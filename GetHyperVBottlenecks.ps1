@@ -1,4 +1,4 @@
-function Invoke-HyperVBottlenecks {
+function Invoke-GetHyperVBottlenecks {
 
 param(
     [string]$ClusterName = $env:COMPUTERNAME
