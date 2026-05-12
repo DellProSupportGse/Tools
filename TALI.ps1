@@ -1218,10 +1218,15 @@ v$ver
         if ($FixErrors -or $FixWarningsAlso) {
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
-                      Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { $_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
                     if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version -match $using:badModule.RequiredVersion)) {
                           Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose -WhatIf
                     }
+                    Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
+                }
+            }
+            Foreach ($badModule in $badModules) {
+                Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
+                    Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
                 }
             }
             if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
