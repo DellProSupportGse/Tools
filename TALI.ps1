@@ -1158,7 +1158,7 @@ v$ver
     $failed=Test-AzLocalThinProvisioningUtilization
     if ($failed.CurrentPercent -lt 99) {$failed.CurrentPercent=$failed.CurrentPercent+1}
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
-    If ([int]($failed.CurrentPercent) -gt [int]($failed.Threshold) -or [int]($failed.MaxPercent) -gt [int]($failed.Threshold)) {
+    If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
         if ($FixErrors -or $FixWarningsAlso) {
             If ($FixErrors -and $failed.CurrentPercent -lt 100 -and $failed.CurrentPercent -gt $failed.Threshold) {
                 Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
@@ -1213,11 +1213,10 @@ v$ver
         if ($FixErrors -or $FixWarningsAlso) {
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
-                      Get-InstalledModule -Name $badModule.ModuleName -AllVersions | Where-Object { $_.Version -ne $badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
-                }
-
-                if (-not ((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version -match $badModule.RequiredVersion)) {
-                      Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose -WhatIf
+                      Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { $_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
+                    if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version -match $using:badModule.RequiredVersion)) {
+                          Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose -WhatIf
+                    }
                 }
             }
             if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
