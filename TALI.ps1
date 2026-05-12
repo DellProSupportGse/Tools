@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.43"
+    $ver="0.44"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -1160,7 +1160,7 @@ v$ver
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
     If ([int]($failed.CurrentPercent) -gt [int]($failed.Threshold) -or [int]($failed.MaxPercent) -gt [int]($failed.Threshold)) {
         if ($FixErrors -or $FixWarningsAlso) {
-            If ($FixErrors -and $failed.CurrentPercent -lt 100) {
+            If ($FixErrors -and $failed.CurrentPercent -lt 100 -and $failed.CurrentPercent -gt $failed.Threshold) {
                 Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
                 Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
             }
@@ -1210,7 +1210,7 @@ v$ver
     Write-Host ""
     $badModules=Test-MismatchedPSModules
     If ($badModules.count) {
-        if ($FixError -or $FixWarningsAlso) {
+        if ($FixErrors -or $FixWarningsAlso) {
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
                       Get-InstalledModule -Name $badModule.ModuleName -AllVersions | Where-Object { $_.Version -ne $badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
