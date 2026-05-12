@@ -14,7 +14,7 @@ function Invoke-GetHyperVBottlenecks {
         [string]$ClusterName = $env:COMPUTERNAME
     )
 
-$ver="1.2"
+$ver="1.3"
 $text = @"
 v$Ver
    ___     _     _  _                      __   __  ___      _   _   _                 _       
@@ -25,6 +25,8 @@ v$Ver
                                                                 By: Jim Gandy
     Simple Hyper-V Perf Bottleneck Detector
 "@
+cls
+$Text
 
 $RequestedCounters = @(
     '\Hyper-V Hypervisor Logical Processor(_Total)\% Total Run Time'
