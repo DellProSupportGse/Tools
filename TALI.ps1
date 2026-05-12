@@ -1159,9 +1159,9 @@ v$ver
     if ($failed.CurrentPercent -lt 99) {$failed.CurrentPercent=$failed.CurrentPercent+1}
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
     If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
-        if ($FixErrors -or $FixWarningsAlso) {
+        if ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
             $changed=$false
-            If ($FixErrors -and $failed.CurrentPercent -lt 100 -and $failed.CurrentPercent -gt $failed.Threshold) {
+            If ($FixErrors -and $failed.CurrentPercent -lt 100) {
                 Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
                 Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
                 $changed=$true
