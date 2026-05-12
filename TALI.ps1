@@ -1221,7 +1221,6 @@ v$ver
                     if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version -match $using:badModule.RequiredVersion)) {
                           Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose -WhatIf
                     }
-                    Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
                 }
             }
             Foreach ($badModule in $badModules) {
