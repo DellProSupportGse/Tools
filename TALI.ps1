@@ -1213,11 +1213,11 @@ v$ver
         if ($FixError -or $FixWarningsAlso) {
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
-                      Get-InstalledModule -Name $badModule.ModuleName -AllVersions | Where-Object { $_.Version -ne $badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $badModule.ModuleName -RequiredVersion $_.Version -Force }
+                      Get-InstalledModule -Name $badModule.ModuleName -AllVersions | Where-Object { $_.Version -ne $badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
                 }
 
                 if (-not ((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version -match $badModule.RequiredVersion)) {
-                      Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force
+                      Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose -WhatIf
                 }
             }
             if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
