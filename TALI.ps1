@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.41"
+    $ver="0.44"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -798,6 +798,44 @@ param(
             return $true
         }
     }
+    function Test-MismatchedPSModules {
+        Write-Host "Testing for mismatched PS module errors"
+        $startTime = (Get-Date).AddHours(-24)
+        $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
+            param($startTime)
+            Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
+                LogName   = 'AzStackHciEnvironmentChecker'
+                Id        = '17203'
+                StartTime = $startTime
+            } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
+        } -ArgumentList $startTime
+        $badModules=@()
+        Foreach ($event in $events) {
+            if ($event.Message -like "Checking version of PS module*") {
+                if ($event.Message -match "'([^']+)'.*?'([^']+)'.*?'([^']+)'.*?'([^']+)'") {
+                    if (((Get-InstalledModule -Name $matches[1] -AllVersions).Version -gt [version]$matches[4]).count -gt 0) {
+                        $badModules += [PSCustomObject]@{
+                            ModuleName      = $matches[1]
+                            NodeName        = $matches[2]
+                            InstalledVersion = [version]$matches[3]
+                            RequiredVersion  = [version]$matches[4]
+                        }
+                    }
+                }
+            }
+        }
+        $badModules=$badModules | Group-Object -Property NodeName,ModuleName | %{$_.Group | sort ModuleName | Select -First 1} | sort ModuleName -Descending
+        if ($badModules.count) {
+            Foreach ($badModule in $badModules) {
+                Write-Host "On Node $($badModule.NodeName), module $($badModule.ModuleName) needs to be version $($badModule.RequiredVersion) but has version $($badModule.InstalledVersion) installed"
+            }
+            Write-ToHost "Mismatched PS modules found" -Level 3 -Checkmark 3
+        } else {
+            Write-ToHost "No mismatched PS modules found"
+        }
+        return $badModules
+    }
+
 
     #endregion Test Scripts
 
@@ -1120,17 +1158,22 @@ v$ver
     $failed=Test-AzLocalThinProvisioningUtilization
     if ($failed.CurrentPercent -lt 99) {$failed.CurrentPercent=$failed.CurrentPercent+1}
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
-    If ([int]($failed.CurrentPercent) -gt [int]($failed.Threshold) -or [int]($failed.MaxPercent) -gt [int]($failed.Threshold)) {
-        if ($FixErrors -or $FixWarningsAlso) {
+    If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
+        if ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
+            $changed=$false
             If ($FixErrors -and $failed.CurrentPercent -lt 100) {
                 Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
                 Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
+                $changed=$true
             }
             If ($FixWarningsAlso -and !($FixErrors) -and $failed.MaxPercent -lt 100) {
                 Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
                 Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
+                $changed=$true
             }
-            If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4}
+            if ($changed) {
+                If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4}
+            }
         } else {
             If ($failed.CurrentPercent -gt $failed.Threshold) {
                 Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)"
@@ -1157,16 +1200,38 @@ v$ver
         Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
     }
     Write-Host ""
-    If (Test-GetHealthFault) {
+    If ((Test-GetHealthFault) -eq $true) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
             Invoke-Command -ComputerName $nodes -ScriptBlock {
                 Restart-Service Winmgmt -Force
             }
             Sleep 5
-            If (Test-GetHealthFault) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4}
+            If ((Test-GetHealthFault) -eq $true) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4}
         } else {
             Write-Host "Recommendation: Restart Winmgmt service on ALL nodes"
+        }
+    }
+    Write-Host ""
+    $badModules=Test-MismatchedPSModules
+    If ($badModules.count) {
+        if ($FixErrors -or $FixWarningsAlso) {
+            Foreach ($badModule in $badModules) {
+                Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
+                    if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version -match $using:badModule.RequiredVersion)) {
+                          Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose -WhatIf
+                    }
+                }
+            }
+            Foreach ($badModule in $badModules) {
+                Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
+                    Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
+                }
+            }
+            if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
+            } else {
+                Write-Host "Recommendation: Install proper PS modules for solution version"
+            }
         }
     }
     #Write-Host "Waiting for Get Solution Update command to time out"
