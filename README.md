@@ -134,6 +134,16 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
 ```  
    
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## GetHyperVBottlenecks
+   
+   This is a tool to detect bottlenecks in a Hyper-V environment
+     
+   How To Use: 
+      From PowerShell as admin execute the following and follow the prompts:
+```Powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetHyperVBottlenecks";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/GetHyperVBottlenecks.ps1'));Invoke-GetHyperVBottlenecks
+```
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## KeyRelay
    
    This is a GUI tool to send text to applications that do not allow pasting.
