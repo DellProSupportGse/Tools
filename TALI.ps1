@@ -1221,7 +1221,7 @@ v$ver
             if ($badModules.ModuleName -match "Az.Accounts") {
                 $azAccountsVer=($badModules | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
             } else {
-                $azAccountsVer=(Get-InstalledModule -Name Az.Accounts).Version
+                $azAccountsVer=[version]((Get-InstalledModule -Name Az.Accounts).Version)
             }
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
