@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.45"
+    $ver="0.451"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -1237,16 +1237,14 @@ v$ver
             Foreach ($badModule in $badModules) {    
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
                     $badModule=$using:badModule
-                    Start-Job -Name "InstallModules-$($badModule.ModuleName)" -ScriptBlock {
-                        $badModule=$using:badModule
-                        $badModule
-                        if (-not ((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version | %{[version]$_} -match $badModule.RequiredVersion)) {
-                              Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose
-                        }
-                    }| Out-Null
-                    Get-Job -Name "InstallModules*" | Receive-Job -Wait
+                    $badModule
+                    if (-not ((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version | %{[version]$_} -match $badModule.RequiredVersion)) {
+                            Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose
+                    }
+
                 } -AsJob -JobName "InstallModules-$($badmodule.ModuleName)" | Out-Null
             }
+            Get-Job
             Get-Job -Name "InstallModules*" | Receive-Job -Wait
             Get-Job -Name "InstallModules*" | Remove-Job
             
