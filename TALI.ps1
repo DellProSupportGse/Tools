@@ -802,13 +802,16 @@ param(
     }
     function Test-MismatchedPSModules {
         Write-Host "Testing for mismatched PS module errors"
-        $startTime = (Get-Date).AddHours(-24)
+        $HealthCheckTime=[TimeZoneInfo]::ConvertTimeFromUtc((Get-SolutionUpdateEnvironment).HealthCheckDate,[TimeZoneInfo]::Local)
+        $startTime = $HealthCheckTime.AddHours(-1)
+        $endTime = $HealthCheckTime.AddHours(1)
         $events=@()
         $events += Invoke-Command -ComputerName $nodes -ScriptBlock {
             Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
                 LogName   = 'AzStackHciEnvironmentChecker'
                 Id        = '17203'
                 StartTime = $using:startTime
+                EndTime   = $using:endTime
             } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
         }
         $badModules=@()
@@ -1218,6 +1221,13 @@ v$ver
     If ($badModules.count) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
+            Invoke-Command -ComputerName $nodes -ScriptBlock {
+                Remove-Module -Name AzStackHci.EnvironmentChecker -Force -ErrorAction SilentlyContinue
+                if ((Get-Module -ListAvailable -Name AzStackHci.EnvironmentChecker).count) {
+                    Write-Host "On Node $($env:COMPUTERNAME), uninstalling AzStackHci.EnvironmentChecker module"
+                    Uninstall-Module -Name AzStackHci.EnvironmentChecker -AllVersions -ErrorAction SilentlyContinue -Force
+                }
+            }
             if ($badModules.ModuleName -match "Az.Accounts") {
                 $azAccountsVer=($badModules | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
             } else {
