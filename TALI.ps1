@@ -1234,6 +1234,9 @@ v$ver
                     Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
                 }
             }
+            Invoke-Command -ComputerName $nodes -ScriptBlock {
+                Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose -WhatIf }
+            }
             if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
             } else {
                 Write-Host "Recommendation: Install proper PS modules for solution version"
