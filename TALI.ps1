@@ -1234,14 +1234,16 @@ v$ver
                 $azAccountsVer=[version]((Get-InstalledModule -Name Az.Accounts).Version)
             }
             
-            Foreach ($badModule in $badModules) {
-                Start-Job -Name "InstallModules-$($badmodule.ModuleName)" -ScriptBlock {
-                    Invoke-Command -ComputerName $using:badModule.NodeName -ScriptBlock {
+            Foreach ($badModule in $badModules) {    
+                Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
+                    $badModule=$using:badModule
+                    Start-Job -Name "InstallModules-$($badmodule.ModuleName)" -ScriptBlock {
                         if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version | %{[version]$_} -match $using:badModule.RequiredVersion)) {
                               Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose
                         }
-                    }
-                } | Out-Null
+                    }| Out-Null
+                    Get-Job -Name "InstallModules*" | Receive-Job -Wait
+                } -AsJob -JobName "InstallModules-$($badmodule.ModuleName)"
             }
             Get-Job -Name "InstallModules*" | Receive-Job -Wait
             Get-Job -Name "InstallModules*" | Remove-Job
