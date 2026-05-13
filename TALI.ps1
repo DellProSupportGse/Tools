@@ -740,12 +740,12 @@ param(
         param(
             [string]$ReportPath = "C:\Windows\Cluster\Reports"
         )
-        Write-Host "Testing recent failures in CAU reports over the last 24 hours since last update attempt..."
-        if (-not (Test-Path $ReportPath)) {
-            Write-Error "CAU Report directory not found at $ReportPath"
-            return
-        }
-        If ((Get-SolutionUpdate).State -eq "InstallationFailed") {
+        if ((Get-SolutionUpdate).State -match "InstallationFailed") { 
+            Write-Host "Testing recent failures in CAU reports over the last 24 hours since last update attempt..."
+            if (-not (Test-Path $ReportPath)) {
+                Write-Error "CAU Report directory not found at $ReportPath"
+                return
+            }
             Write-Host "Getting CAU report after failled SU/SBE installation"
             $AllReports = Invoke-Command -Computername $nodes {Get-ChildItem -Path "$using:ReportPath" -Filter "CauReport*.xml"}
             #$AllReports | Sort-Object LastWriteTime -Descending | Sort Name -Unique
@@ -754,7 +754,8 @@ param(
             $TimeCutoff = $LatestFile.LastWriteTime.AddHours(-24)
             $TargetFiles = $AllReports | Where-Object { $_.LastWriteTime -ge $TimeCutoff }
             Write-Host "Auditing reports from: $($TimeCutoff.ToString()) to $($LatestFile.LastWriteTime.ToString())"
-            $ErrorReport = foreach ($File in $TargetFiles) {
+            $ErrorReport=@()
+            $ErrorReport += foreach ($File in $TargetFiles) {
                 try {
                     [xml]$xml = Invoke-Command -ComputerName $File.PSComputerName {Get-Content -Path $using:File.FullName -ErrorAction Stop}
                     # Navigate to the individual node status entries
@@ -778,15 +779,16 @@ param(
                 }
             }
             $ErrorReport=$ErrorReport | Sort-Object FileDate -Descending
-            if ($null -eq $ErrorReport) {
+            if ($ErrorReport.count -eq 0) {
                 Write-ToHost "No errors found in the last 24 hours of reports since last update attempt."
-                return $false
+                return $null
             } else {
-               Write-ToHost (($ErrorReport | Sort-Object FileDate -Descending | fl *) -join '`r`n') -Level 3 -Checkmark 3
-               return $true
+                Write-ToHost (($ErrorReport | Sort-Object FileDate -Descending | fl *) -join '`r`n') -Level 3 -Checkmark 3
+                return $ErrorReport
             }
         }
-}
+        return $null
+    }
     function Test-GetHealthFault {
         try {
             Write-Host "Testing that Get-HealthFault command works"
@@ -801,14 +803,14 @@ param(
     function Test-MismatchedPSModules {
         Write-Host "Testing for mismatched PS module errors"
         $startTime = (Get-Date).AddHours(-24)
-        $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
-            param($startTime)
+        $events=@()
+        $events += Invoke-Command -ComputerName $nodes -ScriptBlock {
             Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
                 LogName   = 'AzStackHciEnvironmentChecker'
                 Id        = '17203'
-                StartTime = $startTime
+                StartTime = $using:startTime
             } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
-        } -ArgumentList $startTime
+        }
         $badModules=@()
         Foreach ($event in $events) {
             if ($event.Message -like "Checking version of PS module*") {
@@ -1159,32 +1161,31 @@ v$ver
     if ($failed.CurrentPercent -lt 99) {$failed.CurrentPercent=$failed.CurrentPercent+1}
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
     If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
-        if ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
-            $changed=$false
-            If ($FixErrors -and $failed.CurrentPercent -lt 100) {
-                Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
-                Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
-                $changed=$true
-            }
-            If ($FixWarningsAlso -and !($FixErrors) -and $failed.MaxPercent -lt 100) {
-                Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
-                Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
-                $changed=$true
-            }
-            if ($changed) {
-                If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4}
-            }
-        } else {
-            If ($failed.CurrentPercent -gt $failed.Threshold) {
-                Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)"
-            } elseif ($failed.MaxPercent -gt $failed.Threshold) {
-                if ($failed.MaxPercent -lt 100) {
-                    Write-Host "Recommendation: Set Thin Provision Threshold to $($failed.MaxPercent)"
-                } else {
-                    Write-Host "Recommendation: Make sure Vdisk usage does not exceed $($failed.Threshold)%"
-                }
+        $changed=$false
+        If ($FixErrors -and $failed.CurrentPercent -lt 100 -and $failed.CurrentPercent -gt $failed.Threshold) {
+            Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
+            Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
+            $changed=$true
+        }
+        If ($FixWarningsAlso -and !($FixErrors) -and $failed.MaxPercent -lt 100) {
+            Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
+            Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
+            $changed=$true
+        }
+        if ($changed) {
+            If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4}
+        }
+    } else {
+        If ($failed.CurrentPercent -gt $failed.Threshold) {
+            Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)"
+        } elseif ($failed.MaxPercent -gt $failed.Threshold) {
+            if ($failed.MaxPercent -lt 100) {
+                Write-Host "Recommendation: Set Thin Provision Threshold to $($failed.MaxPercent)"
+            } else {
+                Write-Host "Recommendation: Make sure Vdisk usage does not exceed $($failed.Threshold)%"
             }
         }
+        
     }
     Write-Host ""
     If (Test-AzLocalMemoryNMinusOne) {
@@ -1216,6 +1217,12 @@ v$ver
     $badModules=Test-MismatchedPSModules
     If ($badModules.count) {
         if ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
+            if ($badModules.ModuleName -match "Az.Accounts") {
+                $azAccountsVer=($badModules | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
+            } else {
+                $azAccountsVer=(Get-InstalledModule -Name Az.Accounts).Version
+            }
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
                     if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version -match $using:badModule.RequiredVersion)) {
@@ -1227,6 +1234,9 @@ v$ver
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
                     Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
                 }
+            }
+            Invoke-Command -ComputerName $nodes -ScriptBlock {
+                Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose -WhatIf }
             }
             if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
             } else {
