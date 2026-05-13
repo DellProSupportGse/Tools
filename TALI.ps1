@@ -802,7 +802,7 @@ param(
     }
     function Test-MismatchedPSModules {
         Write-Host "Testing for mismatched PS module errors"
-        $startTime = (Get-Date).AddHours(-13)
+        $startTime = (Get-Date).AddHours(-24)
         $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
             param($startTime)
             Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
