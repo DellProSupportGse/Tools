@@ -1222,9 +1222,9 @@ v$ver
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
             Invoke-Command -ComputerName $nodes -ScriptBlock {
-                Remove-Module -Name AzStackHci.EnvironmentChecker -Force -ErrorAction SilentlyContinue
                 if ((Get-Module -ListAvailable -Name AzStackHci.EnvironmentChecker).count) {
                     Write-Host "On Node $($env:COMPUTERNAME), uninstalling AzStackHci.EnvironmentChecker module"
+                    Remove-Module -Name AzStackHci.EnvironmentChecker -Force -ErrorAction SilentlyContinue
                     Uninstall-Module -Name AzStackHci.EnvironmentChecker -AllVersions -ErrorAction SilentlyContinue -Force
                 }
             }
@@ -1236,17 +1236,17 @@ v$ver
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
                     if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version -match $using:badModule.RequiredVersion)) {
-                          Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose -WhatIf
+                          Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose
                     }
                 }
             }
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
-                    Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
+                    Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose }
                 }
             }
             Invoke-Command -ComputerName $nodes -ScriptBlock {
-                Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose -WhatIf }
+                Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose }
             }
             if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
             } else {
