@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.452"
+    $ver="0.453"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -1238,7 +1238,7 @@ v$ver
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
                     $badModule=$using:badModule
                     $badModule
-                    if (-not ((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version | %{[version]$_} -match $badModule.RequiredVersion)) {
+                    if (-not (((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version | Foreach {[version]$_}) -match $badModule.RequiredVersion)) {
                             Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose
                     }
 
