@@ -1222,9 +1222,9 @@ v$ver
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
             Invoke-Command -ComputerName $nodes -ScriptBlock {
+                Remove-Module -Name AzStackHci.EnvironmentChecker -Force -ErrorAction SilentlyContinue
                 if ((Get-Module -ListAvailable -Name AzStackHci.EnvironmentChecker).count) {
                     Write-Host "On Node $($env:COMPUTERNAME), uninstalling AzStackHci.EnvironmentChecker module"
-                    Remove-Module -Name AzStackHci.EnvironmentChecker -Force -ErrorAction SilentlyContinue
                     Uninstall-Module -Name AzStackHci.EnvironmentChecker -AllVersions -ErrorAction SilentlyContinue -Force
                 }
             }
