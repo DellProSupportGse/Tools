@@ -1240,6 +1240,7 @@ v$ver
                     }
                 }
             }
+            Remove-Module Az.Accounts -Force
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
                     Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose }
