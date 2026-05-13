@@ -818,7 +818,7 @@ param(
         Foreach ($event in $events) {
             if ($event.Message -like "Checking version of PS module*") {
                 if ($event.Message -match "'([^']+)'.*?'([^']+)'.*?'([^']+)'.*?'([^']+)'") {
-                    if (([version](Get-InstalledModule -Name $matches[1] -AllVersions).Version -gt [version]$matches[4]) -eq $true) {
+                    if ((((Get-InstalledModule -Name az.stackhci -AllVersions).Version | %{[version]$_}) -gt [version]$matches[4]) -eq $true) {
                         $badModules += [PSCustomObject]@{
                             ModuleName      = $matches[1]
                             NodeName        = $matches[2]
