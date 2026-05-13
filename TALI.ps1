@@ -1237,13 +1237,15 @@ v$ver
             Foreach ($badModule in $badModules) {    
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
                     $badModule=$using:badModule
-                    Start-Job -Name "InstallModules-$($badmodule.ModuleName)" -ScriptBlock {
-                        if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version | %{[version]$_} -match $using:badModule.RequiredVersion)) {
-                              Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose
+                    Start-Job -Name "InstallModules-$($badModule.ModuleName)" -ScriptBlock {
+                        $badModule=$using:badModule
+                        $badModule
+                        if (-not ((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version | %{[version]$_} -match $badModule.RequiredVersion)) {
+                              Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose
                         }
                     }| Out-Null
                     Get-Job -Name "InstallModules*" | Receive-Job -Wait
-                } -AsJob -JobName "InstallModules-$($badmodule.ModuleName)"
+                } -AsJob -JobName "InstallModules-$($badmodule.ModuleName)" | Out-Null
             }
             Get-Job -Name "InstallModules*" | Receive-Job -Wait
             Get-Job -Name "InstallModules*" | Remove-Job
