@@ -1241,7 +1241,7 @@ v$ver
                         }
                     }
                 }
-            }
+            } | Out-Null
             Get-Job -Name "InstallModules" | Receive-Job -Wait
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
