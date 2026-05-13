@@ -803,14 +803,14 @@ param(
     function Test-MismatchedPSModules {
         Write-Host "Testing for mismatched PS module errors"
         $startTime = (Get-Date).AddHours(-24)
-        $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
-            param($startTime)
+        $events=@()
+        $events += Invoke-Command -ComputerName $nodes -ScriptBlock {
             Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
                 LogName   = 'AzStackHciEnvironmentChecker'
                 Id        = '17203'
-                StartTime = $startTime
+                StartTime = $using:startTime
             } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
-        } -ArgumentList $startTime
+        }
         $badModules=@()
         Foreach ($event in $events) {
             if ($event.Message -like "Checking version of PS module*") {
