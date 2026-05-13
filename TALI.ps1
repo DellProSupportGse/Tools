@@ -740,12 +740,12 @@ param(
         param(
             [string]$ReportPath = "C:\Windows\Cluster\Reports"
         )
-        Write-Host "Testing recent failures in CAU reports over the last 24 hours since last update attempt..."
-        if (-not (Test-Path $ReportPath)) {
-            Write-Error "CAU Report directory not found at $ReportPath"
-            return
-        }
-        If ((Get-SolutionUpdate).State -eq "InstallationFailed") {
+        if ((Get-SolutionUpdate).State -match "InstallationFailed") { 
+            Write-Host "Testing recent failures in CAU reports over the last 24 hours since last update attempt..."
+            if (-not (Test-Path $ReportPath)) {
+                Write-Error "CAU Report directory not found at $ReportPath"
+                return
+            }
             Write-Host "Getting CAU report after failled SU/SBE installation"
             $AllReports = Invoke-Command -Computername $nodes {Get-ChildItem -Path "$using:ReportPath" -Filter "CauReport*.xml"}
             #$AllReports | Sort-Object LastWriteTime -Descending | Sort Name -Unique
@@ -754,7 +754,8 @@ param(
             $TimeCutoff = $LatestFile.LastWriteTime.AddHours(-24)
             $TargetFiles = $AllReports | Where-Object { $_.LastWriteTime -ge $TimeCutoff }
             Write-Host "Auditing reports from: $($TimeCutoff.ToString()) to $($LatestFile.LastWriteTime.ToString())"
-            $ErrorReport = foreach ($File in $TargetFiles) {
+            $ErrorReport=@()
+            $ErrorReport += foreach ($File in $TargetFiles) {
                 try {
                     [xml]$xml = Invoke-Command -ComputerName $File.PSComputerName {Get-Content -Path $using:File.FullName -ErrorAction Stop}
                     # Navigate to the individual node status entries
@@ -778,15 +779,16 @@ param(
                 }
             }
             $ErrorReport=$ErrorReport | Sort-Object FileDate -Descending
-            if ($null -eq $ErrorReport) {
+            if ($ErrorReport.count -eq 0) {
                 Write-ToHost "No errors found in the last 24 hours of reports since last update attempt."
-                return $false
+                return $null
             } else {
-               Write-ToHost (($ErrorReport | Sort-Object FileDate -Descending | fl *) -join '`r`n') -Level 3 -Checkmark 3
-               return $true
+                Write-ToHost (($ErrorReport | Sort-Object FileDate -Descending | fl *) -join '`r`n') -Level 3 -Checkmark 3
+                return $ErrorReport
             }
         }
-}
+        return $null
+    }
     function Test-GetHealthFault {
         try {
             Write-Host "Testing that Get-HealthFault command works"
