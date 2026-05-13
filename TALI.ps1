@@ -1216,8 +1216,8 @@ v$ver
     If ($badModules.count) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
-            if ($badModule.ModuleName -match "Az.Accounts") {
-                $azAccountsVer=($badModule | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
+            if ($badModules.ModuleName -match "Az.Accounts") {
+                $azAccountsVer=($badModules | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
             } else {
                 $azAccountsVer=(Get-InstalledModule -Name Az.Accounts).Version
             }
