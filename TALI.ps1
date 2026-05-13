@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.44"
+    $ver="0.46"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -802,20 +802,23 @@ param(
     }
     function Test-MismatchedPSModules {
         Write-Host "Testing for mismatched PS module errors"
-        $startTime = (Get-Date).AddHours(-24)
+        $HealthCheckTime=[TimeZoneInfo]::ConvertTimeFromUtc((Get-SolutionUpdateEnvironment).HealthCheckDate,[TimeZoneInfo]::Local)
+        $startTime = $HealthCheckTime.AddHours(-1)
+        $endTime = $HealthCheckTime.AddHours(1)
         $events=@()
         $events += Invoke-Command -ComputerName $nodes -ScriptBlock {
             Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
                 LogName   = 'AzStackHciEnvironmentChecker'
                 Id        = '17203'
                 StartTime = $using:startTime
+                EndTime   = $using:endTime
             } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
         }
         $badModules=@()
         Foreach ($event in $events) {
             if ($event.Message -like "Checking version of PS module*") {
                 if ($event.Message -match "'([^']+)'.*?'([^']+)'.*?'([^']+)'.*?'([^']+)'") {
-                    if (((Get-InstalledModule -Name $matches[1] -AllVersions).Version -gt [version]$matches[4]).count -gt 0) {
+                    if ((((Get-InstalledModule -Name $matches[1] -AllVersions).Version | %{[version]$_}) -gt [version]$matches[4])) {
                         $badModules += [PSCustomObject]@{
                             ModuleName      = $matches[1]
                             NodeName        = $matches[2]
@@ -1218,25 +1221,39 @@ v$ver
     If ($badModules.count) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
+            Invoke-Command -ComputerName $nodes -ScriptBlock {
+                Remove-Module -Name AzStackHci.EnvironmentChecker -Force -ErrorAction SilentlyContinue
+                if ((Get-Module -ListAvailable -Name AzStackHci.EnvironmentChecker).count) {
+                    Write-Host "On Node $($env:COMPUTERNAME), uninstalling AzStackHci.EnvironmentChecker module"
+                    Uninstall-Module -Name AzStackHci.EnvironmentChecker -AllVersions -ErrorAction SilentlyContinue -Force
+                }
+            }
             if ($badModules.ModuleName -match "Az.Accounts") {
                 $azAccountsVer=($badModules | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
             } else {
-                $azAccountsVer=(Get-InstalledModule -Name Az.Accounts).Version
+                $azAccountsVer=[version]((Get-InstalledModule -Name Az.Accounts).Version)
             }
-            Foreach ($badModule in $badModules) {
+            Foreach ($badModule in $badModules) {    
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
-                    if (-not ((Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions).Version -match $using:badModule.RequiredVersion)) {
-                          Install-Module -Name $using:badModule.ModuleName -RequiredVersion $using:badModule.RequiredVersion -Force -Verbose -WhatIf
+                    $badModule=$using:badModule
+                    #$badModule
+                    if (-not (((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version | Foreach {[version]$_}) -match $badModule.RequiredVersion)) {
+                            Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose
                     }
-                }
+
+                } -AsJob -JobName "InstallModules-$($badmodule.ModuleName)" | Out-Null
             }
+            #Get-Job
+            Get-Job -Name "InstallModules*" | Receive-Job -Wait
+            #Get-Job -Name "InstallModules*" | Remove-Job
+            
             Foreach ($badModule in $badModules) {
                 Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
-                    Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose -WhatIf }
+                    Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose }
                 }
             }
             Invoke-Command -ComputerName $nodes -ScriptBlock {
-                Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose -WhatIf }
+                Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose }
             }
             if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
             } else {
