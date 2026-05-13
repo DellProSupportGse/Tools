@@ -1215,7 +1215,7 @@ v$ver
     $badModules=Test-MismatchedPSModules
     If ($badModules.count) {
         if ($FixErrors -or $FixWarningsAlso) {
-            Write-Host "Fixing mismatched PS moduled...Est time less than $($badModules.count+1) Minutes..."
+            Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
             if ($badModule.ModuleName -match "Az.Accounts") {
                 $azAccountsVer=($badModule | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
             } else {
