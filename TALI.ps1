@@ -751,10 +751,10 @@ param(
             $ErrorReport=@()
             $ErrorReport += foreach ($File in $TargetFiles) {
                 try {
-                    #[xml]$xml = Invoke-Command -ComputerName $File.PSComputerName {Get-Content -Path $using:File.FullName -Raw -ErrorAction Stop}
-                    [xml]$xml = Get-Content -Path $File.FullName -Raw -ErrorAction Stop
+                    [xml]$xml = Invoke-Command -ComputerName $File.PSComputerName {Get-Content -Path $using:File.FullName -Raw -ErrorAction Stop}
+                    #[xml]$xml = Get-Content -Path $File.FullName -Raw -ErrorAction Stop
                     # Select all NodeResult elements
-                    $nodeResults = $cauXml.GetElementsByTagName("NodeResult")
+                    $nodeResults = $Xml.GetElementsByTagName("NodeResult")
 
                     foreach ($node in $nodeResults) {
                         $status = $node.Status
