@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.46"
+    $ver="0.461"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -741,35 +741,44 @@ param(
             [string]$ReportPath = "C:\Windows\Cluster\Reports"
         )
         if ((Get-SolutionUpdate).State -match "InstallationFailed") { 
-            Write-Host "Testing recent failures in CAU reports over the last 24 hours since last update attempt..."
-            if (-not (Test-Path $ReportPath)) {
-                Write-Error "CAU Report directory not found at $ReportPath"
-                return
-            }
-            Write-Host "Getting CAU report after failled SU/SBE installation"
+            Write-Host "Testing recent failures in CAU reports over the last 12 hours since last update attempt..."
             $AllReports = Invoke-Command -Computername $nodes {Get-ChildItem -Path "$using:ReportPath" -Filter "CauReport*.xml"}
-            #$AllReports | Sort-Object LastWriteTime -Descending | Sort Name -Unique
             $AllReports = $AllReports | Group-Object -Property Name | %{$_.Group | sort LastWriteTime,PSComputerName -Descending | Select -First 1} | Sort LastWriteTime -Descending
             $LatestFile = $AllReports[0]
-            $TimeCutoff = $LatestFile.LastWriteTime.AddHours(-24)
+            $TimeCutoff = $LatestFile.LastWriteTime.AddHours(-12)
             $TargetFiles = $AllReports | Where-Object { $_.LastWriteTime -ge $TimeCutoff }
             Write-Host "Auditing reports from: $($TimeCutoff.ToString()) to $($LatestFile.LastWriteTime.ToString())"
             $ErrorReport=@()
             $ErrorReport += foreach ($File in $TargetFiles) {
                 try {
-                    [xml]$xml = Invoke-Command -ComputerName $File.PSComputerName {Get-Content -Path $using:File.FullName -ErrorAction Stop}
-                    # Navigate to the individual node status entries
-                    $NodeEntries = $xml.CauReport.ClusterResult.NodeResults.list.noderesult
-                    foreach ($Node in $NodeEntries) {
-                        # Only grab entries with actual error records or non-success status
-                        # Status 3 = Succeeded, so we look for anything else
-                        if ($null -ne $Node.Errorrecorddata.nil) {
+                    [xml]$xml = Invoke-Command -ComputerName $File.PSComputerName {Get-Content -Path $using:File.FullName -Raw -ErrorAction Stop}
+                    #[xml]$xml = Get-Content -Path $File.FullName -Raw -ErrorAction Stop
+                    # Select all NodeResult elements
+                    $nodeResults = $Xml.GetElementsByTagName("NodeResult")
+
+                    foreach ($node in $nodeResults) {
+                        $status = $node.Status
+    
+                        # Only process failed or partially failed nodes
+                        if ($status -and $status -ne 'Succeeded') {
+        
+                            # The NodeName might be buried in the InstallResults if z:Ref is used in the main Node element
+                            $nodeName = $node.InstallResults.UpdateInstallResult.NodeName
+                            if ($nodeName.InnerText) { $nodeName = $nodeName.InnerText }
+        
+                            $errorData = $node.ErrorRecordData
+                            $errorId = $errorData.FullyQualifiedErrorId
+                            if ($errorId.InnerText) { $errorId = $errorId.InnerText }
+        
+                            $exceptionData = $errorData.ExceptionData
+                            $message = $exceptionData.Message
+                            if ($message.InnerText) { $message = $message.InnerText }
+
                             [PSCustomObject]@{
-                                ReportFile = $File.Name
-                                FileDate   = $File.LastWriteTime
-                                Node       = $Node.NodeName
-                                Phase      = $Node.CurrentUpdatePhase
-                                Error      = $Node.ErrorRecord
+                                NodeName = $nodeName
+                                Status   = $status
+                                ErrorID  = $errorId
+                                Message  = $message
                             }
                         }
                     }
@@ -778,12 +787,12 @@ param(
                     Write-Warning "Could not parse $($File.Name): $($_.Exception.Message)"
                 }
             }
-            $ErrorReport=$ErrorReport | Sort-Object FileDate -Descending
+            $ErrorReport=$ErrorReport | Sort Message -Unique | Sort-Object FileDate -Descending
             if ($ErrorReport.count -eq 0) {
-                Write-ToHost "No errors found in the last 24 hours of reports since last update attempt."
+                Write-ToHost "No errors found in the last 12 hours of reports since last update attempt."
                 return $null
             } else {
-                Write-ToHost (($ErrorReport | Sort-Object FileDate -Descending | fl *) -join '`r`n') -Level 3 -Checkmark 3
+                Write-ToHost "$($ErrorReport.Message -join '`r`n')" -Level 3 -Checkmark 3
                 return $ErrorReport
             }
         }
@@ -1260,6 +1269,11 @@ v$ver
                 Write-Host "Recommendation: Install proper PS modules for solution version"
             }
         }
+    }
+    Write-Host ""
+    $ErrorReport=Test-CauErrorAudit
+    If ($ErrorReport) {
+        Write-Host "Recommendation: Repair issue causing the CAU failure"
     }
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
