@@ -224,6 +224,17 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## TALI
+   This tool is used to test Dell Azure Local clusters for common issues
+   
+  ![alt text](readme/TALI.jpg)
+  
+  How To Use:
+    From PowerShell as admin execute the following:
+```Powershell
+Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1'));Test-DellAzureLocalIssues
+```
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## FLCkr
    **FL**tmc **C**hec**k**e**r**
    This tool lookups up filter drivers in Microsoft's known good list
