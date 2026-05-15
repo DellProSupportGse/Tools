@@ -883,7 +883,7 @@ v$ver
             Write-Host "Fixing Get Solution Update command. Est Time is less than five minutes" -ForegroundColor Cyan
             Get-ClusterGroup "Azure Stack HCI Download Service Cluster Group","Azure Stack HCI Health Service Cluster Group","Azure Stack HCI Orchestrator Service Cluster Group","Azure Stack HCI Update Service Cluster Group" | Stop-ClusterGroup | Start-ClusterGroup
             Write-Host "Restarting cluster groups finished."
-	    Write-Host "Waiting for Get Solution Update command to time out"
+	        Write-Host "Waiting for Get Solution Update command to time out"
             While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
             Write-Host "."
             Get-Job -Name "SUJob" -ErrorAction SilentlyContinue | Remove-Job -Force
