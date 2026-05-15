@@ -869,7 +869,7 @@ v$ver
     If ($FixErrors -or $FixWarningsAlso) {Write-Warning "Fix commands are in beta and SHOULD NOT be used without proper guidance";sleep 5}
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
-    $MasUpdateNotRunning=(!(Get-ActionPlanInstances | ? Status -eq Running | ? ActionPlanName -like "MAS Update*"))
+    $MasUpdateNotRunning=(!((Get-ActionPlanInstances | ? Status -eq Running | ? ActionPlanName -like "MAS Update*").count))
     If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
         Write-Warning "Solution Update is running. Some fixes will be disabled"
     }
