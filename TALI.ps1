@@ -18,9 +18,9 @@ param(
     # Check if script is running on a cluster node
     If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a cluster node.";Break}
     #Get-ClusterStorageSpacesDirect
-    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue -and $IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node"}
-    if (!((Get-ClusterStorageSpacesDirect).State -eq 'Enabled')) {
-        Write-Host "Script must be run locally on an S2d cluster node" -ForegroundColor DarkYellow
+    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue) -and $IgnoreAzureLocalRequired) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node"}
+    if ((Get-ClusterStorageSpacesDirect).State -ne 'Enabled') {
+        Write-Host "Script must be run locally on an S2D cluster node" -ForegroundColor DarkYellow
         break
     }
     if ($IgnoreAzureLocalRequired) {
