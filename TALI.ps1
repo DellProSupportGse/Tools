@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.462"
+    $ver="0.463"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -869,13 +869,17 @@ v$ver
     If ($FixErrors -or $FixWarningsAlso) {Write-Warning "Fix commands are in beta and SHOULD NOT be used without proper guidance";sleep 5}
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
+    $MasUpdateNotRunning=(!(Get-ActionPlanInstances | ? Status -eq Running | ? ActionPlanName -like "MAS Update*"))
+    If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
+        Write-Warning "Solution Update is running. Some fixes will be disabled"
+    }
     Write-Host ""
     If ((Get-Job -Name "SUJob" -ErrorAction SilentlyContinue).count) {
         Write-Host "Waiting for prevoius Get Solution Update command to timeout..."
         Get-Job -Name "SUJob" -ErrorAction SilentlyContinue | Remove-Job -Force
     }
     if (Test-SolutionUpdateCommand) {
-        If ($FixErrors -or $FixWarningsAlso) {
+        If ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Fixing Get Solution Update command. Est Time is less than five minutes" -ForegroundColor Cyan
             Get-ClusterGroup "Azure Stack HCI Download Service Cluster Group","Azure Stack HCI Health Service Cluster Group","Azure Stack HCI Orchestrator Service Cluster Group","Azure Stack HCI Update Service Cluster Group" | Stop-ClusterGroup | Start-ClusterGroup
             Write-Host "Restarting cluster groups finished."
@@ -1030,7 +1034,7 @@ v$ver
     Write-Host ""
     $disksInMaint= Test-NodesUpDisksinMaintMode
     If ($disksInMaint)  {
-        If ($FixErrors -or $FixWarningsAlso) {
+        If ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Taking disks out of maintenance mode. Est Time is less than five minutes" -ForegroundColor Cyan
             $disksFixed=foreach ($disk in $disksInMaint) {
                 try {
@@ -1151,7 +1155,7 @@ v$ver
     )
     $FailedServices=Test-AzureLocalNodeServices
     If ($FailedServices) {
-        if ($FixErrors -or $FixWarningsAlso) {
+        if ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Fixing stopped required services for Azure Local that run on all nodes. Est Time is less than two minutes" -ForegroundColor Cyan
             Foreach ($FailedService in $FailedServices) {
                 Invoke-Command -ComputerName $FailedService.PSComputerName -ScriptBlock {
@@ -1214,7 +1218,7 @@ v$ver
     }
     Write-Host ""
     If ((Test-GetHealthFault) -eq $true) {
-        if ($FixErrors -or $FixWarningsAlso) {
+        if ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
             Invoke-Command -ComputerName $nodes -ScriptBlock {
                 Restart-Service Winmgmt -Force
@@ -1228,7 +1232,7 @@ v$ver
     Write-Host ""
     $badModules=Test-MismatchedPSModules
     If ($badModules.count) {
-        if ($FixErrors -or $FixWarningsAlso) {
+        if ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
             $solutionState=(Get-SolutionUpdate).State
             if ($solutionState -eq "Installing" -or $solutionState -eq "InstallationFailed") {
