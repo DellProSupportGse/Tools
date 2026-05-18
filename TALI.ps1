@@ -101,7 +101,7 @@ param(
         If ($Redfish.Success -match $false) {
             Write-ToHost "iDrac on host(s) $($Redfish.PSComputerName -join ',') have problems accessing the redfish url!" -Checkmark 3 -Level 3
         } else {
-            Write-ToHost "All iDracs can access the redfish url" -Level 1 -Checkmark 1
+            Write-ToHost "All hosts can access their iDrac redfish url" -Level 1 -Checkmark 1
         }
         return $Redfish
     }
