@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.463"
+    $ver="0.464"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -866,6 +866,138 @@ v$ver
                                       
                       by: Tommy Paulk
 "@
+    Write-Host "Logging Telemetry Information..."
+
+    function Add-TableData {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory=$true)]
+            [string]$TableName,
+
+            [Parameter(Mandatory=$true)]
+            [string]$PartitionKey,
+
+            [Parameter(Mandatory=$false)]
+            [string]$RowKey,
+
+            [Parameter(Mandatory=$false)]
+            [string]$SasToken,
+            
+            [Parameter(Mandatory=$true)]
+            $Data
+        )
+
+        try {$Data=[HashTable]$Data
+
+        $RowKey = [guid]::NewGuid().Guid
+        
+        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/?SECRET REMOVED'
+
+        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
+
+        $headers = @{
+            "Accept"       = "application/json;odata=nometadata"
+            "Content-Type" = "application/json"
+            "x-ms-version" = "2019-02-02"
+        }
+
+        $Data["PartitionKey"] = $PartitionKey
+        $Data["RowKey"]       = $RowKey
+
+        $body = $Data | ConvertTo-Json -Depth 5
+
+        $maxRetries = 3
+        $attempt = 0
+        $success = $false
+        } catch {return}
+        while (-not $success -and $attempt -lt $maxRetries) {
+
+            try {
+                Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
+                $success = $true
+                Write-Indent "Telemetry recorded successfully" 1 Green
+            }
+            catch {
+                $attempt++
+
+                if ($attempt -lt $maxRetries) {
+                    Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
+                    Start-Sleep -Seconds 2
+                }
+                else {
+                    Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
+                }
+            }
+        }
+    }
+
+    function Write-Indent {
+        param(
+            [string]$Message,
+            [int]$Level = 1,
+            [string]$Color = "Gray"
+        )
+
+        $prefix = "  " * $Level
+        Write-Host "$prefix$Message" -ForegroundColor $Color
+    }
+
+    # Unique report id
+    $CReportID = [guid]::NewGuid().Guid
+
+
+    Write-Indent "Resolving Geo Location..."
+
+    try {
+        if (-not $global:GeoCache) {
+            $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+        }
+
+        $response = $global:GeoCache
+
+        if ($response.success -eq $true) {
+
+            $country     = $response.country
+            $countryCode = $response.country_code
+            $region      = $response.region
+            $city        = $response.city
+            $latitude    = $response.latitude
+            $longitude   = $response.longitude
+            $timezone    = $response.timezone.id
+
+            Write-Indent "Country: $country" 2
+            Write-Indent "Region : $region" 2
+        }
+    }
+    catch {
+        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+    }
+
+    $data = @{
+        Region       = $region
+        Version      = $ver
+        ReportID     = $CReportID
+        country      = $country
+        countryCode  = $countryCode
+        geoRegion    = $region
+        city         = $city
+        lat          = $latitude
+        lon          = $longitude
+        timezone     = $timezone
+        Timestamp = (Get-Date).ToUniversalTime().ToString("o")
+        HostOS = [System.Environment]::OSVersion.VersionString
+        PSVersion = $PSVersionTable.PSVersion.ToString()
+    }
+
+    # We use tool name for this value
+    $PartitionKey = "Tali"
+
+    Add-TableData `
+        -TableName "TaliTelemetryData" `
+        -PartitionKey $PartitionKey `
+        -Data $data 
+
+
     If ($FixErrors -or $FixWarningsAlso) {Write-Warning "Fix commands are in beta and SHOULD NOT be used without proper guidance";sleep 5}
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
