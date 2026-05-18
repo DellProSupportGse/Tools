@@ -1404,7 +1404,7 @@ v$ver
                 }
                 #Get-Job
                 Get-Job -Name "InstallModules*" | Receive-Job -Wait
-                #Get-Job -Name "InstallModules*" | Remove-Job
+                Get-Job -Name "InstallModules*" | Remove-Job
             
                 Foreach ($badModule in $badModules) {
                     Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
