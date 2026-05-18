@@ -132,7 +132,7 @@ param(
         $nonCompliant = $null
         $nonCompliant = $results | Where-Object { $_.HwTimeout -lt 10000 }
         If ($nonCompliant) {
-            Write-ToHost "Node(s) $($nonCompliant.Node) do(es) not have HWTimeout set to at least 10000" -Checkmark 3 -Level 3
+            Write-ToHost "Node(s) $($nonCompliant.Node -join ',') do(es) not have HWTimeout set to at least 10000" -Checkmark 3 -Level 3
         } else {
             Write-ToHost "All nodes have HWtimeout set to at least 10000"
         }
@@ -165,7 +165,7 @@ param(
             } else {
                 $nonCompliant += $tzones | Where-Object { $_.TimeZone -ne $topGroup.Name }
                 If ($nonCompliant) {
-                    Write-ToHost "Node(s) $($nonCompliant.Node) do(es) not have the correct time zone defined" -Checkmark 3 -Level 3
+                    Write-ToHost "Node(s) $($nonCompliant.Node -join ',') do(es) not have the correct time zone defined" -Checkmark 3 -Level 3
                 }
             }
         } else {
@@ -357,7 +357,7 @@ param(
                     ) -Level 3 -Checkmark 3
                 } 
                 If ($ErrorOnlyCheck -eq $false) {
-                    if ($maxPercent -gt $threshold) {
+                    if ($maxPercent -gt $threshold -and !($ErrorOnlyCheck)) {
                          Write-ToHost (
                              "MAX thin provisioning usage exceeds threshold: $maxPercent% (Threshold: $threshold%)"
                          ) -Level 2 -Checkmark 2
