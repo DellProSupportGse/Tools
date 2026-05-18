@@ -951,6 +951,7 @@ v$ver
         Write-Host "$prefix$Message" -ForegroundColor $Color
     }
 
+    <#
     # Unique report id
     $CReportID = [guid]::NewGuid().Guid
 
@@ -1005,7 +1006,7 @@ v$ver
         -TableName "TaliTelemetryData" `
         -PartitionKey $PartitionKey `
         -Data $data 
-
+#>
 
     If ($FixErrors -or $FixWarningsAlso) {Write-Warning "Fix commands are in beta and SHOULD NOT be used without proper guidance";sleep 5}
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
