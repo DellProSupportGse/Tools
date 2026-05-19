@@ -7,7 +7,8 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.466"
+    $ver="0.468"
+
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -19,8 +20,8 @@ param(
     If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a cluster node.";Break}
     #Get-ClusterStorageSpacesDirect
     if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue) -and !($IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
-    $IsS2d=try {((Get-ClusterStorageSpacesDirect).State -eq 'Enabled')} catch {$false}
-    if (!($IsS2d)) {
+    $isNotS2d=try {((Get-ClusterStorageSpacesDirect).State -ne 'Enabled')} catch {$true}
+    if ($isNotS2d) {
         Write-Host "Script must be run locally on an S2D cluster node" -ForegroundColor DarkYellow
         break
     }
@@ -1326,7 +1327,8 @@ v$ver
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
             $changed=$true
         }
-        If ($FixWarningsAlso -and !($FixErrors) -and $failed.MaxPercent -lt 100 -and !($ErrorOnlyCheck) -and $failed.MaxPercent -gt $failed.Threshold) {
+        If ($FixWarningsAlso -and $failed.MaxPercent -lt 100 -and !($ErrorOnlyCheck) -and $failed.MaxPercent -gt $failed.Threshold) {
+
             Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
             $changed=$true
@@ -1416,10 +1418,10 @@ v$ver
                     Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose }
                 }
                 if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
-                } else {
-                    Write-Host "Recommendation: Install proper PS modules for solution version"
-                }
+                } 
             }
+        } else {
+            Write-Host "Recommendation: Install proper PS modules for solution version"
         }
     }
     Write-Host ""
