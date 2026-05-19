@@ -8,6 +8,7 @@ param(
     [switch]$IgnoreAzureLocalRequired
 )
     $ver="0.467"
+
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -1327,6 +1328,7 @@ v$ver
             $changed=$true
         }
         If ($FixWarningsAlso -and $failed.MaxPercent -lt 100 -and !($ErrorOnlyCheck) -and $failed.MaxPercent -gt $failed.Threshold) {
+
             Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
             $changed=$true
