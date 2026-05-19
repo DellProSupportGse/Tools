@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.465"
+    $ver="0.466"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -18,8 +18,9 @@ param(
     # Check if script is running on a cluster node
     If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a cluster node.";Break}
     #Get-ClusterStorageSpacesDirect
-    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue) -and $IgnoreAzureLocalRequired) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
-    if ((Get-ClusterStorageSpacesDirect).State -ne 'Enabled') {
+    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue) -and !($IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
+    $IsS2d=try {((Get-ClusterStorageSpacesDirect).State -eq 'Enabled')} catch {$false}
+    if (!($IsS2d)) {
         Write-Host "Script must be run locally on an S2D cluster node" -ForegroundColor DarkYellow
         break
     }
