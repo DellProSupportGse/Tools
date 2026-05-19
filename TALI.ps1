@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.467"
+    $ver="0.468"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1418,10 +1418,10 @@ v$ver
                     Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose }
                 }
                 if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4
-                } else {
-                    Write-Host "Recommendation: Install proper PS modules for solution version"
-                }
+                } 
             }
+        } else {
+            Write-Host "Recommendation: Install proper PS modules for solution version"
         }
     }
     Write-Host ""
