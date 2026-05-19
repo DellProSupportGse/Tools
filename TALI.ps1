@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.462"
+    $ver="0.466"
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host -ForegroundColor Yellow "Not running as Administrator. Please run the script with elevated privileges."
@@ -18,9 +18,10 @@ param(
     # Check if script is running on a cluster node
     If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a cluster node.";Break}
     #Get-ClusterStorageSpacesDirect
-    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue -and $IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node"}
-    if (!((Get-ClusterStorageSpacesDirect).State -eq 'Enabled')) {
-        Write-Host "Script must be run locally on an S2d cluster node" -ForegroundColor DarkYellow
+    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue) -and !($IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
+    $IsS2d=try {((Get-ClusterStorageSpacesDirect).State -eq 'Enabled')} catch {$false}
+    if (!($IsS2d)) {
+        Write-Host "Script must be run locally on an S2D cluster node" -ForegroundColor DarkYellow
         break
     }
     if ($IgnoreAzureLocalRequired) {
@@ -101,19 +102,21 @@ param(
         If ($Redfish.Success -match $false) {
             Write-ToHost "iDrac on host(s) $($Redfish.PSComputerName -join ',') have problems accessing the redfish url!" -Checkmark 3 -Level 3
         } else {
-            Write-ToHost "All iDracs can access the redfish url" -Level 1 -Checkmark 1
+            Write-ToHost "All hosts can access their iDrac redfish url" -Level 1 -Checkmark 1
         }
         return $Redfish
     }
     Function Test-OsBootTimeOver99Days {
-        Write-Host "Testing that all nodes have been rebooted within 99 days..."
         $OSBootTimeOver99Days=@()
-        $OSBootTimeOver99Days+=Get-CimInstance -ComputerName $nodes Win32_OperatingSystem | %{[PSCustomObject]@{"CsName"=$_.CsName;"OSBootOver99Days"=(((Get-Date).AddDays(-99)-$_.LastBootUpTime) -gt 0)}}
-        $failedOSBootTimeOver99Days=$OSBootTimeOver99Days | ? OSBootOver99Days -eq $true
-        If ($failedOSBootTimeOver99Days) {
-           Write-ToHost "Node(s) $($failedOSBootTimeOver99Days.CsName -join ',') have not been rebooted for over 99 days" -Checkmark 2 -Level 2
-        } else {
-           Write-ToHost "All nodes have been rebooted within 99 days"
+        If ($ErrorOnlyCheck -eq $false) {
+            Write-Host "Testing that all nodes have been rebooted within 99 days..."
+            $OSBootTimeOver99Days+=Get-CimInstance -ComputerName $nodes Win32_OperatingSystem | %{[PSCustomObject]@{"CsName"=$_.CsName;"OSBootOver99Days"=(((Get-Date).AddDays(-99)-$_.LastBootUpTime) -gt 0)}}
+            $failedOSBootTimeOver99Days=$OSBootTimeOver99Days | ? OSBootOver99Days -eq $true
+            If ($failedOSBootTimeOver99Days) {
+               Write-ToHost "Node(s) $($failedOSBootTimeOver99Days.CsName -join ',') have not been rebooted for over 99 days" -Checkmark 2 -Level 2
+            } else {
+               Write-ToHost "All nodes have been rebooted within 99 days"
+            }
         }
         return $failedOSBootTimeOver99Days
     }
@@ -130,7 +133,7 @@ param(
         $nonCompliant = $null
         $nonCompliant = $results | Where-Object { $_.HwTimeout -lt 10000 }
         If ($nonCompliant) {
-            Write-ToHost "Node(s) $($nonCompliant.Node) do(es) not have HWTimeout set to at least 10000" -Checkmark 3 -Level 3
+            Write-ToHost "Node(s) $($nonCompliant.Node -join ',') do(es) not have HWTimeout set to at least 10000" -Checkmark 3 -Level 3
         } else {
             Write-ToHost "All nodes have HWtimeout set to at least 10000"
         }
@@ -163,7 +166,7 @@ param(
             } else {
                 $nonCompliant += $tzones | Where-Object { $_.TimeZone -ne $topGroup.Name }
                 If ($nonCompliant) {
-                    Write-ToHost "Node(s) $($nonCompliant.Node) do(es) not have the correct time zone defined" -Checkmark 3 -Level 3
+                    Write-ToHost "Node(s) $($nonCompliant.Node -join ',') do(es) not have the correct time zone defined" -Checkmark 3 -Level 3
                 }
             }
         } else {
@@ -282,7 +285,7 @@ param(
             # Survivable capacity
             $usableCapacity = $pool.Size - $pool.Reserved - $failureReserve
             if ($totalAllocatedMax -gt $usableCapacity) {
-                Write-ToHost "If volumes are filled, there will not be enough space for disk repairs. $([int](($usableCapacity-$totalAllocatedMax)/1gb)) GB" -Checkmark 2 -Level 2
+                If ($ErrorOnlyCheck -eq $false) { Write-ToHost "If volumes are filled, there will not be enough space for disk repairs. $([int](($usableCapacity-$totalAllocatedMax)/1gb)) GB" -Checkmark 2 -Level 2}
             } else {
                 Write-ToHost "Storage Pool space looks good"
             }
@@ -290,7 +293,7 @@ param(
             return ($totalAllocatedMax -gt $usableCapacity)
         }
         catch {
-            Write-ToHost "Could not determine Over Provisioned Virtual Disks on Storage Pool" -Checkmark 2 -Level 2
+            If ($ErrorOnlyCheck -eq $false) {Write-ToHost "Could not determine Over Provisioned Virtual Disks on Storage Pool" -Checkmark 2 -Level 2}
             return $false
         }
     }
@@ -354,12 +357,13 @@ param(
                         "CURRENT thin provisioning usage exceeds threshold: $currentPercent% (Threshold: $threshold%)"
                     ) -Level 3 -Checkmark 3
                 } 
-                if ($maxPercent -gt $threshold) {
-                     Write-ToHost (
-                         "MAX thin provisioning usage exceeds threshold: $maxPercent% (Threshold: $threshold%)"
-                     ) -Level 2 -Checkmark 2
+                If ($ErrorOnlyCheck -eq $false) {
+                    if ($maxPercent -gt $threshold -and !($ErrorOnlyCheck)) {
+                         Write-ToHost (
+                             "MAX thin provisioning usage exceeds threshold: $maxPercent% (Threshold: $threshold%)"
+                         ) -Level 2 -Checkmark 2
+                    }
                 }
-
 
                 return [pscustomobject]@{
                     StoragePoolName = $poolName
@@ -433,131 +437,135 @@ param(
     function Test-AzLocalCpuNMinusOneOvercommit {
         [CmdletBinding()]
         param()
+        If ($ErrorOnlyCheck -eq $false) {
 
-        Write-Host "Testing cluster CPU vCPU overcommit risk (N-1 model, 200% threshold)..."
+            Write-Host "Testing cluster CPU vCPU overcommit risk (N-1 model, 200% threshold)..."
 
-        $clusterNodes = (Get-ClusterNode).Name
+            $clusterNodes = (Get-ClusterNode).Name
 
-        # Total VM vCPU demand (cluster-wide)
-        $vmVcpus = (Get-VM -ComputerName $clusterNodes | ? State -eq Running |
-            Measure-Object ProcessorCount -Sum).Sum
+            # Total VM vCPU demand (cluster-wide)
+            $vmVcpus = (Get-VM -ComputerName $clusterNodes | ? State -eq Running |
+                Measure-Object ProcessorCount -Sum).Sum
 
-        # Logical processors per node
-        $nodeCpu = foreach ($node in $clusterNodes) {
-            [pscustomobject]@{
-                Node     = $node
-                Logical  = (Get-CimInstance -ComputerName $node Win32_ComputerSystem).NumberOfLogicalProcessors
+            # Logical processors per node
+            $nodeCpu = foreach ($node in $clusterNodes) {
+                [pscustomobject]@{
+                    Node     = $node
+                    Logical  = (Get-CimInstance -ComputerName $node Win32_ComputerSystem).NumberOfLogicalProcessors
+                }
+            }
+
+            # Total cluster logical CPUs
+            $clusterTotal = ($nodeCpu | Measure-Object Logical -Sum).Sum
+
+            # Largest node failure domain
+            $largestNode = ($nodeCpu | Measure-Object Logical -Maximum).Maximum
+
+            # N-1 available CPU capacity
+            $nMinusOneCpu = $clusterTotal - $largestNode
+
+            # 200% overcommit threshold (your rule)
+            $warningThreshold = $nMinusOneCpu * 2
+
+            # Delta evaluation
+            $delta = $warningThreshold - $vmVcpus
+
+            if ($vmVcpus -gt $warningThreshold) {
+                Write-ToHost "VM vCPU: $vmVcpus | N-1 Capacity: $nMinusOneCpu | Threshold: $warningThreshold" -Level 2 -Checkmark 2
+                return $true   # WARNING condition
+            }
+            else {
+                Write-ToHost "CPU overcommit within acceptable N-1 threshold" -Level 1 -Checkmark 1
+                return $false  # OK
             }
         }
-
-        # Total cluster logical CPUs
-        $clusterTotal = ($nodeCpu | Measure-Object Logical -Sum).Sum
-
-        # Largest node failure domain
-        $largestNode = ($nodeCpu | Measure-Object Logical -Maximum).Maximum
-
-        # N-1 available CPU capacity
-        $nMinusOneCpu = $clusterTotal - $largestNode
-
-        # 200% overcommit threshold (your rule)
-        $warningThreshold = $nMinusOneCpu * 2
-
-        # Delta evaluation
-        $delta = $warningThreshold - $vmVcpus
-
-        if ($vmVcpus -gt $warningThreshold) {
-            Write-ToHost "VM vCPU: $vmVcpus | N-1 Capacity: $nMinusOneCpu | Threshold: $warningThreshold" -Level 2 -Checkmark 2
-            return $true   # WARNING condition
-        }
-        else {
-            Write-ToHost "CPU overcommit within acceptable N-1 threshold" -Level 1 -Checkmark 1
-            return $false  # OK
-        }
+        return $false
     }
     function Test-AzLocalVmMigrationFailures {
         [CmdletBinding()]
         param()
+        If ($ErrorOnlyCheck -eq $false) {
 
-        Write-Host "Analyzing non-Windows VM live migration / failback failures (last 7 days across all nodes)..."
+            Write-Host "Analyzing non-Windows VM live migration / failback failures (last 7 days across all nodes)..."
 
-        $startTime = (Get-Date).AddDays(-7)
-        $eventIds = 21502, 21503, 21504, 1069, 1205
-        $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
-            param($startTime, $eventIds)
+            $startTime = (Get-Date).AddDays(-7)
+            $eventIds = 21502, 21503, 21504, 1069, 1205
+            $events = Invoke-Command -ComputerName $nodes -ScriptBlock {
+                param($startTime, $eventIds)
 
-            Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
-                LogName   = 'System'
-                Id        = $eventIds
-                StartTime = $startTime
-            } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
+                Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
+                    LogName   = 'System'
+                    Id        = $eventIds
+                    StartTime = $startTime
+                } | Select-Object TimeCreated,MachineName,Id,@{L="Message";E={$_.Properties.Value}}
 
-        } -ArgumentList $startTime, $eventIds
+            } -ArgumentList $startTime, $eventIds
 
-        if (-not $events) {
-            Write-ToHost "No migration or failback failures detected in last 7 days"
-            return
-        }
+            if (-not $events) {
+                Write-ToHost "No migration or failback failures detected in last 7 days"
+                return
+            }
 
-        # Extract VM names
-        $vmFailures = foreach ($event in $events) {
-            $match=[regex]::Match($event.message,"'Virtual Machine\s(.*?)'")
-            if ($match.Success) {
-                [PSCustomObject]@{
-                    VMName = $match.groups[1].value
-                    Node   = $event.MachineName
+            # Extract VM names
+            $vmFailures = foreach ($event in $events) {
+                $match=[regex]::Match($event.message,"'Virtual Machine\s(.*?)'")
+                if ($match.Success) {
+                    [PSCustomObject]@{
+                        VMName = $match.groups[1].value
+                        Node   = $event.MachineName
+                    }
                 }
             }
-        }
 
-        if (-not $vmFailures) {
-            Write-ToHost "No VM-specific failures identified in event logs"
-            return
-        }
+            if (-not $vmFailures) {
+                Write-ToHost "No VM-specific failures identified in event logs"
+                return
+            }
 
-        # Aggregate counts
-        $vmCounts = $vmFailures |
-            Group-Object VMName |
-            Select-Object Name, Count |
-            Sort-Object Count -Descending
-        if (($vmCounts.name).count -gt 1) {
-            $offenderAverage=[int]((Measure-Object -Sum $vmCounts.count).Sum/($vmCounts.name).count)
-        } else {
-            $offenderAverage=0
-        }
-        $offenders = $vmCounts | Where-Object { $_.Count -ge ($offenderAverage*2) }
-        $nonWindowsGroups=@()
-        # 3. Resolve cluster groups from offender names
-        $clusterGroups = foreach ($o in $offenders) {
-            Get-ClusterGroup -Name $o.Name -ErrorAction SilentlyContinue
-        }
-        # 4. Resolve VM objects and filter NON-Windows only
-        $nonWindowsGroups += foreach ($group in $clusterGroups) {
-            $vm = Get-VM -ComputerName $nodes -Name $group.Name -ErrorAction SilentlyContinue | ? State -eq "Running"
-            $VmWmi = gwmi -namespace root\virtualization\v2 -query "Select * From Msvm_ComputerSystem Where ElementName='$(($vm).Name)'" -ComputerName $vm.PSComputerName
-            $Kvp = gwmi -namespace root\virtualization\v2 -query "Associators of {$VmWmi} Where AssocClass=Msvm_SystemDevice ResultClass=Msvm_KvpExchangeComponent" -ComputerName $vm.PSComputerName
-            $OSPlatformId=$Kvp.GuestIntrinsicExchangeItems | %{
-                $xml = [xml]$_
-                if ($xml.INSTANCE.PROPERTY | Where-Object { $_.Name -eq 'Name' -and $_.VALUE -eq 'OSPlatformId' }) {
-                    ($xml.INSTANCE.PROPERTY | Where-Object { $_.Name -eq 'Data' }).VALUE
+            # Aggregate counts
+            $vmCounts = $vmFailures |
+                Group-Object VMName |
+                Select-Object Name, Count |
+                Sort-Object Count -Descending
+            if (($vmCounts.name).count -gt 1) {
+                $offenderAverage=[int]((Measure-Object -Sum $vmCounts.count).Sum/($vmCounts.name).count)
+            } else {
+                $offenderAverage=0
+            }
+            $offenders = $vmCounts | Where-Object { $_.Count -ge ($offenderAverage*2) }
+            $nonWindowsGroups=@()
+            # 3. Resolve cluster groups from offender names
+            $clusterGroups = foreach ($o in $offenders) {
+                Get-ClusterGroup -Name $o.Name -ErrorAction SilentlyContinue
+            }
+            # 4. Resolve VM objects and filter NON-Windows only
+            $nonWindowsGroups += foreach ($group in $clusterGroups) {
+                $vm = Get-VM -ComputerName $nodes -Name $group.Name -ErrorAction SilentlyContinue | ? State -eq "Running"
+                $VmWmi = gwmi -namespace root\virtualization\v2 -query "Select * From Msvm_ComputerSystem Where ElementName='$(($vm).Name)'" -ComputerName $vm.PSComputerName
+                $Kvp = gwmi -namespace root\virtualization\v2 -query "Associators of {$VmWmi} Where AssocClass=Msvm_SystemDevice ResultClass=Msvm_KvpExchangeComponent" -ComputerName $vm.PSComputerName
+                $OSPlatformId=$Kvp.GuestIntrinsicExchangeItems | %{
+                    $xml = [xml]$_
+                    if ($xml.INSTANCE.PROPERTY | Where-Object { $_.Name -eq 'Name' -and $_.VALUE -eq 'OSPlatformId' }) {
+                        ($xml.INSTANCE.PROPERTY | Where-Object { $_.Name -eq 'Data' }).VALUE
+                    }
+                } 
+                if ($vm -and (Get-ClusterGroup -Name $group.Name).Priority -gt 1000 -and $OSPlatformId -ne 2) {
+                    $group
                 }
-            } 
-            if ($vm -and (Get-ClusterGroup -Name $group.Name).Priority -gt 1000 -and $OSPlatformId -ne 2) {
-                $group
+            }
+            if ($nonWindowsGroups) {
+                Write-ToHost "Non-Windows VMs with repeated migration / failback failures detected" -Level 2 -Checkmark 2
+
+                foreach ($vm in $nonWindowsGroups) {
+                    Write-Host "Non-Windows VM '$($vm.Name)' failed $($vm.Count) times"
+                }
+                return $nonWindowsGroups
+            }
+            else {
+                Write-ToHost "No Non-Windows VMs exceeded failure threshold (>200% of average) in last 7 days" -Level 1 -Checkmark 1
             }
         }
-        if ($nonWindowsGroups) {
-            Write-ToHost "Non-Windows VMs with repeated migration / failback failures detected" -Level 2 -Checkmark 2
-
-            foreach ($vm in $nonWindowsGroups) {
-                Write-ToHost "Non-Windows VM '$($vm.Name)' failed $($vm.Count) times" -Level 2
-            }
-
-            return $nonWindowsGroups
-        }
-        else {
-            Write-ToHost "No Non-Windows VMs exceeded failure threshold (>200% of average) in last 7 days" -Level 1 -Checkmark 1
-            return
-        }
+        return $null
     }
     Function Test-AzureLocalNodeServices {
         Write-Host "Checking per node services vital to Azure local..."
@@ -578,97 +586,99 @@ param(
         return $FailedServices
     }
     Function Test-DiskLatencyOutlier {
-        Write-Host "Looking at physical disk latency in the past week..."
-        try {
-            #Sample 2: Fire, fire, latency outlier
-            #Ref: https://learn.microsoft.com/en-us/windows-server/storage/storage-spaces/performance-history-scripting#sample-2-fire-fire-latency-outlier
-            $Cluster = Get-cluster
-            $ClusterNodes = Get-ClusterNode -Cluster $Cluster -ErrorAction SilentlyContinue
-            $TotalProblemDrives=@()
-            $TotalProblemDrives += Invoke-Command $ClusterNodes.Name {
-                Function Format-Latency {
-                Param (
-                $RawValue
-                )
-                $i = 0 ; $Labels = ("s", "ms", "$([char]956)s", "ns") # Petabits, just in case!
-                Do { $RawValue *= 1000 ; $i++ } While ( $RawValue -Lt 1 )
-                # Return
-                [String][Math]::Round($RawValue, 2) + " " + $Labels[$i]
-                }
-
-                Function Format-StandardDeviation {
-                Param (
-                $RawValue
-                )
-                If ($RawValue -Gt 0) {
-                    $Sign = "+"
-                } Else {
-                    $Sign = "-"
-                }
+        If ($ErrorOnlyCheck -eq $false) {
+            Write-Host "Looking at physical disk latency in the past week..."
+            try {
+                #Sample 2: Fire, fire, latency outlier
+                #Ref: https://learn.microsoft.com/en-us/windows-server/storage/storage-spaces/performance-history-scripting#sample-2-fire-fire-latency-outlier
+                $Cluster = Get-cluster
+                $ClusterNodes = Get-ClusterNode -Cluster $Cluster -ErrorAction SilentlyContinue
+                $TotalProblemDrives=@()
+                $TotalProblemDrives += Invoke-Command $ClusterNodes.Name {
+                    Function Format-Latency {
+                    Param (
+                    $RawValue
+                    )
+                    $i = 0 ; $Labels = ("s", "ms", "$([char]956)s", "ns") # Petabits, just in case!
+                    Do { $RawValue *= 1000 ; $i++ } While ( $RawValue -Lt 1 )
                     # Return
-                    $Sign + [String][Math]::Round([Math]::Abs($RawValue), 2)
-                }
-
-                $HDD = Get-StorageNode | ?{$ENV:COMPUTERNAME -imatch ($_.name -split '\.')[0]} | Get-PhysicalDisk  -PhysicallyConnected
-                $Output = $HDD | ForEach-Object {
-                    $Iops = $_ | Get-ClusterPerf -PhysicalDiskSeriesName "PhysicalDisk.Iops.Total" -TimeFrame "LastWeek"
-                    $AvgIops = ($Iops | Measure-Object -Property Value -Average).Average
-                    If ($AvgIops -Gt 1) { # Exclude idle or nearly idle drives
-                        $Latency = $_ | Get-ClusterPerf -PhysicalDiskSeriesName "PhysicalDisk.Latency.Average" -TimeFrame "LastWeek" 
-                        $AvgLatency = ($Latency | Measure-Object -Property Value -Average).Average
-                        [PsCustomObject]@{
-                            "FriendlyName"  = $_.FriendlyName
-                            "SerialNumber"  = $_.SerialNumber
-                            "MediaType"     = $_.MediaType
-                            "AvgLatencyPopulation" = $null # Set below
-                            "AvgLatencyThisHDD"    = Format-Latency $AvgLatency
-                            "RawAvgLatencyThisHDD" = $AvgLatency
-                            "Deviation"            = $null # Set below
-                            "RawDeviation"         = $null # Set below
-                        }
+                    [String][Math]::Round($RawValue, 2) + " " + $Labels[$i]
                     }
-                }
 
-                If ($Output.Length -Ge 3) { # Minimum population requirement
+                    Function Format-StandardDeviation {
+                    Param (
+                    $RawValue
+                    )
+                    If ($RawValue -Gt 0) {
+                        $Sign = "+"
+                    } Else {
+                        $Sign = "-"
+                    }
+                        # Return
+                        $Sign + [String][Math]::Round([Math]::Abs($RawValue), 2)
+                    }
 
-                    # Find mean u and standard deviation o
-                    $u = ($Output | Measure-Object -Property RawAvgLatencyThisHDD -Average).Average
-                    $d = $Output | ForEach-Object { ($_.RawAvgLatencyThisHDD - $u) * ($_.RawAvgLatencyThisHDD - $u) }
-                    $o = [Math]::Sqrt(($d | Measure-Object -Sum).Sum / $Output.Length)
-
-                    $FoundOutlier = $False
-                    $ProblemDrives=@()
-                    $ProblemDrives+=$Output | ForEach-Object {
-                        $Deviation = ($_.RawAvgLatencyThisHDD - $u) / $o
-                        $_.AvgLatencyPopulation = Format-Latency $u
-                        $_.Deviation = Format-StandardDeviation $Deviation
-                        $_.RawDeviation = $Deviation
-                        # If distribution is Normal, expect >99% within 3 deviations
-                        If ($Deviation -Gt 3) {
-                            $FoundOutlier = $True
-                            [PSCustomerObject] @{
-                                "SerialNumber"   = $_.SerialNumber
-                                "MediaType"      = $_.MediaType
-                                "PSComputerName" = "$env:COMPUTERNAME"
-                                "Deviation"       = $Deviation
+                    $HDD = Get-StorageNode | ?{$ENV:COMPUTERNAME -imatch ($_.name -split '\.')[0]} | Get-PhysicalDisk  -PhysicallyConnected
+                    $Output = $HDD | ForEach-Object {
+                        $Iops = $_ | Get-ClusterPerf -PhysicalDiskSeriesName "PhysicalDisk.Iops.Total" -TimeFrame "LastWeek"
+                        $AvgIops = ($Iops | Measure-Object -Property Value -Average).Average
+                        If ($AvgIops -Gt 1) { # Exclude idle or nearly idle drives
+                            $Latency = $_ | Get-ClusterPerf -PhysicalDiskSeriesName "PhysicalDisk.Latency.Average" -TimeFrame "LastWeek" 
+                            $AvgLatency = ($Latency | Measure-Object -Property Value -Average).Average
+                            [PsCustomObject]@{
+                                "FriendlyName"  = $_.FriendlyName
+                                "SerialNumber"  = $_.SerialNumber
+                                "MediaType"     = $_.MediaType
+                                "AvgLatencyPopulation" = $null # Set below
+                                "AvgLatencyThisHDD"    = Format-Latency $AvgLatency
+                                "RawAvgLatencyThisHDD" = $AvgLatency
+                                "Deviation"            = $null # Set below
+                                "RawDeviation"         = $null # Set below
                             }
                         }
                     }
-                }
 
-                $ProblemDrives
-            }
-            $TotalProblemDrives = $TotalProblemDrives | Sort PSComputerName
-            if ($TotalProblemDrives) {
-                Foreach ($disk in $TotalProblemDrives) {
-                    Write-ToHost "Node $($disk.PSComputerName) with SN $($disk.SerialNumber) with deviation of $($disk.Deviation) may need to be reseated" -Level 2 -Checkmark 2
+                    If ($Output.Length -Ge 3) { # Minimum population requirement
+
+                        # Find mean u and standard deviation o
+                        $u = ($Output | Measure-Object -Property RawAvgLatencyThisHDD -Average).Average
+                        $d = $Output | ForEach-Object { ($_.RawAvgLatencyThisHDD - $u) * ($_.RawAvgLatencyThisHDD - $u) }
+                        $o = [Math]::Sqrt(($d | Measure-Object -Sum).Sum / $Output.Length)
+
+                        $FoundOutlier = $False
+                        $ProblemDrives=@()
+                        $ProblemDrives+=$Output | ForEach-Object {
+                            $Deviation = ($_.RawAvgLatencyThisHDD - $u) / $o
+                            $_.AvgLatencyPopulation = Format-Latency $u
+                            $_.Deviation = Format-StandardDeviation $Deviation
+                            $_.RawDeviation = $Deviation
+                            # If distribution is Normal, expect >99% within 3 deviations
+                            If ($Deviation -Gt 3) {
+                                $FoundOutlier = $True
+                                [PSCustomerObject] @{
+                                    "SerialNumber"   = $_.SerialNumber
+                                    "MediaType"      = $_.MediaType
+                                    "PSComputerName" = "$env:COMPUTERNAME"
+                                    "Deviation"       = $Deviation
+                                }
+                            }
+                        }
+                    }
+
+                    $ProblemDrives
                 }
-                return $true
-            } else {
-                Write-ToHost "All physical disks passed"
-                return $false
-            }
-            } catch { Show-Warning "Unable to get latency outlier Data.  `nError="+$_.Exception.Message
+                $TotalProblemDrives = $TotalProblemDrives | Sort PSComputerName
+                if ($TotalProblemDrives) {
+                    Foreach ($disk in $TotalProblemDrives) {
+                        Write-ToHost "Node $($disk.PSComputerName) with SN $($disk.SerialNumber) with deviation of $($disk.Deviation) may need to be reseated" -Level 2 -Checkmark 2
+                    }
+                    return $true
+                } else {
+                    Write-ToHost "All physical disks passed"
+                    return $false
+                }
+                } catch { Show-Warning "Unable to get latency outlier Data.  `nError="+$_.Exception.Message
+                }
             }
     }
     function Test-AzLocalClusterDiskEndurance {
@@ -866,20 +876,157 @@ v$ver
                                       
                       by: Tommy Paulk
 "@
+    Write-Host "Logging Telemetry Information..."
+
+    function Add-TableData {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory=$true)]
+            [string]$TableName,
+
+            [Parameter(Mandatory=$true)]
+            [string]$PartitionKey,
+
+            [Parameter(Mandatory=$false)]
+            [string]$RowKey,
+
+            [Parameter(Mandatory=$false)]
+            [string]$SasToken,
+            
+            [Parameter(Mandatory=$true)]
+            $Data
+        )
+
+        try {$Data=[HashTable]$Data
+
+        $RowKey = [guid]::NewGuid().Guid
+        
+        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/?SECRET REMOVED'
+
+        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
+
+        $headers = @{
+            "Accept"       = "application/json;odata=nometadata"
+            "Content-Type" = "application/json"
+            "x-ms-version" = "2019-02-02"
+        }
+
+        $Data["PartitionKey"] = $PartitionKey
+        $Data["RowKey"]       = $RowKey
+
+        $body = $Data | ConvertTo-Json -Depth 5
+
+        $maxRetries = 3
+        $attempt = 0
+        $success = $false
+        } catch {return}
+        while (-not $success -and $attempt -lt $maxRetries) {
+
+            try {
+                Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
+                $success = $true
+                Write-Indent "Telemetry recorded successfully" 1 Green
+            }
+            catch {
+                $attempt++
+
+                if ($attempt -lt $maxRetries) {
+                    Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
+                    Start-Sleep -Seconds 2
+                }
+                else {
+                    Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
+                }
+            }
+        }
+    }
+
+    function Write-Indent {
+        param(
+            [string]$Message,
+            [int]$Level = 1,
+            [string]$Color = "Gray"
+        )
+
+        $prefix = "  " * $Level
+        Write-Host "$prefix$Message" -ForegroundColor $Color
+    }
+
+    <#
+    # Unique report id
+    $CReportID = [guid]::NewGuid().Guid
+
+
+    Write-Indent "Resolving Geo Location..."
+
+    try {
+        if (-not $global:GeoCache) {
+            $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+        }
+
+        $response = $global:GeoCache
+
+        if ($response.success -eq $true) {
+
+            $country     = $response.country
+            $countryCode = $response.country_code
+            $region      = $response.region
+            $city        = $response.city
+            $latitude    = $response.latitude
+            $longitude   = $response.longitude
+            $timezone    = $response.timezone.id
+
+            Write-Indent "Country: $country" 2
+            Write-Indent "Region : $region" 2
+        }
+    }
+    catch {
+        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+    }
+
+    $data = @{
+        Region       = $region
+        Version      = $ver
+        ReportID     = $CReportID
+        country      = $country
+        countryCode  = $countryCode
+        geoRegion    = $region
+        city         = $city
+        lat          = $latitude
+        lon          = $longitude
+        timezone     = $timezone
+        Timestamp = (Get-Date).ToUniversalTime().ToString("o")
+        HostOS = [System.Environment]::OSVersion.VersionString
+        PSVersion = $PSVersionTable.PSVersion.ToString()
+    }
+
+    # We use tool name for this value
+    $PartitionKey = "Tali"
+
+    Add-TableData `
+        -TableName "TaliTelemetryData" `
+        -PartitionKey $PartitionKey `
+        -Data $data 
+#>
+
     If ($FixErrors -or $FixWarningsAlso) {Write-Warning "Fix commands are in beta and SHOULD NOT be used without proper guidance";sleep 5}
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
+    $MasUpdateNotRunning=(!((Get-ActionPlanInstances | ? Status -eq Running | ? ActionPlanName -like "MAS Update*").count))
+    If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
+        Write-Warning "Solution Update is running. Some fixes will be disabled"
+    }
     Write-Host ""
     If ((Get-Job -Name "SUJob" -ErrorAction SilentlyContinue).count) {
         Write-Host "Waiting for prevoius Get Solution Update command to timeout..."
         Get-Job -Name "SUJob" -ErrorAction SilentlyContinue | Remove-Job -Force
     }
     if (Test-SolutionUpdateCommand) {
-        If ($FixErrors -or $FixWarningsAlso) {
+        If ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Fixing Get Solution Update command. Est Time is less than five minutes" -ForegroundColor Cyan
             Get-ClusterGroup "Azure Stack HCI Download Service Cluster Group","Azure Stack HCI Health Service Cluster Group","Azure Stack HCI Orchestrator Service Cluster Group","Azure Stack HCI Update Service Cluster Group" | Stop-ClusterGroup | Start-ClusterGroup
             Write-Host "Restarting cluster groups finished."
-	    Write-Host "Waiting for Get Solution Update command to time out"
+	        Write-Host "Waiting for Get Solution Update command to time out"
             While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
             Write-Host "."
             Get-Job -Name "SUJob" -ErrorAction SilentlyContinue | Remove-Job -Force
@@ -1030,7 +1177,7 @@ v$ver
     Write-Host ""
     $disksInMaint= Test-NodesUpDisksinMaintMode
     If ($disksInMaint)  {
-        If ($FixErrors -or $FixWarningsAlso) {
+        If ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Taking disks out of maintenance mode. Est Time is less than five minutes" -ForegroundColor Cyan
             $disksFixed=foreach ($disk in $disksInMaint) {
                 try {
@@ -1151,7 +1298,7 @@ v$ver
     )
     $FailedServices=Test-AzureLocalNodeServices
     If ($FailedServices) {
-        if ($FixErrors -or $FixWarningsAlso) {
+        if ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Fixing stopped required services for Azure Local that run on all nodes. Est Time is less than two minutes" -ForegroundColor Cyan
             Foreach ($FailedService in $FailedServices) {
                 Invoke-Command -ComputerName $FailedService.PSComputerName -ScriptBlock {
@@ -1179,7 +1326,7 @@ v$ver
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
             $changed=$true
         }
-        If ($FixWarningsAlso -and !($FixErrors) -and $failed.MaxPercent -lt 100) {
+        If ($FixWarningsAlso -and !($FixErrors) -and $failed.MaxPercent -lt 100 -and !($ErrorOnlyCheck) -and $failed.MaxPercent -gt $failed.Threshold) {
             Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
             $changed=$true
@@ -1214,7 +1361,7 @@ v$ver
     }
     Write-Host ""
     If ((Test-GetHealthFault) -eq $true) {
-        if ($FixErrors -or $FixWarningsAlso) {
+        if ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
             Invoke-Command -ComputerName $nodes -ScriptBlock {
                 Restart-Service Winmgmt -Force
@@ -1228,7 +1375,7 @@ v$ver
     Write-Host ""
     $badModules=Test-MismatchedPSModules
     If ($badModules.count) {
-        if ($FixErrors -or $FixWarningsAlso) {
+        if ($FixErrors -or $FixWarningsAlso -and $MasUpdateNotRunning) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
             $solutionState=(Get-SolutionUpdate).State
             if ($solutionState -eq "Installing" -or $solutionState -eq "InstallationFailed") {
@@ -1258,7 +1405,7 @@ v$ver
                 }
                 #Get-Job
                 Get-Job -Name "InstallModules*" | Receive-Job -Wait
-                #Get-Job -Name "InstallModules*" | Remove-Job
+                Get-Job -Name "InstallModules*" | Remove-Job
             
                 Foreach ($badModule in $badModules) {
                     Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
