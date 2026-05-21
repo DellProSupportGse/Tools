@@ -93,7 +93,7 @@ if ($CapState -eq "Blocked") {
     $State = "Transitional"
 } elseif ([string]::IsNullOrWhiteSpace($Status)) {
     $State = "Blocked" 
-    $BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "Secure Boot servicing framework may not be installed" )
+    $BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "BIOS may need to be updated", "Secure Boot servicing framework may not be installed" )
 } elseif ($CapState -eq "Unknown") {
     $State = "Remediate BIOS First"
 } elseif ($CapState -eq "Optimal") {
