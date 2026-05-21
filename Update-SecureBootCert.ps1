@@ -167,10 +167,9 @@ Set-ItemProperty `
     -Name AvailableUpdates `
     -Type DWord `
     -Value 0x5944
+Enable-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update"
 
-Start-ScheduledTask `
-    -TaskPath "\Microsoft\Windows\PI\" `
-    -TaskName "Secure-Boot-Update"
+Start-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update"
 
 Write-Host "Remediation triggered successfully." -ForegroundColor Green
 Write-Host "Reboot required." -ForegroundColor Yellow
