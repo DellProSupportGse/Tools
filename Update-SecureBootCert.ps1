@@ -92,7 +92,7 @@ if ($CapState -eq "Blocked") {
 } elseif ($CapState -eq "Capable") {
     $State = "Transitional"
 } elseif ([string]::IsNullOrWhiteSpace($Status)) {
-    $State = "Transitional" 
+    $State = "NotStarted" 
     #$BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "BIOS may need to be updated", "Secure Boot servicing framework may not be installed" )
 } elseif ($CapState -eq "Unknown") {
     $State = "Remediate BIOS First"
@@ -155,7 +155,7 @@ if (gcm Get-BitLockerVolume) {
 # Optional remediation gate (only if NOT Ready or BIOS-blocked)
 # ------------------------------------------------------------
 
-$AllowRemediation = $State -in @("Transitional")
+$AllowRemediation = $State -in @("NotStarted")
 
 if (-not $AllowRemediation) {
 
