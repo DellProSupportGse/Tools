@@ -35,6 +35,10 @@ $Capable  = $props.WindowsUEFICA2023Capable
 
 $AvailableUpdates = (Get-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue).AvailableUpdates
 
+if ([string]::IsNullOrWhiteSpace($Status)) { 
+    $State = "Blocked" 
+    $BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "Secure Boot servicing framework may not be installed" ) }
+
 # ------------------------------------------------------------
 # Normalize Capable State (CRITICAL)
 # ------------------------------------------------------------
@@ -122,7 +126,8 @@ switch ($State) {
     }
 
     "Blocked" {
-        Write-Host "Secure Boot is disabled or unavailable." -ForegroundColor Red
+        Write-Host "Secure Boot is disabled or unavailable. OS may not be updated." -ForegroundColor Red
+        $BlockingReason
     }
 
     "Transitional" {
