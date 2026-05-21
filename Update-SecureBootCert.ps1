@@ -146,8 +146,10 @@ switch ($State) {
         Write-Host "Unknown state. Manual investigation required." -ForegroundColor DarkYellow
     }
 }
-If ((Get-BitLockerVolume -MountPoint "C:" -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') {
-    Write-Warning "Bitlocker is enabled. Bitlocker should be Off before any remediation reboot or the key may be required"
+if (gcm Get-BitLockerVolume) {
+    If ((Get-BitLockerVolume -MountPoint "C:" -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') {
+        Write-Warning "Bitlocker is enabled. Bitlocker should be Off before any remediation reboot or the key may be required"
+    }
 }
 # ------------------------------------------------------------
 # Optional remediation gate (only if NOT Ready or BIOS-blocked)
