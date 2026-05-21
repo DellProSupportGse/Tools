@@ -104,27 +104,25 @@ if ($CapState -eq "Blocked") {
     if ($AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
         $State = "Ready"
     }
-}
-
-
-# 2. Firmware readiness checks
-if ($AvailableUpdates -eq 0x0040 -or $AvailableUpdates -eq 0x0044) {
-    $State = "Remediate BIOS First"
-} elseif ($AvailableUpdates -eq 0) {
-    $State = "Update OS"
-    Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
-} elseif ($Status -eq "InProgress") {
-    $State = "Reboot"
-} elseif ($HasFailure -and -not $HasSuccess) {
-    $State = "Transitional"
-} elseif (($Status -ne "Updated" -or -not $DbUpdated) -and $Status -gt $null) {
-    $State = "Transitional"
-} elseif ($Status -eq "InProgress") {
-    $State = "Reboot"
 } else {
-    $State = "NotStarted"
+    # 2. Firmware readiness checks
+    if ($AvailableUpdates -eq 0x0040 -or $AvailableUpdates -eq 0x0044) {
+        $State = "Remediate BIOS First"
+    } elseif ($AvailableUpdates -eq 0) {
+        $State = "Update OS"
+        Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
+    } elseif ($Status -eq "InProgress") {
+        $State = "Reboot"
+    } elseif ($HasFailure -and -not $HasSuccess) {
+        $State = "Transitional"
+    } elseif (($Status -ne "Updated" -or -not $DbUpdated) -and $Status -gt $null) {
+        $State = "Transitional"
+    } elseif ($Status -eq "InProgress") {
+        $State = "Reboot"
+    } else {
+        $State = "NotStarted"
+    }
 }
-
 
 # ------------------------------------------------------------
 # OUTPUT
@@ -152,7 +150,7 @@ switch ($State) {
     }
 
     "Reboot" {
-        Write-Host "System may need another reboot" -ForegroundColor Red
+        Write-Host "Wait 15 minutes and if you still get this the system may need another reboot" -ForegroundColor Red
     }
 
     "Transitional" {
