@@ -14,12 +14,12 @@ Write-Host ""
 try {
     if (-not (Confirm-SecureBootUEFI)) {
         Write-Host "STATE: BLOCKED (Secure Boot disabled)" -ForegroundColor Red
-        exit 1
+        return 1
     }
 }
 catch {
     Write-Host "STATE: BLOCKED (Not UEFI or Secure Boot unavailable)" -ForegroundColor Red
-    exit 1
+    return 1
 }
 
 Write-Host "Secure Boot: ENABLED" -ForegroundColor Green
@@ -159,7 +159,7 @@ if (-not $AllowRemediation) {
 
     Write-Host ""
     Write-Host "Remediation NOT triggered (state = $State)" -ForegroundColor Yellow
-    exit 0
+    return 0
 }
 
 Write-Host ""
