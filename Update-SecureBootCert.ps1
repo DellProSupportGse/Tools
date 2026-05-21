@@ -92,25 +92,35 @@ if ($CapState -eq "Blocked") {
 } elseif ($CapState -eq "Capable") {
     $State = "Transitional"
 } elseif ([string]::IsNullOrWhiteSpace($Status)) {
-    $State = "NotStarted" 
+    if ($AvailableUpdates -gt $null) {
+        $State = "Transitional" 
+    } else {
+        $State = "NotStarted"
+    }
     #$BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "BIOS may need to be updated", "Secure Boot servicing framework may not be installed" )
 } elseif ($CapState -eq "Unknown") {
     $State = "Remediate BIOS First"
 } elseif ($CapState -eq "Optimal") {
+    if ($AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
+        $State = "Ready"
+    }
+}
+
 
     # 2. Firmware readiness checks
     if ($AvailableUpdates -eq 0x0040 -or $AvailableUpdates -eq 0x0044) {
         $State = "Remediate BIOS First"
+    } elseif ($AvailableUpdates -eq 0) {
+        $State = "Update OS"
+        Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
     } elseif ($HasFailure -and -not $HasSuccess) {
         $State = "Transitional"
-    } elseif ($Status -ne "Updated" -or -not $DbUpdated) {
+    } elseif (($Status -ne "Updated" -or -not $DbUpdated) -and $Status -gt $null) {
         $State = "Transitional"
-    } elseif ($AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
-        $State = "Ready"
     } else {
-        $State = "Transitional"
+        $State = "NotStarted"
     }
-}
+
 
 # ------------------------------------------------------------
 # OUTPUT
@@ -131,6 +141,10 @@ switch ($State) {
     "Blocked" {
         Write-Host "Secure Boot with 2023 certs is disabled or unavailable. BIOS or OS may not be updated." -ForegroundColor Red
         $BlockingReason
+    }
+
+    "Update OS" {
+        Write-Host "Update OS First" -ForegroundColor Red
     }
 
     "Transitional" {
