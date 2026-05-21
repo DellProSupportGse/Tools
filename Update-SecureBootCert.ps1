@@ -172,4 +172,4 @@ Enable-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-U
 Start-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update"
 
 Write-Host "Remediation triggered successfully." -ForegroundColor Green
-Write-Host "Reboot required." -ForegroundColor Yellow
+Write-Host "Reboot required. Please wait 10 minutes before reboot" -ForegroundColor Yellow
