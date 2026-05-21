@@ -145,6 +145,10 @@ switch ($State) {
         $BlockingReason
     }
 
+    "NotStarted" {
+        Write-Host "Beginning remediation process" -ForegroundColor Green
+    }
+
     "Update OS" {
         Write-Host "Update OS First" -ForegroundColor Red
     }
