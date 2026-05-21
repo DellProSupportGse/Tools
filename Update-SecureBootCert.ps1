@@ -92,10 +92,10 @@ if ($CapState -eq "Blocked") {
 } elseif ($CapState -eq "Capable") {
     $State = "Transitional"
 } elseif ([string]::IsNullOrWhiteSpace($Status)) {
-    if ($AvailableUpdates -gt $null) {
-        $State = "Transitional" 
+    if ($CapState -eq "Unknown" -and !((Get-ScheduledTaskInfo -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update").LastRunTime -gt (Get-Date).AddMinutes(-60))) {
+        $State = "NotStarted" 
     } else {
-        $State = "NotStarted"
+        $State = "Update OS"
     }
     #$BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "BIOS may need to be updated", "Secure Boot servicing framework may not be installed" )
 } elseif ($CapState -eq "Unknown") {
@@ -198,4 +198,4 @@ Start-ScheduledTask `
     -TaskName "Secure-Boot-Update"
 
 Write-Host "Remediation triggered successfully." -ForegroundColor Green
-Write-Host "Reboot required." -ForegroundColor Yellow
+Write-Host "Reboot required. After reboot, wait 15 minutes" -ForegroundColor Yellow
