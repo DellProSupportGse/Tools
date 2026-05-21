@@ -37,7 +37,7 @@ $AvailableUpdates = (Get-ItemProperty -Path $SecureBootPath -Name AvailableUpdat
 
 if ([string]::IsNullOrWhiteSpace($Status)) { 
     $State = "Blocked" 
-    $BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "Secure Boot servicing framework may not be installed" ) }
+    $BlockingReason = @( "UEFICA2023Status registry value not found", "BIOS may need to be updated","OS may require newer cumulative updates", "Secure Boot servicing framework may not be installed" ) }
 
 # ------------------------------------------------------------
 # Normalize Capable State (CRITICAL)
