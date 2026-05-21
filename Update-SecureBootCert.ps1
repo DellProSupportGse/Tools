@@ -35,6 +35,10 @@ $Capable  = $props.WindowsUEFICA2023Capable
 
 $AvailableUpdates = (Get-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue).AvailableUpdates
 
+if ([string]::IsNullOrWhiteSpace($Status)) { 
+    $State = "Blocked" 
+    $BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "Secure Boot servicing framework may not be installed" ) }
+
 # ------------------------------------------------------------
 # Normalize Capable State (CRITICAL)
 # ------------------------------------------------------------
@@ -42,7 +46,7 @@ $AvailableUpdates = (Get-ItemProperty -Path $SecureBootPath -Name AvailableUpdat
 $CapState = switch ($Capable) {
     0 { "Blocked" }
     1 { "Capable" }
-    2 { "Transitional" }
+    2 { "Optimal" }
     default { "Unknown" }
 }
 
@@ -85,29 +89,25 @@ $State = "Unknown"
 # 1. Hard blockers first
 if ($CapState -eq "Blocked") {
     $State = "Blocked"
-}
-elseif ($CapState -eq "Unknown") {
-    $State = "Remediate BIOS First"
-}
-elseif ($CapState -eq "Transitional") {
+} elseif ($CapState -eq "Capable") {
     $State = "Transitional"
-}
-elseif ($CapState -eq "Capable") {
+} elseif ([string]::IsNullOrWhiteSpace($Status)) {
+    $State = "Blocked" 
+    $BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "BIOS may need to be updated", "Secure Boot servicing framework may not be installed" )
+} elseif ($CapState -eq "Unknown") {
+    $State = "Remediate BIOS First"
+} elseif ($CapState -eq "Optimal") {
 
     # 2. Firmware readiness checks
     if ($AvailableUpdates -eq 0x0040 -or $AvailableUpdates -eq 0x0044) {
         $State = "Remediate BIOS First"
-    }
-    elseif ($HasFailure -and -not $HasSuccess) {
+    } elseif ($HasFailure -and -not $HasSuccess) {
         $State = "Transitional"
-    }
-    elseif ($Status -ne "Updated" -or -not $DbUpdated) {
+    } elseif ($Status -ne "Updated" -or -not $DbUpdated) {
         $State = "Transitional"
-    }
-    elseif ($AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
+    } elseif ($AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
         $State = "Ready"
-    }
-    else {
+    } else {
         $State = "Transitional"
     }
 }
@@ -129,7 +129,8 @@ switch ($State) {
     }
 
     "Blocked" {
-        Write-Host "Secure Boot is disabled or unavailable." -ForegroundColor Red
+        Write-Host "Secure Boot is disabled or unavailable. OS may not be updated." -ForegroundColor Red
+        $BlockingReason
     }
 
     "Transitional" {
@@ -145,7 +146,9 @@ switch ($State) {
         Write-Host "Unknown state. Manual investigation required." -ForegroundColor DarkYellow
     }
 }
-
+If ((Get-BitLockerVolume -MountPoint "C:" -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') {
+    Write-Warning "Bitlocker is enabled. Bitlocker should be Off before any remediation reboot or the key may be required"
+}
 # ------------------------------------------------------------
 # Optional remediation gate (only if NOT Ready or BIOS-blocked)
 # ------------------------------------------------------------
@@ -167,9 +170,10 @@ Set-ItemProperty `
     -Name AvailableUpdates `
     -Type DWord `
     -Value 0x5944
-Enable-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update"
 
-Start-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update"
+Start-ScheduledTask `
+    -TaskPath "\Microsoft\Windows\PI\" `
+    -TaskName "Secure-Boot-Update"
 
 Write-Host "Remediation triggered successfully." -ForegroundColor Green
-Write-Host "Reboot required. Please wait 10 minutes before reboot" -ForegroundColor Yellow
+Write-Host "Reboot required." -ForegroundColor Yellow
