@@ -129,7 +129,7 @@ switch ($State) {
     }
 
     "Blocked" {
-        Write-Host "Secure Boot is disabled or unavailable. OS may not be updated." -ForegroundColor Red
+        Write-Host "Secure Boot with 2023 certs is disabled or unavailable. BIOS or OS may not be updated." -ForegroundColor Red
         $BlockingReason
     }
 
