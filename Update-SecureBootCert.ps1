@@ -128,7 +128,7 @@ if ($CapState -eq "Blocked") {
         If ($BootMgrLastUpdateErrorReason -gt "" -or $OROMLastUpdateErrorReason -gt "" -or $UEFILastUpdateErrorReason -gt "") {
             $LastError=@($BootMgrLastUpdateErrorReason,$OROMLastUpdateErrorReason,$UEFILastUpdateErrorReason) | Sort -Unique
             $State="Blocked"
-            $BlockingReason=$LastError
+            $BlockingReason="Update error $LastError"
         }
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
@@ -162,7 +162,7 @@ switch ($State) {
 
     "Blocked" {
         Write-Host "Secure Boot with 2023 certs is disabled or unavailable. BIOS or OS may not be updated." -ForegroundColor Red
-        $BlockingReason
+        Write-Host $BlockingReason -ForegroundColor Yellow
     }
 
     "NotStarted" {
