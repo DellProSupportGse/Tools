@@ -114,7 +114,7 @@ if ($CapState -eq "Blocked") {
     } elseif ($CapState -eq "Capable" -and $AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
         $State = "Ready"
         $ConfidenceLevel = $props.ConfidenceLevel
-        If ($ConfidenceLevel -match "Under Obervation.*?More Data Needed") {
+        If ($ConfidenceLevel -match "Under Observation - More Data Needed") {
             Write-Host "Update is done, but MS does not have enough information on this configuration to ensure success" -ForegroundColor DarkYellow
         } else {
             Write-Host "Update is done, but confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
