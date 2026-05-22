@@ -128,7 +128,7 @@ if ($CapState -eq "Blocked") {
         If ($BootMgrLastUpdateErrorReason -gt "" -or $OROMLastUpdateErrorReason -gt "" -or $UEFILastUpdateErrorReason -gt "") {
             $LastError=@($BootMgrLastUpdateErrorReason,$OROMLastUpdateErrorReason,$UEFILastUpdateErrorReason) | Sort -Unique
             $State="Blocked"
-            $BlockingReason="Update error $LastError"
+            $BlockingReason="Update error $($LastError -join ",")"
         }
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
