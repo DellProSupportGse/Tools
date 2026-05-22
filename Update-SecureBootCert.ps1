@@ -113,6 +113,11 @@ if ($CapState -eq "Blocked") {
     # 2. Firmware readiness checks
     if ($AvailableUpdates -eq 0x0040 -or $AvailableUpdates -eq 0x0044) {
         $State = "Remediate BIOS First"
+    } elseif ($CapState -eq "Capable" -and $AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
+        $State = "Ready"
+        $ConfidenceLevel = $props.ConfidenceLevel
+        Write-Host "Update is done, but confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
+        #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
