@@ -93,6 +93,7 @@ $State = "Unknown"
 # 1. Hard blockers first
 if ($CapState -eq "Blocked") {
     $State = "Blocked"
+    $BlockingReason="BIOS not up to date or BIOS is not capable of booting with the 2023 certs. Please update the BIOS"
 } elseif ($Status -eq "InProgress" -and $HasMadeProgress) {
     $State = "RebootIn15"
 } elseif ($Status -eq "NotStarted") {
