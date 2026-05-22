@@ -124,6 +124,7 @@ if ($CapState -eq "Blocked") {
         $State = "Reboot"
     } else {
         $State = "Update OS"
+    }
 }
 
 # ------------------------------------------------------------
