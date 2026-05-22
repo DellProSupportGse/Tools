@@ -34,6 +34,9 @@ $Status   = $props.UEFICA2023Status
 $Capable  = $props.WindowsUEFICA2023Capable
 
 $AvailableUpdates = (Get-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue).AvailableUpdates
+$OROMLastUpdateErrorReason = $props.DB3POROMLastUpdateErrorReason
+$UEFILastUpdateErrorReason = $props.DB3PUEFILastUpdateErrorReason
+$BootMgrLastUpdateErrorReason = $props.BootMgrLastUpdateErrorReason
 
 if ([string]::IsNullOrWhiteSpace($Status)) { 
     $State = "Blocked" 
@@ -122,6 +125,11 @@ if ($CapState -eq "Blocked") {
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
     } elseif ($CapState -eq "Capable") {
         $State = "Transitional"
+        If ($BootMgrLastUpdateErrorReason -gt "" -or $OROMLastUpdateErrorReason -gt "" -or $UEFILastUpdateErrorReason -gt "") {
+            $LastError=@($BootMgrLastUpdateErrorReason,$OROMLastUpdateErrorReason,$UEFILastUpdateErrorReason) | Sort -Unique
+            $State="Blocked"
+            $BlockingReason=$LastError
+        }
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
