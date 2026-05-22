@@ -204,9 +204,9 @@ Set-ItemProperty `
     -Type DWord `
     -Value 0x5944
 
-Start-ScheduledTask `
-    -TaskPath "\Microsoft\Windows\PI\" `
-    -TaskName "Secure-Boot-Update"
-
+Start-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update" -Verbose
+Write-Host "Waiting for task to finish"
+While ((Get-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
+Write-Host ""
 Write-Host "Remediation triggered successfully." -ForegroundColor Green
 Write-Host "Reboot required. After reboot, wait 15 minutes" -ForegroundColor Yellow
