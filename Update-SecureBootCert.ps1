@@ -116,7 +116,11 @@ if ($CapState -eq "Blocked") {
     } elseif ($CapState -eq "Capable" -and $AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
         $State = "Ready"
         $ConfidenceLevel = $props.ConfidenceLevel
-        Write-Host "Update is done, but confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
+        If ($ConfidenceLevel -match "Under Obervation - More Data Needed") {
+            Write-Host "Update is done, but MS does not have enough information on this configuration to ensure success" -ForegroundColor DarkYellow
+        } else {
+            Write-Host "Update is done, but confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
+        }
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
