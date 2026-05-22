@@ -178,7 +178,7 @@ switch ($State) {
     }
 
     "RebootIn15" {
-        Write-Host "Please wait an additional 10-15 mins, run the script and if needed reboot to continue remediation. Feel free to spam the script." -ForegroundColor Red
+        Write-Host "Please wait an additional 10-15 minutes, run the script and if needed reboot to continue remediation." -ForegroundColor Red
     }
 
     "Transitional" {
