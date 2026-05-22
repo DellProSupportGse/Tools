@@ -194,7 +194,7 @@ switch ($State) {
         Write-Host "Unknown state. Manual investigation required." -ForegroundColor DarkYellow
     }
 }
-if (gcm Get-BitLockerVolume) {
+if (gcm Get-BitLockerVolume -and $State -ne "Ready") {
     If ((Get-BitLockerVolume -MountPoint "C:" -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') {
         Write-Warning "Bitlocker is enabled. Bitlocker should be Off before any remediation reboot or the key may be required"
     }
