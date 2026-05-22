@@ -94,8 +94,6 @@ if ($CapState -eq "Blocked") {
     $State = "RebootIn15"
 } elseif ($Status -eq "NotStarted") {
     $State = "NotStarted"
-} elseif ($CapState -eq "Capable") {
-    $State = "Transitional"
 } elseif ([string]::IsNullOrWhiteSpace($Status)) {
     #if ($CapState -eq "Unknown") { # -and !((Get-ScheduledTaskInfo -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update").LastRunTime -gt (Get-Date).AddMinutes(-60))
     #    $State = "NotStarted" 
@@ -122,6 +120,8 @@ if ($CapState -eq "Blocked") {
             Write-Host "Update is done, but confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
         }
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
+    } elseif ($CapState -eq "Capable") {
+        $State = "Transitional"
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
