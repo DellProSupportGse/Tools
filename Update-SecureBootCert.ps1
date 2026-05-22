@@ -206,9 +206,11 @@ if (gcm Get-BitLockerVolume) {
 $AllowRemediation = $State -in @("NotStarted")
 
 if (-not $AllowRemediation) {
-
-    Write-Host ""
-    Write-Host "Remediation NOT triggered (state = $State)" -ForegroundColor Yellow
+    If ($CapState -eq "Unknown") {
+        Write-Host ""
+        Write-Host "Remediation NOT triggered (state = $State)" -ForegroundColor Yellow
+        return 0
+    }
     return 0
 }
 
