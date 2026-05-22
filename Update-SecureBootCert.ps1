@@ -90,6 +90,10 @@ $State = "Unknown"
 # 1. Hard blockers first
 if ($CapState -eq "Blocked") {
     $State = "Blocked"
+} elseif ($Status -eq "InProgress" -and $HasMadeProgress) {
+    $State = "RebootNow"
+} elseif ($Status -eq "NotStarted") {
+    $State = "NotStarted"
 } elseif ($CapState -eq "Capable") {
     $State = "Transitional"
 } elseif ([string]::IsNullOrWhiteSpace($Status)) {
@@ -109,13 +113,9 @@ if ($CapState -eq "Blocked") {
     # 2. Firmware readiness checks
     if ($AvailableUpdates -eq 0x0040 -or $AvailableUpdates -eq 0x0044) {
         $State = "Remediate BIOS First"
-   } elseif ($Status -eq "NotStarted") {
-        $State = "NotStarted"
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
-    } elseif ($Status -eq "InProgress" -and $HasMadeProgress) {
-        $State = "RebootNow"
     } elseif ($HasFailure -and -not $HasSuccess) {
         $State = "Transitional"
     } elseif (($Status -ne "Updated" -or -not $DbUpdated) -and $Status -gt $null) {
