@@ -119,7 +119,7 @@ if ($CapState -eq "Blocked") {
         $State = "Ready"
         $ConfidenceLevel = $props.ConfidenceLevel
         If ($ConfidenceLevel -match "Under Observation - More Data Needed") {
-            Write-Host "Update is done, but MS does not have enough information on this configuration to ensure success" -ForegroundColor DarkYellow
+            Write-Host "Update is done, but MS does not have enough information on this configuration to ensure success. This is common for servers." -ForegroundColor DarkYellow
         } else {
             Write-Host "Update is done, but confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
         }
