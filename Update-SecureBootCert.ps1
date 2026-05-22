@@ -120,8 +120,8 @@ if ($CapState -eq "Blocked") {
         $ConfidenceLevel = $props.ConfidenceLevel
         If ($ConfidenceLevel -match "Under Observation - More Data Needed") {
             Write-Host "Update is done, but MS does not have enough information on this configuration to ensure success. This is common for servers." -ForegroundColor DarkYellow
-        } else {
-            Write-Host "Update is done, but confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
+        } elseif (!($ConfidenceLevel -match "High Confidence")) {
+            Write-Host "Update is done and confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
         }
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
     } elseif ($CapState -eq "Capable") {
