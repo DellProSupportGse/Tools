@@ -79,6 +79,7 @@ $Events = Get-WinEvent -FilterHashtable @{
 
 $HasFailure   = $Events.Id -contains 1795 -or $Events.Id -contains 1801
 $HasSuccess   = $Events.Id -contains 1808
+$HasMadeProgress = $Events.Id -contains 1799
 
 # ------------------------------------------------------------
 # STATE MACHINE LOGIC
@@ -108,11 +109,13 @@ if ($CapState -eq "Blocked") {
     # 2. Firmware readiness checks
     if ($AvailableUpdates -eq 0x0040 -or $AvailableUpdates -eq 0x0044) {
         $State = "Remediate BIOS First"
+   } elseif ($Status -eq "NotStarted") {
+        $State = "NotStarted"
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
-        Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
-    } elseif ($Status -eq "InProgress") {
-        $State = "Reboot"
+        #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
+    } elseif ($Status -eq "InProgress" -and $HasMadeProgress) {
+        $State = "RebootNow"
     } elseif ($HasFailure -and -not $HasSuccess) {
         $State = "Transitional"
     } elseif (($Status -ne "Updated" -or -not $DbUpdated) -and $Status -gt $null) {
@@ -120,8 +123,7 @@ if ($CapState -eq "Blocked") {
     } elseif ($Status -eq "InProgress") {
         $State = "Reboot"
     } else {
-        $State = "NotStarted"
-    }
+        $State = "Update OS"
 }
 
 # ------------------------------------------------------------
@@ -150,11 +152,15 @@ switch ($State) {
     }
 
     "Update OS" {
-        Write-Host "Update OS First" -ForegroundColor Red
+        Write-Host "Update OS and BIOS first or wait 10 minutes and try script again" -ForegroundColor Red
     }
 
     "Reboot" {
         Write-Host "Wait 15 minutes and if you still get this the system may need another reboot" -ForegroundColor Red
+    }
+
+    "RebootNow" {
+        Write-Host "Reboot to continue remediation" -ForegroundColor Red
     }
 
     "Transitional" {
