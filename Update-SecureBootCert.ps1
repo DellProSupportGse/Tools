@@ -34,6 +34,9 @@ $Status   = $props.UEFICA2023Status
 $Capable  = $props.WindowsUEFICA2023Capable
 
 $AvailableUpdates = (Get-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue).AvailableUpdates
+$OROMLastUpdateErrorReason = $props.DB3POROMLastUpdateErrorReason
+$UEFILastUpdateErrorReason = $props.DB3PUEFILastUpdateErrorReason
+$BootMgrLastUpdateErrorReason = $props.BootMgrLastUpdateErrorReason
 
 if ([string]::IsNullOrWhiteSpace($Status)) { 
     $State = "Blocked" 
@@ -90,18 +93,17 @@ $State = "Unknown"
 # 1. Hard blockers first
 if ($CapState -eq "Blocked") {
     $State = "Blocked"
+    $BlockingReason="BIOS not up to date or BIOS is not capable of booting with the 2023 certs. Please update the BIOS"
 } elseif ($Status -eq "InProgress" -and $HasMadeProgress) {
     $State = "RebootIn15"
 } elseif ($Status -eq "NotStarted") {
     $State = "NotStarted"
-} elseif ($CapState -eq "Capable") {
-    $State = "Transitional"
 } elseif ([string]::IsNullOrWhiteSpace($Status)) {
-    if ($CapState -eq "Unknown" -and !((Get-ScheduledTaskInfo -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update").LastRunTime -gt (Get-Date).AddMinutes(-60))) {
-        $State = "NotStarted" 
-    } else {
+    #if ($CapState -eq "Unknown") { # -and !((Get-ScheduledTaskInfo -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update").LastRunTime -gt (Get-Date).AddMinutes(-60))
+    #    $State = "NotStarted" 
+    #} else {
         $State = "Update OS"
-    }
+    #}
     #$BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "BIOS may need to be updated", "Secure Boot servicing framework may not be installed" )
 } elseif ($CapState -eq "Unknown") {
     $State = "Remediate BIOS First"
@@ -113,6 +115,22 @@ if ($CapState -eq "Blocked") {
     # 2. Firmware readiness checks
     if ($AvailableUpdates -eq 0x0040 -or $AvailableUpdates -eq 0x0044) {
         $State = "Remediate BIOS First"
+    } elseif ($CapState -eq "Capable" -and $AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
+        $State = "Ready"
+        $ConfidenceLevel = $props.ConfidenceLevel
+        If ($ConfidenceLevel -match "Under Observation - More Data Needed") {
+            Write-Host "Update is done, but MS does not have enough information on this configuration to ensure success. This is common for servers." -ForegroundColor DarkYellow
+        } else {
+            Write-Host "Update is done, but confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
+        }
+        #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
+    } elseif ($CapState -eq "Capable") {
+        $State = "Transitional"
+        If ($BootMgrLastUpdateErrorReason -gt "" -or $OROMLastUpdateErrorReason -gt "" -or $UEFILastUpdateErrorReason -gt "") {
+            $LastError=@($BootMgrLastUpdateErrorReason,$OROMLastUpdateErrorReason,$UEFILastUpdateErrorReason) | Sort -Unique
+            $State="Blocked"
+            $BlockingReason="Update error $($LastError -join ",")"
+        }
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
         #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
@@ -145,7 +163,7 @@ switch ($State) {
 
     "Blocked" {
         Write-Host "Secure Boot with 2023 certs is disabled or unavailable. BIOS or OS may not be updated." -ForegroundColor Red
-        $BlockingReason
+        Write-Host $BlockingReason -ForegroundColor Yellow
     }
 
     "NotStarted" {
@@ -161,7 +179,7 @@ switch ($State) {
     }
 
     "RebootIn15" {
-        Write-Host "Please wait an additional 10-15 mins,run the script and if needed reboot to continue remediation. Feel free to spam the script." -ForegroundColor Red
+        Write-Host "Please wait an additional 10-15 minutes, run the script and if needed reboot to continue remediation." -ForegroundColor Red
     }
 
     "Transitional" {
@@ -177,7 +195,7 @@ switch ($State) {
         Write-Host "Unknown state. Manual investigation required." -ForegroundColor DarkYellow
     }
 }
-if (gcm Get-BitLockerVolume) {
+if (gcm Get-BitLockerVolume -and $State -ne "Ready") {
     If ((Get-BitLockerVolume -MountPoint "C:" -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') {
         Write-Warning "Bitlocker is enabled. Bitlocker should be Off before any remediation reboot or the key may be required"
     }
@@ -189,9 +207,11 @@ if (gcm Get-BitLockerVolume) {
 $AllowRemediation = $State -in @("NotStarted")
 
 if (-not $AllowRemediation) {
-
-    Write-Host ""
-    Write-Host "Remediation NOT triggered (state = $State)" -ForegroundColor Yellow
+    If ($CapState -eq "Unknown") {
+        Write-Host ""
+        Write-Host "Remediation NOT triggered (state = $State)" -ForegroundColor Yellow
+        return 0
+    }
     return 0
 }
 
@@ -204,9 +224,9 @@ Set-ItemProperty `
     -Type DWord `
     -Value 0x5944
 
-Start-ScheduledTask `
-    -TaskPath "\Microsoft\Windows\PI\" `
-    -TaskName "Secure-Boot-Update"
-
+Start-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update" -Verbose
+Write-Host "Waiting for task to finish"
+While ((Get-ScheduledTask -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
+Write-Host ""
 Write-Host "Remediation triggered successfully." -ForegroundColor Green
 Write-Host "Reboot required. After reboot, wait 15 minutes" -ForegroundColor Yellow
