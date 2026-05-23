@@ -99,12 +99,7 @@ if ($CapState -eq "Blocked") {
 } elseif ($Status -eq "NotStarted") {
     $State = "NotStarted"
 } elseif ([string]::IsNullOrWhiteSpace($Status)) {
-    #if ($CapState -eq "Unknown") { # -and !((Get-ScheduledTaskInfo -TaskPath "\Microsoft\Windows\PI\" -TaskName "Secure-Boot-Update").LastRunTime -gt (Get-Date).AddMinutes(-60))
-    #    $State = "NotStarted" 
-    #} else {
-        $State = "Update OS"
-    #}
-    #$BlockingReason = @( "UEFICA2023Status registry value not found", "OS may require newer cumulative updates", "BIOS may need to be updated", "Secure Boot servicing framework may not be installed" )
+    $State = "Update OS"
 } elseif ($CapState -eq "Unknown") {
     $State = "Remediate BIOS First"
 } elseif ($CapState -eq "Optimal") {
@@ -123,7 +118,6 @@ if ($CapState -eq "Blocked") {
         } elseif (!($ConfidenceLevel -match "High Confidence")) {
             Write-Host "Update is done and confidence level is '$ConfidenceLevel'" -ForegroundColor DarkYellow
         }
-        #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
     } elseif ($CapState -eq "Capable") {
         $State = "Transitional"
         If ($BootMgrLastUpdateErrorReason -gt "" -or $OROMLastUpdateErrorReason -gt "" -or $UEFILastUpdateErrorReason -gt "") {
@@ -133,7 +127,6 @@ if ($CapState -eq "Blocked") {
         }
     } elseif ($AvailableUpdates -eq 0) {
         $State = "Update OS"
-        #Remove-ItemProperty -Path $SecureBootPath -Name AvailableUpdates -ErrorAction SilentlyContinue -Confirm:$false
     } elseif ($HasFailure -and -not $HasSuccess) {
         $State = "Transitional"
     } elseif (($Status -ne "Updated" -or -not $DbUpdated) -and $Status -gt $null) {
@@ -179,7 +172,7 @@ switch ($State) {
     }
 
     "RebootIn15" {
-        Write-Host "Please wait an additional 10-15 minutes, run the script and if needed reboot to continue remediation." -ForegroundColor Red
+        Write-Host "Please wait an additional 15 minutes, run the script and if needed reboot to continue remediation." -ForegroundColor Red
     }
 
     "Transitional" {
@@ -187,8 +180,8 @@ switch ($State) {
     }
 
     "Remediate BIOS First" {
-        Write-Host "Firmware/BIOS is limiting Secure Boot update capability." -ForegroundColor Red
-        Write-Host "Action: Update OEM BIOS/UEFI firmware and retry." -ForegroundColor Yellow
+        Write-Host "OS or BIOS is limiting Secure Boot update capability." -ForegroundColor Red
+        Write-Host "Action: Update OS and BIOS and retry." -ForegroundColor Yellow
     }
 
     default {
