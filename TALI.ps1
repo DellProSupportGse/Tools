@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.47"
+    $ver="0.49"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -860,7 +860,198 @@ param(
         }
         return $badModules
     }
+    function Test-ClusterControlPlaneHealth {
+        [CmdletBinding()]
+        param(
+            [int]$NodeTimeoutSec  = 8,
+            [int]$ProbeTimeoutSec = 2,
+            [int]$ThrottleLimit   = 10,
+	    [string[]] $nodes=(Get-ClusterNode).name
+        )
+	Write-Host "Testing WMI, VMMS and Cluster service"
+        # ----------------------------
+        # Node-level execution (runs in parallel across cluster)
+        # ----------------------------
+        $scriptBlock = {
+            param($ProbeTimeoutSec)
 
+            function Run-Probe {
+                param(
+                    [string]$Name,
+                    [int]$TimeoutSec,
+                    [scriptblock]$Command
+                )
+
+                $job = Start-Job -ScriptBlock $Command
+
+                # ----------------------------
+                # TIMEOUT handling
+                # ----------------------------
+                if (-not (Wait-Job $job -Timeout $TimeoutSec)) {
+                    Stop-Job $job -Force | Out-Null
+                    Remove-Job $job -Force -ErrorAction SilentlyContinue
+
+                    return [pscustomobject]@{
+                        Name  = $Name
+                        State = "TIMEOUT"
+                    }
+                }
+
+                # ----------------------------
+                # JOB STATE is authoritative
+                # ----------------------------
+                $state = $job.State
+
+                try {
+                    Receive-Job $job -ErrorAction SilentlyContinue | Out-Null
+                }
+                finally {
+                    Remove-Job $job -Force -ErrorAction SilentlyContinue
+                }
+
+                switch ($state) {
+                    "Failed" {
+                        return [pscustomobject]@{
+                            Name  = $Name
+                            State = "FAILED"
+                        }
+                    }
+
+                    "Stopped" {
+                        return [pscustomobject]@{
+                            Name  = $Name
+                            State = "FAILED"
+                        }
+                    }
+
+                    default {
+                        return [pscustomobject]@{
+                            Name  = $Name
+                            State = "OK"
+                        }
+                    }
+                }
+            }
+
+            # ----------------------------
+            # WMI (root control plane dependency)
+            # ----------------------------
+            $wmi = Run-Probe -Name "WMI" -TimeoutSec $ProbeTimeoutSec -Command {
+                Get-CimInstance Win32_OperatingSystem | Out-Null
+            }
+
+            # ----------------------------
+            # VMMS provider layer
+            # ----------------------------
+            $vmms = Run-Probe -Name "VMMS" -TimeoutSec $ProbeTimeoutSec -Command {
+                Get-CimInstance -Namespace root\virtualization\v2 -Class Msvm_ComputerSystem | Out-Null
+            }
+
+            # ----------------------------
+            # Hyper-V orchestration layer
+            # ----------------------------
+            $vm = Run-Probe -Name "GetVM" -TimeoutSec $ProbeTimeoutSec -Command {
+                Get-VM | Out-Null
+            }
+
+            # ----------------------------
+            # Cluster service layer
+            # ----------------------------
+            $cluster = Run-Probe -Name "Cluster" -TimeoutSec $ProbeTimeoutSec -Command {
+                if (Get-Command Get-ClusterNode -ErrorAction SilentlyContinue) {
+                    Get-ClusterNode | Out-Null
+                }
+            }
+
+            # ----------------------------
+            # Fault domain classification
+            # ----------------------------
+            $fault =
+                if ($wmi.State -eq "TIMEOUT") {
+                    "WMI / CONTROL PLANE TIMEOUT"
+                }
+                elseif ($wmi.State -eq "FAILED") {
+                    "WMI / WINMGMT FAILED"
+                }
+                elseif ($vmms.State -eq "FAILED" -or $vm.State -eq "FAILED") {
+                    "VMMS / HYPER-V FAILED"
+                }
+                elseif ($vmms.State -eq "TIMEOUT" -or $vm.State -eq "TIMEOUT") {
+                    "VMMS / HYPER-V TIMEOUT"
+                }
+                elseif ($cluster.State -eq "FAILED") {
+                    "CLUSTER / CLUSSVC FAILED"
+                }
+                elseif ($cluster.State -eq "TIMEOUT") {
+                    "CLUSTER / CLUSSVC TIMEOUT"
+                }
+                else {
+                    "HEALTHY"
+                }
+
+            [pscustomobject]@{
+                Node        = $env:COMPUTERNAME
+                WMI         = $wmi.State
+                VMMS        = $vmms.State
+                GetVM       = $vm.State
+                Cluster     = $cluster.State
+                FaultDomain = $fault
+            }
+        }
+
+        # ----------------------------
+        # TRUE PARALLEL EXECUTION ACROSS NODES
+        # ----------------------------
+        $jobs = Invoke-Command -ComputerName $nodes `
+            -ScriptBlock $scriptBlock `
+            -ArgumentList $ProbeTimeoutSec `
+            -ThrottleLimit $ThrottleLimit `
+            -AsJob
+
+        # ----------------------------
+        # Node-level timeout window
+        # ----------------------------
+        Wait-Job $jobs -Timeout $NodeTimeoutSec | Out-Null
+
+        $timedOutJobs = Get-Job $jobs -ErrorAction SilentlyContinue | Where-Object State -eq "Running"
+
+        foreach ($j in $timedOutJobs) {
+            Stop-Job $j -Force | Out-Null
+        }
+
+        # ----------------------------
+        # Collect results
+        # ----------------------------
+        $results = Receive-Job $jobs -ErrorAction SilentlyContinue
+
+        Remove-Job $jobs -Force
+
+        # ----------------------------
+        # Inject node-level TIMEOUT classification
+        # ----------------------------
+        foreach ($j in $timedOutJobs) {
+            $results += [pscustomobject]@{
+                Node        = $j.Location
+                WMI         = "TIMEOUT"
+                VMMS        = "UNKNOWN"
+                GetVM       = "UNKNOWN"
+                Cluster     = "UNKNOWN"
+                FaultDomain = "WMI / CONTROL PLANE TIMEOUT"
+            }
+        }
+	    $badnodes=@()
+	    $badNodes+=$results.FaultDomain -notmatch "HEALTHY"
+	    If ($badnodes.count) {
+		    If ($badNodes.FaultDomain -notmatch "WMI / CONTROL PLANE TIMEOUT") {
+			    Write-ToHost "Nodes $($badNodes.Node -join ',') have unhealthy WMI, VMMS or ClusSvc services!" -Level 3 -CheckMark 3
+		    } else {
+		    Write-ToHost "Nodes $(($badNodes | ? FaultDomain -notmatch "WMI / CONTROL PLANE TIMEOUT").Node -join ',') have a problem with WMI" -Level 3 -CheckMark 3
+		    }
+	    } else {
+		    Write-ToHost "All nodes WMI, VMMS and Cluster services check out"
+	    }
+        return $badNodes
+    }
 
     #endregion Test Scripts
 
@@ -1017,6 +1208,11 @@ v$ver
     $MasUpdateNotRunning=(!((Get-ActionPlanInstances | ? Status -eq Running | ? ActionPlanName -like "MAS Update*").count))
     If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
         Write-Warning "Solution Update is running. Some fixes will be disabled"
+    }
+    Write-Host ""
+    $badNodes=Test-ClusterControlPlaneHealth
+    If ($badNodes) {
+        Write-Host "Recommendation: Restart node(s) ($badNodes.Node -join ',') to resolve service issue"
     }
     Write-Host ""
     If ((Get-Job -Name "SUJob" -ErrorAction SilentlyContinue).count) {
