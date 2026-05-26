@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.49"
+    $ver="0.491"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -763,7 +763,6 @@ param(
             $ErrorReport += foreach ($File in $TargetFiles) {
                 try {
                     [xml]$xml = Invoke-Command -ComputerName $File.PSComputerName {Get-Content -Path $using:File.FullName -Raw -ErrorAction Stop}
-                    #[xml]$xml = Get-Content -Path $File.FullName -Raw -ErrorAction Stop
                     # Select all NodeResult elements
                     $nodeResults = $Xml.GetElementsByTagName("NodeResult")
 
@@ -793,9 +792,16 @@ param(
                             }
                         }
                     }
-                }
-                catch {
+                } catch {
                     Write-Warning "Could not parse $($File.Name): $($_.Exception.Message)"
+                }
+                If ($xml.CauReport.ClusterResult.ErrorRecordData.ExceptionData.Message) {
+                    [PSCustomObject]@{
+                        NodeName = (Get-Cluster).Name
+                        Status   = $xml.CauReport.ClusterResult.Status
+                        ErrorID  = $xml.CauReport.ClusterResult.ErrorRecordData.ExceptionData.FullyQualifiedErrorId
+                        Message  = $xml.CauReport.ClusterResult.ErrorRecordData.ExceptionData.Message
+                    }
                 }
             }
             $ErrorReport=$ErrorReport | Sort Message -Unique | Sort-Object FileDate -Descending
