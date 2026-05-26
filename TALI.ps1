@@ -804,8 +804,6 @@ param(
                     }
                 }
             }
-
-            }
             $ErrorReport=$ErrorReport | Sort Message -Unique | Sort-Object FileDate -Descending
             if ($ErrorReport.count -eq 0) {
                 Write-ToHost "No errors found in the last 12 hours of reports since last update attempt."
