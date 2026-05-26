@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.48"
+    $ver="0.49"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -865,9 +865,10 @@ param(
         param(
             [int]$NodeTimeoutSec  = 8,
             [int]$ProbeTimeoutSec = 2,
-            [int]$ThrottleLimit   = 10
+            [int]$ThrottleLimit   = 10,
+	    [string[]] $nodes=(Get-ClusterNode).name
         )
-
+	Write-Host "Testing WMI, VMMS and Cluster service"
         # ----------------------------
         # Node-level execution (runs in parallel across cluster)
         # ----------------------------
@@ -1012,7 +1013,7 @@ param(
         # ----------------------------
         Wait-Job $jobs -Timeout $NodeTimeoutSec | Out-Null
 
-        $timedOutJobs = Get-Job $jobs | Where-Object State -eq "Running"
+        $timedOutJobs = Get-Job $jobs -ErrorAction SilentlyContinue | Where-Object State -eq "Running"
 
         foreach ($j in $timedOutJobs) {
             Stop-Job $j -Force | Out-Null
@@ -1038,8 +1039,18 @@ param(
                 FaultDomain = "WMI / CONTROL PLANE TIMEOUT"
             }
         }
-
-        return $results
+	    $badnodes=@()
+	    $badNodes+=$results.FaultDomain -notmatch "HEALTHY"
+	    If ($badnodes.count) {
+		    If ($badNodes.FaultDomain -notmatch "WMI / CONTROL PLANE TIMEOUT") {
+			    Write-ToHost "Nodes $($badNodes.Node -join ',') have unhealthy WMI, VMMS or ClusSvc services!" -Level 3 -CheckMark 3
+		    } else {
+		    Write-ToHost "Nodes $(($badNodes | ? FaultDomain -notmatch "WMI / CONTROL PLANE TIMEOUT").Node -join ',') have a problem with WMI" -Level 3 -CheckMark 3
+		    }
+	    } else {
+		    Write-ToHost "All nodes WMI, VMMS and Cluster services check out"
+	    }
+        return $badNodes
     }
 
     #endregion Test Scripts
@@ -1197,6 +1208,11 @@ v$ver
     $MasUpdateNotRunning=(!((Get-ActionPlanInstances | ? Status -eq Running | ? ActionPlanName -like "MAS Update*").count))
     If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
         Write-Warning "Solution Update is running. Some fixes will be disabled"
+    }
+    Write-Host ""
+    $badNodes=Test-ClusterControlPlaneHealth
+    If ($badNodes) {
+        Write-Host "Recommendation: Restart node(s) ($badNodes.Node -join ',') to resolve service issue"
     }
     Write-Host ""
     If ((Get-Job -Name "SUJob" -ErrorAction SilentlyContinue).count) {
