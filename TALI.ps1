@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.5"
+    $ver="0.499"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1661,11 +1661,11 @@ v$ver
             (1..6) | %{Write-Host ".";sleep 10}
             $controlPlaneVMDown=Test-ControlPlaneVMNetwork
             if ($controlPlaneVMDown) {Write-ToHost "Rebooting Control Plane VM did not resolve the issue!!!" -Checkmark 4 -Level 4
-        } else {
-            Write-Host "Recommendation: Reboot the Control Plane VM"
-        } 
+            } else {
+                Write-Host "Recommendation: Reboot the Control Plane VM"
+            } 
+        }
     }
-
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
     #Write-Host "."
