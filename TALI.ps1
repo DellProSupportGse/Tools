@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.492"
+    $ver="0.493"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -870,7 +870,7 @@ param(
         [CmdletBinding()]
         param(
             [int]$NodeTimeoutSec  = 8,
-            [int]$ProbeTimeoutSec = 2,
+            [int]$ProbeTimeoutSec = 3,
             [int]$ThrottleLimit   = 10,
 	    [string[]] $nodes=(Get-ClusterNode).name
         )
@@ -1296,7 +1296,9 @@ v$ver
                 Get-NetAdapter -ifdesc *NDIS* | Get-NetIPAddress | Remove-NetIPAddress -Confirm:$false -Verbose
                 Get-NetAdapter -ifdesc *NDIS* | Set-NetIPInterface -Dhcp Enabled -Verbose
                 Get-NetAdapter -ifdesc *NDIS* | Disable-NetAdapter -Confirm:$false -PassThru | Enable-NetAdapter -Verbose | Out-Null
+                While ((Get-NetAdapter -ifdesc *NDIS*| Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue).AddressState -ne "Preferred") {Write-Host "." -NoNewline;sleep 1}
             }
+            Write-Host ""
             Sleep 10
             $failediDracDHCP=Test-iDracHostNicDHCP
             If ($failediDracDHCP) {Write-ToHost "Fix iDrac Host Nic DHCP FAILED!!!" -Level 4 -Checkmark 4}
