@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.49951"
+    $ver="0.49952"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1063,13 +1063,15 @@ param(
         $arcHciConfig = Get-ArcHciConfig
         $controlPlaneIp = $arcHciConfig.controlPlaneIp
         #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500)
         $pingablecount=0
         #Foreach ($IP in $CPIPs.IPAddressToString) {
             If ((ping -n 2 $controlPlaneIp | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
         #}
-        $result=($pingablecount -eq 0)
+        $result=($pingablecount -eq 0 -and !($tcpClient.Connected))
         if ($result) {
-            Write-ToHost "Azure Control Plane VM with IP $controlPlaneIp is not pingable!" -Checkmark 3 -Level 3
+            Write-ToHost "Azure Control Plane VM with IP $controlPlaneIp is not healthy!" -Checkmark 3 -Level 3
         } else {
             Write-ToHost "Control Plane VM network checks out"
         }
