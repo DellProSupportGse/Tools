@@ -1060,7 +1060,7 @@ param(
     }
     Function Test-ControlPlaneVMNetwork {
         Write-Host "Testing Control Plane VM network..."
-        $CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
+        $CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
         $pingablecount=0
         Foreach ($IP in $CPIPs.IPAddressToString) {
             If ((ping -n 2 $IP | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
@@ -1654,7 +1654,7 @@ v$ver
     If ($controlPlaneVMDown) {
         If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Rebooting Control Plane VM to fix it's network" -ForegroundColor Cyan
-            $CPVM="-control-plan-*"
+            $CPVM="-control-plan*"
             Get-VM $CPVM -ComputerName $nodes | Restart-VM -Force -Confirm:$false
             $dtime=0
             while((Get-Vm $CPVM -ComputerName $nodes | Get-VMNetworkAdapter).IPAddresses.count -eq 0 -and $dtime -lt 50) {Write-Host "." -NoNewline;sleep 10;$dtime++}
