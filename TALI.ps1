@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.4994"
+    $ver="0.4995"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1661,7 +1661,8 @@ v$ver
             $controlPlaneIp = $arcHciConfig.controlPlaneIp
             Get-VM $CPVM -ComputerName $nodes | Restart-VM -Force -Confirm:$false -Verbose
             $dtime=0
-            while((Test-NetConnection $controlPlaneIp -Port 6443 -WarningAction SilentlyContinue).TCPTestSucceeded -eq $false -and $dtime -lt 50) {Write-Host "." -NoNewline;sleep 10;$dtime++}
+            Write-Host "Waiting for VM to come up"
+            while((Test-NetConnection $controlPlaneIp -Port 6443 -WarningAction SilentlyContinue).TCPTestSucceeded -eq $false -and $dtime -lt 50) {Write-Host "." -NoNewline;sleep 1;$dtime++}
             $controlPlaneVMDown=Test-ControlPlaneVMNetwork
             if ($controlPlaneVMDown) {Write-ToHost "Rebooting Control Plane VM did not resolve the issue!!!" -Checkmark 4 -Level 4
             } else {
