@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.49954"
+    $ver="0.5"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1075,7 +1075,7 @@ param(
         } else {
             Write-ToHost "Control Plane VM network checks out"
         }
-        return $true #$result
+        return $result
     }
 
     #endregion Test Scripts
