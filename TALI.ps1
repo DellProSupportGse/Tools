@@ -1656,7 +1656,7 @@ v$ver
     } 
     If ($ErrorReport -ne $null) {Write-Host ""}
     $controlPlaneVMDown=Test-ControlPlaneVMNetwork
-    If ($controlPlaneVMDown) {
+    If ($controlPlaneVMDown -eq $true) {
         If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Rebooting Control Plane VM to fix it's network" -ForegroundColor Cyan
             $CPVM="*-control-plan*"
