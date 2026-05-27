@@ -1064,7 +1064,7 @@ param(
         $controlPlaneIp = $arcHciConfig.controlPlaneIp
         #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
         $tcpClient = New-Object System.Net.Sockets.TcpClient
-        $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500)
+        $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500) | Out-Null
         $pingablecount=0
         #Foreach ($IP in $CPIPs.IPAddressToString) {
             If ((ping -n 2 $controlPlaneIp | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
