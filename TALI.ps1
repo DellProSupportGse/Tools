@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.491"
+    $ver="0.492"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1046,7 +1046,7 @@ param(
             }
         }
 	    $badnodes=@()
-	    $badNodes+=$results.FaultDomain -notmatch "HEALTHY"
+	    $badNodes+=$results | ? FaultDomain -notmatch "HEALTHY"
 	    If ($badnodes.count) {
 		    If ($badNodes.FaultDomain -notmatch "WMI / CONTROL PLANE TIMEOUT") {
 			    Write-ToHost "Nodes $($badNodes.Node -join ',') have unhealthy WMI, VMMS or ClusSvc services!" -Level 3 -CheckMark 3
@@ -1217,8 +1217,8 @@ v$ver
     }
     Write-Host ""
     $badNodes=Test-ClusterControlPlaneHealth
-    If ($badNodes) {
-        Write-Host "Recommendation: Restart node(s) ($badNodes.Node -join ',') to resolve service issue"
+    If ($badNodes.count) {
+        Write-Host "Recommendation: Restart node(s) $($badNodes.Node -join ',') to resolve service issue"
     }
     Write-Host ""
     If ((Get-Job -Name "SUJob" -ErrorAction SilentlyContinue).count) {
