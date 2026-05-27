@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.49953"
+    $ver="0.49954"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1654,7 +1654,7 @@ v$ver
         Write-Host "Recommendation: Repair issue causing the CAU failure"
         Write-Host ""
     } 
-    If ($ErrorReport -eq $null) {Write-Host ""}
+    If ($ErrorReport -ne $null) {Write-Host ""}
     $controlPlaneVMDown=Test-ControlPlaneVMNetwork
     If ($controlPlaneVMDown) {
         If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
@@ -1666,7 +1666,7 @@ v$ver
             $dtime=0
             Write-Host "Waiting for VM to come up"
             $tcpClient = New-Object System.Net.Sockets.TcpClient
-            $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500)
+            $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500) | Out-Null
             while(($tcpClient.Connected) -eq $false -and $dtime -lt 500) {Write-Host "." -NoNewline;sleep 1;$dtime++}
             Write-Host ""
             $controlPlaneVMDown=Test-ControlPlaneVMNetwork
