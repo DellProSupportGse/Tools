@@ -68,7 +68,7 @@ param(
         $failedNetIntentGlobal=$failedNetIntentGlobal | ? {$_.Progress -gt ""}
         If ($failedNetIntent) {
            Foreach ($failedIntent in $failedNetIntent) {
-               Write-ToHost "Net Intent $($failedIntent.Name) on Node $($failedIntent.Host) FAILED" -Checkmark 3 -Level 3
+               Write-ToHost "Net Intent $($failedIntent.IntentName) on Node $($failedIntent.Host) FAILED" -Checkmark 3 -Level 3
            }
         } elseif ($failedNetIntentGlobal) {
             Foreach ($failedIntent in $failedNetIntentGlobal) {
