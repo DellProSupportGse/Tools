@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.4992"
+    $ver="0.4993"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1060,14 +1060,16 @@ param(
     }
     Function Test-ControlPlaneVMNetwork {
         Write-Host "Testing Control Plane VM network..."
-        $CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
+        $arcHciConfig = Get-ArcHciConfig
+        $controlPlaneIp = $arcHciConfig.controlPlaneIp
+        #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
         $pingablecount=0
-        Foreach ($IP in $CPIPs.IPAddressToString) {
-            If ((ping -n 2 $IP | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
-        }
-        $result=($pingablecount -lt $CPIPs.count -or $pingablecount -eq 0)
+        #Foreach ($IP in $CPIPs.IPAddressToString) {
+            If ((ping -n 2 $controlPlaneIp | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
+        #}
+        $result=($pingablecount -eq 0)
         if ($result) {
-            Write-ToHost "Azure Control Plane VM with IP(s) $($CPIPs.IPAddressToString -join ',') is not pingable!" -Checkmark 3 -Level 3
+            Write-ToHost "Azure Control Plane VM with IP $controlPlaneIp is not pingable!" -Checkmark 3 -Level 3
         } else {
             Write-ToHost "Control Plane VM network checks out"
         }
@@ -1654,8 +1656,8 @@ v$ver
     If ($controlPlaneVMDown) {
         If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Rebooting Control Plane VM to fix it's network" -ForegroundColor Cyan
-            $CPVM="-control-plan*"
-            Get-VM $CPVM -ComputerName $nodes | Restart-VM -Force -Confirm:$false
+            $CPVM="*-control-plan*"
+            Get-VM $CPVM -ComputerName $nodes | Restart-VM -Force -Confirm:$false -Verbose
             $dtime=0
             while((Get-Vm $CPVM -ComputerName $nodes | Get-VMNetworkAdapter).IPAddresses.count -eq 0 -and $dtime -lt 50) {Write-Host "." -NoNewline;sleep 10;$dtime++}
             (1..6) | %{Write-Host ".";sleep 10}
