@@ -1660,7 +1660,7 @@ v$ver
             Get-VM $CPVM -ComputerName $nodes | Restart-VM -Force -Confirm:$false -Verbose
             $dtime=0
             while((Get-Vm $CPVM -ComputerName $nodes | Get-VMNetworkAdapter).IPAddresses.count -eq 0 -and $dtime -lt 50) {Write-Host "." -NoNewline;sleep 10;$dtime++}
-            (1..6) | %{Write-Host ".";sleep 10}
+            (1..6) | %{Write-Host "." -NoNewline;sleep 10}
             $controlPlaneVMDown=Test-ControlPlaneVMNetwork
             if ($controlPlaneVMDown) {Write-ToHost "Rebooting Control Plane VM did not resolve the issue!!!" -Checkmark 4 -Level 4
             } else {
