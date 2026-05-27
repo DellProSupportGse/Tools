@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.499"
+    $ver="0.4992"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1277,13 +1277,13 @@ v$ver
             }
             Foreach ($failedIntent in $failedNetIntent) {
                 if ($failedIntent.IntentName -le "") {
-                     Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -GlobalOverrides -Wait
+                     try {Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -GlobalOverrides -Wait} catch {}
                 } else {
-                     Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -Name "$($failedIntent.IntentName)" -Wait
+                     try {Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -Name "$($failedIntent.IntentName)" -Wait} catch {}
                 }
             }
             do {
-                Start-Sleep 5
+                Start-Sleep 10
                 $ready = Get-NetIntentStatus | Where-Object { $_.LastSuccess }
             } until ($ready)
             $GetNetIntentStatus=Get-NetIntentStatus
