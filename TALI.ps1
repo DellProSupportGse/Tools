@@ -1263,8 +1263,8 @@ v$ver
     If ($failedNetIntent)  {
         If ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing Net Intents. Est Time is less than $($failedNetIntent.count+1) minutes" -ForegroundColor Cyan
-            Get-service -ComputerName $nodes "NetworkAtc" | Stop-Service
-            Get-service -ComputerName $nodes "NetworkAtc" | Start-Service -Verbose
+            Get-service -ComputerName (($failedNetIntent).host | sort -Unique) "NetworkAtc" | Stop-Service
+            Get-service -ComputerName (($failedNetIntent).host | sort -Unique) "NetworkAtc" | Start-Service -Verbose
             Foreach ($dNetAdapter in ($GetNetAdapterAll | ? {($GetNetIntent.NetAdapterNamesAsList) -match $_.name -and !($_.status -eq "Up" -or $_.ifOperStatus -eq "Up")})) {
                   Invoke-Command -ComputerName "$(($dNetAdapter).PSComputerName)" -ScriptBlock {Enable-NetAdapter -ifAlias "$($using:dNetAdapter.Name)" -Verbose}
             }
