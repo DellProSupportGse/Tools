@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.493"
+    $ver="0.5"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1058,6 +1058,21 @@ param(
 	    }
         return $badNodes
     }
+    Function Test-ControlPlaneVMNetwork {
+        Write-Host "Testing Control Plane VM network..."
+        $CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
+        $pingablecount=0
+        Foreach ($IP in $CPIPs.IPAddressToString) {
+            If ((ping -n 2 $IP | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
+        }
+        $result=($pingablecount -lt $CPIPs.count -or $pingablecount -eq 0)
+        if ($result) {
+            Write-ToHost "Azure Control Plane VM with IP(s) $($CPIPs.IPAddressToString -join ',') is not pingable!" -Checkmark 3 -Level 3
+        } else {
+            Write-ToHost "Control Plane VM network checks out"
+        }
+        return $true #$result
+    }
 
     #endregion Test Scripts
 
@@ -1634,6 +1649,23 @@ v$ver
     If ($ErrorReport) {
         Write-Host "Recommendation: Repair issue causing the CAU failure"
     }
+    Write-Host ""
+    $controlPlaneVMDown=Test-ControlPlaneVMNetwork
+    If ($controlPlaneVMDown) {
+        If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
+            Write-Host "Rebooting Control Plane VM to fix it's network" -ForegroundColor Cyan
+            $CPVM="-control-plan-*"
+            Get-VM $CPVM -ComputerName $nodes | Restart-VM -Force -Confirm:$false
+            $dtime=0
+            while((Get-Vm $CPVM -ComputerName $nodes | Get-VMNetworkAdapter).IPAddresses.count -eq 0 -and $dtime -lt 50) {Write-Host "." -NoNewline;sleep 10;$dtime++}
+            (1..6) | %{Write-Host ".";sleep 10}
+            $controlPlaneVMDown=Test-ControlPlaneVMNetwork
+            if ($controlPlaneVMDown) {Write-ToHost "Rebooting Control Plane VM did not resolve the issue!!!" -Checkmark 4 -Level 4
+        } else {
+            Write-Host "Recommendation: Reboot the Control Plane VM"
+        } 
+    }
+
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
     #Write-Host "."
