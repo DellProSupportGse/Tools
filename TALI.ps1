@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.493"
+    $ver="0.5"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -68,7 +68,7 @@ param(
         $failedNetIntentGlobal=$failedNetIntentGlobal | ? {$_.Progress -gt ""}
         If ($failedNetIntent) {
            Foreach ($failedIntent in $failedNetIntent) {
-               Write-ToHost "Net Intent $($failedIntent.Name) on Node $($failedIntent.Host) FAILED" -Checkmark 3 -Level 3
+               Write-ToHost "Net Intent $($failedIntent.IntentName) on Node $($failedIntent.Host) FAILED" -Checkmark 3 -Level 3
            }
         } elseif ($failedNetIntentGlobal) {
             Foreach ($failedIntent in $failedNetIntentGlobal) {
@@ -1058,6 +1058,25 @@ param(
 	    }
         return $badNodes
     }
+    Function Test-ControlPlaneVMNetwork {
+        Write-Host "Testing Control Plane VM network..."
+        $arcHciConfig = Get-ArcHciConfig
+        $controlPlaneIp = $arcHciConfig.controlPlaneIp
+        #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500) | Out-Null
+        $pingablecount=0
+        #Foreach ($IP in $CPIPs.IPAddressToString) {
+            If ((ping -n 2 $controlPlaneIp | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
+        #}
+        $result=($pingablecount -eq 0 -and !($tcpClient.Connected))
+        if ($result) {
+            Write-ToHost "Azure Control Plane VM with IP $controlPlaneIp is not healthy!" -Checkmark 3 -Level 3
+        } else {
+            Write-ToHost "Control Plane VM network checks out"
+        }
+        return $result
+    }
 
     #endregion Test Scripts
 
@@ -1248,8 +1267,8 @@ v$ver
     If ($failedNetIntent)  {
         If ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing Net Intents. Est Time is less than $($failedNetIntent.count+1) minutes" -ForegroundColor Cyan
-            Get-service -ComputerName $nodes "NetworkAtc" | Stop-Service
-            Get-service -ComputerName $nodes "NetworkAtc" | Start-Service -Verbose
+            Get-service -ComputerName (($failedNetIntent).host | sort -Unique) "NetworkAtc" | Stop-Service
+            Get-service -ComputerName (($failedNetIntent).host | sort -Unique) "NetworkAtc" | Start-Service -Verbose
             Foreach ($dNetAdapter in ($GetNetAdapterAll | ? {($GetNetIntent.NetAdapterNamesAsList) -match $_.name -and !($_.status -eq "Up" -or $_.ifOperStatus -eq "Up")})) {
                   Invoke-Command -ComputerName "$(($dNetAdapter).PSComputerName)" -ScriptBlock {Enable-NetAdapter -ifAlias "$($using:dNetAdapter.Name)" -Verbose}
             }
@@ -1262,13 +1281,13 @@ v$ver
             }
             Foreach ($failedIntent in $failedNetIntent) {
                 if ($failedIntent.IntentName -le "") {
-                     Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -GlobalOverrides -Wait
+                     try {Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -GlobalOverrides -Wait} catch {}
                 } else {
-                     Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -Name "$($failedIntent.IntentName)" -Wait
+                     try {Set-NetIntentRetryState -NodeName "$($failedIntent.Host)" -Name "$($failedIntent.IntentName)" -Wait} catch {}
                 }
             }
             do {
-                Start-Sleep 5
+                Start-Sleep 10
                 $ready = Get-NetIntentStatus | Where-Object { $_.LastSuccess }
             } until ($ready)
             $GetNetIntentStatus=Get-NetIntentStatus
@@ -1633,6 +1652,29 @@ v$ver
     $ErrorReport=Test-CauErrorAudit
     If ($ErrorReport) {
         Write-Host "Recommendation: Repair issue causing the CAU failure"
+        Write-Host ""
+    } 
+    If ($ErrorReport -ne $null) {Write-Host ""}
+    $controlPlaneVMDown=Test-ControlPlaneVMNetwork
+    If ($controlPlaneVMDown -eq $true) {
+        If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
+            Write-Host "Rebooting Control Plane VM to fix it's network" -ForegroundColor Cyan
+            $CPVM="*-control-plan*"
+            $arcHciConfig = Get-ArcHciConfig
+            $controlPlaneIp = $arcHciConfig.controlPlaneIp
+            Get-VM $CPVM -ComputerName $nodes | Restart-VM -Force -Confirm:$false -Verbose
+            $dtime=0
+            Write-Host "Waiting for VM to come up"
+            $tcpClient = New-Object System.Net.Sockets.TcpClient
+            $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500) | Out-Null
+            while(($tcpClient.Connected) -eq $false -and $dtime -lt 500) {Write-Host "." -NoNewline;sleep 1;$dtime++}
+            Write-Host ""
+            $controlPlaneVMDown=Test-ControlPlaneVMNetwork
+            if ($controlPlaneVMDown) {Write-ToHost "Rebooting Control Plane VM did not resolve the issue!!!" -Checkmark 4 -Level 4
+            } else {
+                Write-Host "Recommendation: Reboot the Control Plane VM"
+            } 
+        }
     }
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
