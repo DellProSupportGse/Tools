@@ -49,15 +49,17 @@ param(
         "CloudPlatformManager"   # Matches: Cloud Platform Manager VM
     )#>
     $acpGroup=Get-ClusterGroup -Name "APEX Cloud Platform Manager"
+    $acpGroup | Select Name,OwnerNode,State,Priority | Format-Table -AutoSize
     <#$acpResources = Get-ClusterResource | Where-Object {
         $name = $_.Name
         $acpKeywords | Where-Object { $name -like "*$_*" }
     }#>
     if ($acpGroup -and $DoConversion) {
+        Write-Host "Stopping ACP VM cluster group and setting priority to 0" -ForegroundColor Cyan
         #foreach ($CR in $acpResources.Name) {
             #Stop-ClusterResource -Name $CR -Verbose
-        Stop-ClusterGroup $acpGroup
         $acpGroup.Priority=0
+        Stop-ClusterGroup $acpGroup | Out-Null
         $acpGroup=Get-ClusterGroup -Name "APEX Cloud Platform Manager"
 
         #}
@@ -131,7 +133,6 @@ param(
     # 3.1: ACP Parameter Cleanup on Cluster IP Address
     # ------------------------------------------------------------------------------
     $ipResourceName = "Cluster IP Address"
-    $conversionDone=$false
     Write-Host "`n Getting ACP parameters from '$ipResourceName'..." -ForegroundColor Yellow
 
     $acpParams = @(
