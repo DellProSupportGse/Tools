@@ -431,7 +431,6 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     $extractionFolder = "C:\ClusterStorage\Infrastructure_1\SBE\SBE_Extracted_Payload"
-    New-Item -ItemType Directory -path (Split-Path $extractionFolder -Parent) -Name (Split-Path $extractionFolder -Leaf) -ErrorAction SilentlyContinue -Force
     $tempFolder = $env:TEMP
 
     Write-Host "`n Locating Dell driver download page from release notes table..." -ForegroundColor Yellow
@@ -483,9 +482,10 @@ param(
         Write-Error "CRITICAL: Failed to scrape Dell Drivers page or match filename. Error: $_" -ErrorAction Stop
     }
     If ($conversionDone) {
+        if (!(Test-Path $extractionFolder)) { New-Item -ItemType Directory -path (Split-Path $extractionFolder -Parent) -Name (Split-Path $extractionFolder -Leaf) -ErrorAction SilentlyContinue -Force}
         Write-Host "Downloading the SBE package requires logging into the Dell site which cannot be done in this script at this time"
         Write-host "Please download and extract the SBE package to $extractionFolder"
-        If ((gci $extractionFolder).count -lt 3 -and $PrepareSBE) {Write-Host "SBE folder is not correct. Please extract the files from the zip directly into the expected folder";break}
+        If ((gci $extractionFolder).count -lt 3 -and $PrepareSBE) {Write-Host "SBE folder is not correct. Please extract the files from the zip directly into the expected folder";$PrepareSBE=$false;break}
     } else {
         Write-Host "Conversion has not been completed" -ForegroundColor Yellow
         break
