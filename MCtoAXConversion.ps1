@@ -361,7 +361,7 @@ param(
     $manifestUrl = "https://aka.ms/AzureStackSBEUpdate/DellEMC"
     $compatibleUpdates = @()
 
-    Write-Host "Please copy file $exportFilePath off the cluster!!!!!" -ForegroundColor DarkYellow -BackgroundColor White
+    Write-Host "Please copy file $exportFilePath off the cluster!!!!!" -ForegroundColor Black -BackgroundColor White
     notepad $exportFilePath
 
     try {
