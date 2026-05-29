@@ -485,7 +485,7 @@ param(
     If ($conversionDone) {
         Write-Host "Downloading the SBE package requires logging into the Dell site which cannot be done in this script at this time"
         Write-host "Please download and extract the SBE package to $extractionFolder"
-        If ((gci $extractionFolder).count -lt 3) {Write-Host "SBE folder is not correct. Please extract the files from the zip directly into the expected folder";break}
+        If ((gci $extractionFolder).count -lt 3 -and $PrepareSBE) {Write-Host "SBE folder is not correct. Please extract the files from the zip directly into the expected folder";break}
     } else {
         Write-Host "Conversion has not been completed" -ForegroundColor Yellow
         break
