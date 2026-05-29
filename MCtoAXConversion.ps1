@@ -68,7 +68,7 @@ param(
     }
     if ($acpGroup) {
         Write-Host "`nACP VM cluster group found:" -ForegroundColor Cyan
-        $acpGroup | Format-Table -AutoSize
+        $acpGroup | Select Name,OwnerNode,State,Priority | Format-Table -AutoSize
         If ($acpGroup.State -eq "Online" -or $acpGroup.Priority -ne 0) {
             Write-Warning "ACP VM cluster group should be offline and priority set to 0"
             $conversionDone=$false
