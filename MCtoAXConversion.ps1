@@ -40,39 +40,43 @@ param(
     Write-Host "All cluster nodes report State = Up. Proceeding..." -ForegroundColor Green
 
     # 4. Filter for APEX Cloud Platform / APEXCP-related resources
-    Write-Host "`n Filtering for ACP-related cluster resources..." -ForegroundColor Yellow
+    Write-Host "`n Filtering for ACP VM cluster group..." -ForegroundColor Yellow
 
-    $acpKeywords = @(
-        "APEX",
+    <#$acpKeywords = @(
+        "APEX Cloud Platform Manager",
         "APEXCP",
         "Cloud Platform",
         "CloudPlatformManager"   # Matches: Cloud Platform Manager VM
-    )
+    )#>
+    $acpGroup=Get-ClusterGroup -Name "APEX Cloud Platform Manager"
+    <#$acpResources = Get-ClusterResource | Where-Object {
+        $name = $_.Name
+        $acpKeywords | Where-Object { $name -like "*$_*" }
+    }#>
+    if ($acpGroup -and $DoConversion) {
+        #foreach ($CR in $acpResources.Name) {
+            #Stop-ClusterResource -Name $CR -Verbose
+        Stop-ClusterGroup $acpGroup
+        $acpGroup.Priority=0
+        $acpGroup=Get-ClusterGroup -Name "APEX Cloud Platform Manager"
 
-    $acpResources = Get-ClusterResource | Where-Object {
-        $name = $_.Name
-        $acpKeywords | Where-Object { $name -like "*$_*" }
+        #}
+        #$acpResources = Get-ClusterResource | Where-Object {
+        #$name = $_.Name
+        #$acpKeywords | Where-Object { $name -like "*$_*" }
+    #}
     }
-    if ($acpResources -and $DoConversion) {
-        foreach ($CR in $acpResources.Name) {
-            Stop-ClusterResource -Name $CR -Verbose
-        }
-        $acpResources = Get-ClusterResource | Where-Object {
-        $name = $_.Name
-        $acpKeywords | Where-Object { $name -like "*$_*" }
-    }
-    }
-    if ($acpResources) {
-        Write-Host "`nACP-Related Cluster Resources Found:" -ForegroundColor Cyan
-        $acpResources | Select-Object Name, ResourceType, State, OwnerGroup | Format-Table -AutoSize
-        If ($acpResources.State -eq "Online") {
-            Write-Warning "ACP-Related cluster resources should be offline"
+    if ($acpGroup) {
+        Write-Host "`nACP VM cluster group found:" -ForegroundColor Cyan
+        $acpGroup | Format-Table -AutoSize
+        If ($acpGroup.State -eq "Online" -or $acpGroup.Priority -ne 0) {
+            Write-Warning "ACP VM cluster group should be offline and priority set to 0"
             $conversionDone=$false
         } else {
             $conversionDone=$true
         }
     } else {
-        Write-Host "No ACP-labeled resources found." -ForegroundColor Green
+        Write-Host "No ACP VM cluster group found." -ForegroundColor Green
         $conversionDone=$true
     }
 
