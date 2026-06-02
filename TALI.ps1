@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.5"
+    $ver="0.51"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -829,8 +829,13 @@ param(
     function Test-MismatchedPSModules {
         Write-Host "Testing for mismatched PS module errors"
         $HealthCheckTime=[TimeZoneInfo]::ConvertTimeFromUtc((Get-SolutionUpdateEnvironment).HealthCheckDate,[TimeZoneInfo]::Local)
-        $startTime = $HealthCheckTime.AddHours(-1)
-        $endTime = $HealthCheckTime.AddHours(1)
+        try {
+            $startTime = $HealthCheckTime.AddHours(-1)
+            $endTime = $HealthCheckTime.AddHours(1)
+        } catch {
+            $startTime = (Get-WinEvent -LogName 'AzStackHciEnvironmentChecker' -MaxEvents 1).TimeCreated.AddHours(-1)
+            $endTime = (Get-Date)
+        }
         $events=@()
         $events += Invoke-Command -ComputerName $nodes -ScriptBlock {
             Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{
