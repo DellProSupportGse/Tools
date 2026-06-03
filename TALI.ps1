@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.52"
+    $ver="0.53"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -95,7 +95,7 @@ param(
         $Redfish=Invoke-Command -ComputerName $nodes -ScriptBlock {
             add-type "using System.Net;using System.Security.Cryptography.X509Certificates;public class T : ICertificatePolicy {public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate,WebRequest request, int certificateProblem) {return true;}}";[System.Net.ServicePointManager]::CertificatePolicy = New-Object T
             $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
-            $result=try {Invoke-RestMethod https://$iDracIP/redfish/v1/ } catch {}
+            $result=try {Invoke-RestMethod https://$iDracIP/redfish/v1/ -UseBasicParsing} catch {}
             If ($result.Vendor -ne 'Dell') {$work=$false} else {$work=$true}
             [PSCustomObject]@{"PSComputerName"=$env:COMPUTERNAME;"Success"=$work}
         }
@@ -1231,6 +1231,29 @@ v$ver
         -Data $data 
 #>
 
+<#
+    $scriptBlock = $MyInvocation.MyCommand.ScriptBlock
+
+    $TestFunctions = $scriptBlock.Ast.FindAll({
+        param($n)
+
+        $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $n.Name -like 'Test-*'
+    }, $true).Name
+
+
+    $Tests = foreach ($name in $TestFunctions) {
+        [pscustomobject]@{
+            Name        = $name
+            ScriptBlock = $scriptBlock.Ast.FindAll({
+                param($n)
+                $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $n.Name -eq $name
+            }, $true).ScriptBlock
+        }
+    } #>
+
+
     If ($FixErrors -or $FixWarningsAlso) {Write-Warning "Fix commands are in beta and SHOULD NOT be used without proper guidance";sleep 5}
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
@@ -1239,6 +1262,127 @@ v$ver
     If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
         Write-Warning "Solution Update is running. Some fixes will be disabled"
     }
+
+<#    $MaxJobs = 20
+    $Jobs = @()
+
+    foreach ($test in $Tests) {
+
+        while ((Get-Job -State Running).Count -ge $MaxJobs) {
+            Start-Sleep -Milliseconds 200
+        }
+
+        $Jobs += Start-Job -Name $test.Name -ArgumentList $test.Name, $test.ScriptBlock -ScriptBlock {
+
+            param($FunctionName, $FunctionScriptBlock)
+            $nodes=$using:nodes
+            try {
+                $GetNetAdapterAll=$using:GetNetAdapterAll
+                $GetNetIntent=$using:GetNetIntent
+                $GetNetIntentStatus=$using:GetNetIntentStatus
+                $GetNetIntentGlobalStatus=$using:GetNetIntentGlobalStatus
+            } catch {}
+            Set-Item -Path "Function:\$FunctionName" -Value $FunctionScriptBlock
+
+            try {
+                $output = & $FunctionName
+
+                # Contract:
+                # $false = success
+                # $true  = failure
+                # anything else = failure payload
+                if ($output -is [bool]) {
+                    $success = -not $output
+                    $failedItems = $null
+                }
+                elseif ($null -eq $output) {
+                    $success = $true
+                    $failedItems = $null
+                }
+                else {
+                    $success = $false
+                    $failedItems = @($output)
+                }
+
+                [pscustomobject]@{
+                    TestName    = $FunctionName
+                    Success     = $success
+                    FailedItems = $failedItems
+                    RawResult   = $output
+                }
+            }
+            catch {
+                [pscustomobject]@{
+                    TestName    = $FunctionName
+                    Success     = $false
+                    FailedItems = $null
+                    RawResult   = $null
+                    Error       = $_.Exception.Message
+                }
+            }
+        }
+    }
+
+    $allJobs=$Jobs
+    $StartTime = Get-Date
+    $LastReport = Get-Date
+    $SeenCompleted = @{}
+    do {
+
+        $now = Get-Date
+
+        # -----------------------------
+        # 30-second running snapshot
+        # -----------------------------
+        if (($now - $LastReport).TotalSeconds -ge 30) {
+
+            Write-Host "`n=== Running Jobs (Snapshot) ===" -ForegroundColor Cyan
+
+            $running = Get-Job -State Running | Sort-Object Name
+
+            foreach ($job in $running) {
+
+                $start = $job.PSBeginTime
+                $duration = if ($start) { $now - $start } else { $null }
+
+                "{0,-25} Start: {1}  Duration: {2}" -f `
+                    $job.Name,
+                    $start,
+                    $duration
+            }
+
+            $LastReport = $now
+        }
+
+        # -----------------------------
+        # completion handling (print once, then remove)
+        # -----------------------------
+        $completed = Get-Job | ? State -ne Running
+
+        foreach ($job in $completed) {
+
+            if (-not $SeenCompleted.ContainsKey($job.Id)) {
+
+                #$result = Receive-Job -Job $job -ErrorAction SilentlyContinue
+                $duration = (Get-Date) - $StartTime
+
+                [pscustomobject]@{
+                    JobName  = $job.Name
+                    Start    = $StartTime
+                    Duration = $duration
+                    Failed  = ($job.state -ne "Completed")
+                }
+
+                $SeenCompleted[$job.Id] = $true
+                #Remove-Job -Job $job
+            }
+        }
+
+        Start-Sleep -Seconds 1
+
+    } while ((Get-Job).Count -gt 0)
+    $dResults=Get-Job | Receive-Job -Wait #>
+
     Write-Host ""
     $badNodes=Test-ClusterControlPlaneHealth
     If ($badNodes.count) {
