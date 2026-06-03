@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.51"
+    $ver="0.52"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -81,7 +81,7 @@ param(
     }
     Function Test-iDracHostNicDHCP {
         Write-Host "Checking iDrac host nics have DHCP enabled..."
-        $iDracDHCP=Invoke-Command -ComputerName $nodes -ScriptBlock {Get-NetAdapter -ifdesc *NDIS* | Get-NetIPInterface -AddressFamily IPv4 | Select PSComputerName,DHCP}
+        $iDracDHCP=Invoke-Command -ComputerName $nodes -ScriptBlock {$idracnic=Get-NetAdapter -ifdesc *NDIS* | Get-NetIPInterface -AddressFamily IPv4 -ErrorAction SilentlyContinue ; [PSCustomObject]@{"PSComputerName"=$env:COMPUTERNAME;"DHCP"=$idracnic.DHCP}}
         Foreach($dIDrac in $iDracDHCP) {if ($dIDrac.DHCP -match "\d") {$dIDrac.DHCP=@("Disabled","Enabled")[$dIDrac.DHCP]}}
         If (($iDracDHCP.DHCP -notlike "Enabled*").count) {
             Write-ToHost "iDracs network adapters on host(s) $(($iDracDHCP | ? Dhcp -notlike "Enabled*").PSComputerName -join ',') have DHCP disabled!!" -Checkmark 3 -Level 3
@@ -94,7 +94,7 @@ param(
         Write-Host "Checking iDrac redfish url..."
         $Redfish=Invoke-Command -ComputerName $nodes -ScriptBlock {
             add-type "using System.Net;using System.Security.Cryptography.X509Certificates;public class T : ICertificatePolicy {public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate,WebRequest request, int certificateProblem) {return true;}}";[System.Net.ServicePointManager]::CertificatePolicy = New-Object T
-            $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*").DHCPServer
+            $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
             $result=try {Invoke-RestMethod https://$iDracIP/redfish/v1/ } catch {}
             If ($result.Vendor -ne 'Dell') {$work=$false} else {$work=$true}
             [PSCustomObject]@{"PSComputerName"=$env:COMPUTERNAME;"Success"=$work}
@@ -1345,7 +1345,8 @@ v$ver
             $IdracReboots=@()
             $IdracReboots+=$failediDracRedfish.PSComputerName | %{Invoke-Command -ComputerName $_ -ScriptBlock {
                 add-type "using System.Net;using System.Security.Cryptography.X509Certificates;public class T : ICertificatePolicy {public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate,WebRequest request, int certificateProblem) {return true;}}";[System.Net.ServicePointManager]::CertificatePolicy = New-Object T
-                $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*").DHCPServer
+                $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
+                if ($IDracIP -le "") {$iDracIP=(Get-PcsvDevice).IPv4Address}
                 $credential=$using:credential
                 $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$iDracIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr
                 IF($RespErr -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
@@ -1364,14 +1365,15 @@ v$ver
                 }
             }}
             if ($IdracReboots.Contains($true)) {Invoke-Command -ComputerName $failediDracRedfish[$IdracReboots.IndexOf($true)].PSComputerName -ScriptBlock {
-               $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*").DHCPServer
+               $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
+               if ($IDracIP -le "") {$iDracIP=(Get-PcsvDevice).IPv4Address}
                Write-Host "Waiting for iDrac with ip $iDracIP to shutdown"
                $dtime=0
-               While ($dtime -lt 30 -and (((Test-NetConnection -ComputerName 169.254.1.11 -WarningAction SilentlyContinue).PingSucceeded) -or ((Test-NetConnection -ComputerName 169.254.1.11 -WarningAction SilentlyContinue).PingSucceeded))) {Write-Host -NoNewline ".";sleep 10;$dtime++}
+               While ($dtime -lt 30 -and (((Test-NetConnection -ComputerName $iDracIP -WarningAction SilentlyContinue).PingSucceeded) -or ((Test-NetConnection -ComputerName $iDracIP -WarningAction SilentlyContinue).PingSucceeded))) {Write-Host -NoNewline ".";sleep 10;$dtime++}
                Write-Host "."
                $dtime=0
                Write-Host "Waiting for iDrac with ip $iDracIP to boot"
-               While ($dtime -lt 50 -and !((Test-NetConnection -ComputerName 169.254.1.11 -WarningAction SilentlyContinue).PingSucceeded)) {Write-Host -NoNewline ".";sleep 10;$dtime++}
+               While ($dtime -lt 50 -and !((Test-NetConnection -ComputerName $iDracIP -WarningAction SilentlyContinue).PingSucceeded)) {Write-Host -NoNewline ".";sleep 10;$dtime++}
                Write-Host "."
                Write-Host "Waiting 30 seconds for iDrac services to come up"
                (1..3) | %{Write-Host "." -NoNewline;sleep 10}
