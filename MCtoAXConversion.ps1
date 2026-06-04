@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.2"
+    $ver="0.3"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -432,69 +432,74 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
     # SECTION 6 — SBE Auto-Download, Extraction, and Installation
     # ══════════════════════════════════════════════════════════════════════════════
+    if ($latestSbeVer -gt $currentSbeVer) {
+        $extractionFolder = "C:\ClusterStorage\Infrastructure_1\SBE\SBE_Extracted_Payload"
+        $tempFolder = $env:TEMP
 
-    $extractionFolder = "C:\ClusterStorage\Infrastructure_1\SBE\SBE_Extracted_Payload"
-    $tempFolder = $env:TEMP
+        Write-Host "`n Locating Dell driver download page from release notes table..." -ForegroundColor Yellow
 
-    Write-Host "`n Locating Dell driver download page from release notes table..." -ForegroundColor Yellow
+        # Extract the wave from the latest SBE version (e.g., "2603" from "5.0.2603.1641")
+        $sbeWave = $latestSbeStr.Split('.')[2]
+        $releaseNotesUrl = "https://dell.github.io/azurestack-docs/docs/hci/supportmatrix/$sbeWave/sbereleasenotes/"
 
-    # Extract the wave from the latest SBE version (e.g., "2603" from "5.0.2603.1641")
-    $sbeWave = $latestSbeStr.Split('.')[2]
-    $releaseNotesUrl = "https://dell.github.io/azurestack-docs/docs/hci/supportmatrix/$sbeWave/sbereleasenotes/"
-
-    try {
-        Write-Host "  -> Scraping: $releaseNotesUrl" -ForegroundColor Cyan
-        $releaseNotesResponse = Invoke-WebRequest -Uri $releaseNotesUrl -UseBasicParsing -ErrorAction Stop
+        try {
+            Write-Host "  -> Scraping: $releaseNotesUrl" -ForegroundColor Cyan
+            $releaseNotesResponse = Invoke-WebRequest -Uri $releaseNotesUrl -UseBasicParsing -ErrorAction Stop
     
-        # Anchor Regex: Find the exact SBE version <td>, then non-greedily (.*?) find the NEXT Dell driver URL
-        $searchPattern = "(?si)<td>\s*$([regex]::Escape($latestSbeStr))\s*</td>.*?href=`"(https://www\.dell\.com/support/[^`"]+driverid=[a-zA-Z0-9]+)`""
+            # Anchor Regex: Find the exact SBE version <td>, then non-greedily (.*?) find the NEXT Dell driver URL
+            $searchPattern = "(?si)<td>\s*$([regex]::Escape($latestSbeStr))\s*</td>.*?href=`"(https://www\.dell\.com/support/[^`"]+driverid=[a-zA-Z0-9]+)`""
     
-        if ($releaseNotesResponse.Content -match $searchPattern) {
-            $driverPageUrl = $matches[1]
-        } else {
-            Write-Error "CRITICAL: Could not locate the version '$latestSbeStr' or its adjacent driver URL on the release notes page." -ErrorAction Stop
+            if ($releaseNotesResponse.Content -match $searchPattern) {
+                $driverPageUrl = $matches[1]
+            } else {
+                Write-Error "CRITICAL: Could not locate the version '$latestSbeStr' or its adjacent driver URL on the release notes page." -ErrorAction Stop
+            }
+    
+            Write-Host "Found exact driver page: $driverPageUrl" -ForegroundColor Green
+        } catch {
+            Write-Error "CRITICAL: Failed to scrape Dell GitHub release notes. Error: $_" -ErrorAction Stop
         }
-    
-        Write-Host "Found exact driver page: $driverPageUrl" -ForegroundColor Green
-    } catch {
-        Write-Error "CRITICAL: Failed to scrape Dell GitHub release notes. Error: $_" -ErrorAction Stop
-    }
 
-    Write-Host "`n Locating exact SBE zip file for $targetFamily (v$latestSbeStr)..." -ForegroundColor Yellow
+        Write-Host "`n Locating exact SBE zip file for $targetFamily (v$latestSbeStr)..." -ForegroundColor Yellow
 
-    try {
-        $driverPageResponse = Invoke-WebRequest -Uri $driverPageUrl -UseBasicParsing -ErrorAction Stop
+        try {
+            $driverPageResponse = Invoke-WebRequest -Uri $driverPageUrl -UseBasicParsing -ErrorAction Stop
     
-        # Define the pattern with a leading wildcard
-        $expectedZipPattern = "*Bundle_SBE_Dell_${targetFamily}_${latestSbeStr}.zip"
+            # Define the pattern with a leading wildcard
+            $expectedZipPattern = "*Bundle_SBE_Dell_${targetFamily}_${latestSbeStr}.zip"
     
-        # Filter the Links property using the -like operator
-        $zipLink = $driverPageResponse.Links | Where-Object { $_.href -like $expectedZipPattern } | Select-Object -First 1
+            # Filter the Links property using the -like operator
+            $zipLink = $driverPageResponse.Links | Where-Object { $_.href -like $expectedZipPattern } | Select-Object -First 1
 
-        if (-not $zipLink) {
-            Write-Error "CRITICAL: Could not find zip file matching '$expectedZipPattern' on the driver page." -ErrorAction Stop
+            if (-not $zipLink) {
+                Write-Error "CRITICAL: Could not find zip file matching '$expectedZipPattern' on the driver page." -ErrorAction Stop
+            }
+    
+            $zipUrl = $zipLink.href
+            $zipFileName = ($zipUrl -split '/')[-1]
+            $tempZipPath = Join-Path $tempFolder $zipFileName
+
+            Write-Host "Found target zip link: $zipFileName" -ForegroundColor Green
+            Write-Host "Full link is $zipUrl" -ForegroundColor Green
+        } catch {
+            Write-Error "CRITICAL: Failed to scrape Dell Drivers page or match filename. Error: $_" -ErrorAction Stop
         }
-    
-        $zipUrl = $zipLink.href
-        $zipFileName = ($zipUrl -split '/')[-1]
-        $tempZipPath = Join-Path $tempFolder $zipFileName
-
-        Write-Host "Found target zip link: $zipFileName" -ForegroundColor Green
-        Write-Host "Full link is $zipUrl" -ForegroundColor Green
-    } catch {
-        Write-Error "CRITICAL: Failed to scrape Dell Drivers page or match filename. Error: $_" -ErrorAction Stop
     }
     If ($conversionDone) {
-        if (!(Test-Path $extractionFolder)) { New-Item -ItemType Directory -path (Split-Path $extractionFolder -Parent) -Name (Split-Path $extractionFolder -Leaf) -ErrorAction SilentlyContinue -Force}
-        Write-Host "Downloading the SBE package requires logging into the Dell site which cannot be done in this script at this time"
-        Write-host "Please download and extract the SBE package to $extractionFolder"
-        If ((gci $extractionFolder).count -lt 3 -and $PrepareSBE) {Write-Host "SBE folder is not correct. Please extract the files from the zip directly into the expected folder";$PrepareSBE=$false;break}
+        If ($latestSbeVer -gt $currentSbeVer) {
+            if (!(Test-Path $extractionFolder)) { New-Item -ItemType Directory -path (Split-Path $extractionFolder -Parent) -Name (Split-Path $extractionFolder -Leaf) -ErrorAction SilentlyContinue -Force}
+            Write-Host "Downloading the SBE package requires logging into the Dell site which cannot be done in this script at this time"
+            Write-host "Please download and extract the SBE package to $extractionFolder"
+            If ((gci $extractionFolder).count -lt 3 -and $PrepareSBE) {Write-Host "SBE folder is not correct. Please extract the files from the zip directly into the expected folder";$PrepareSBE=$false;break}
+        } else {
+            Write-Host "Conversion has been completed and no SBE updates are avaiable" -ForegroundColor Yellow
+        }
     } else {
         Write-Host "Conversion has not been completed" -ForegroundColor Yellow
         break
     }
 
-    If ($PrepareSBE -and $conversionDone) {
+    If ($PrepareSBE -and $conversionDone -and ($latestSbeVer -gt $currentSbeVer)) {
         <#
 
         Write-Host "`n Downloading and extracting SBE payload..." -ForegroundColor Yellow
