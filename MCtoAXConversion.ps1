@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.3"
+    $ver="0.4"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -271,7 +271,7 @@ param(
             try {
                 Write-Host "`n Moving directory to C: drive..." -ForegroundColor Yellow
                 Move-Item -Path $sourcePath -Destination $destPath -Force -ErrorAction Stop
-                Remove-Item $sourcePath -Confirm:$false -Recurse -Force
+                Remove-Item $sourcePath -Confirm:$false -Recurse -Force -ErrorAction SilentlyContinue
                 Write-Host "Directory successfully moved to $destPath" -ForegroundColor Green
                 #$conversionDone=$true
             }
@@ -482,7 +482,11 @@ param(
             Write-Host "Found target zip link: $zipFileName" -ForegroundColor Green
             Write-Host "Full link is $zipUrl" -ForegroundColor Green
         } catch {
-            Write-Error "CRITICAL: Failed to scrape Dell Drivers page or match filename. Error: $_" -ErrorAction Stop
+            If ($_ -match "Access Denied") {
+                Write-Host "Could not retrive download file url. Please download from $driverPageUrl" -ForegroundColor Yellow
+            } else {
+                Write-Host "CRITICAL: Failed to scrape Dell Drivers page or match filename. Error: $_" -ForegroundColor Red
+            }
         }
     }
     If ($conversionDone) {
