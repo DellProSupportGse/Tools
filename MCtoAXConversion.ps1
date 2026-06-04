@@ -8,6 +8,8 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
+    $ver="0.2"
+    Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
     Write-Host "`n Verifying cluster service..." -ForegroundColor Yellow
@@ -403,7 +405,8 @@ param(
         }
 
         # 2b. Sort the compatible updates and extract the maximum version
-        $sortedUpdates = $compatibleUpdates | Sort-Object { [version]([string]$_.version) }
+        $sortedUpdates=@()
+        $sortedUpdates += $compatibleUpdates | Sort-Object { [version]([string]$_.version) }
         $latestSbeStr = [string]$sortedUpdates[-1].version
         $latestSbeVer = [version]$latestSbeStr
     
