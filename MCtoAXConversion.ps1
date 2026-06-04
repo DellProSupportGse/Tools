@@ -50,7 +50,7 @@ param(
         "Cloud Platform",
         "CloudPlatformManager"   # Matches: Cloud Platform Manager VM
     )#>
-    $acpGroup=Get-ClusterGroup -Name "APEX Cloud Platform Manager"
+    $acpGroup=Get-ClusterGroup -Name "APEX Cloud Platform Manager" -ErrorAction SilentlyContinue
     $acpGroup | Select Name,OwnerNode,State,Priority | Format-Table -AutoSize
     <#$acpResources = Get-ClusterResource | Where-Object {
         $name = $_.Name
