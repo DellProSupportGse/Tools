@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.53"
+    $ver="0.54"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -225,6 +225,25 @@ param(
             Write-ToHost "Compute Net Intents Network Direct are configured correctly"
         }
         return $FailedComputeIntents
+    }
+     Function Test-NetworkDirectOnStorageIntents {
+        Write-Host "Testing for invalid Net Intent Network Direct Technology configuration on storage intents..."
+        $GetNetIntentStorage = @()
+        $FailedStorageIntents = @()
+        $GetNetIntentStorage += $GetNetIntent | ? IsStorageIntentSet -eq $true
+        Foreach ($GetNetIntentC in $GetNetIntentStorage) {
+            If ($GetNetIntentC.AdapterAdvancedParametersOverride.NetworkDirect -gt 0) {
+                If ($GetNetIntentC.AdapterAdvancedParametersOverride.NetworkDirectTechnology -le "") {
+                    $FailedStorageIntents += $GetNetIntentC
+                }
+            }
+        }
+        If ($FailedStorageIntents) {
+            Write-ToHost "Storage Net Intent(s) do not have NetworkDirectTechnology defined" -Checkmark 3 -Level 3
+        } else {
+            Write-ToHost "Storage Net Intents Network Direct Technology are configured correctly"
+        }
+        return $FailedStorageIntents
     }
     function Test-AzLocalOverProvisionedVirtualDisks {
         [CmdletBinding()]
@@ -1555,6 +1574,7 @@ v$ver
     If ($disksInMaint)  {
         If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Taking disks out of maintenance mode. Est Time is less than five minutes" -ForegroundColor Cyan
+            Repair-ClusterS2D -DisableStorageMaintenenceMode -Verbose
             $disksFixed=foreach ($disk in $disksInMaint) {
                 try {
                     $disk | Get-PhysicalDisk | Disable-StorageMaintenanceMode -ErrorAction Stop
@@ -1632,6 +1652,26 @@ v$ver
             If ($FailedComputeIntents) {Write-ToHost "Fix invalid Net Intent Network Direct configuration failed!!!" -Level 4 -Checkmark 4}
         } else {
             Write-Host "Recommendation: Remove Network Direct setting on compute intents"
+        }
+    }
+    Write-Host ""
+    $FailedStorageIntents=Test-NetworkDirectOnStorageIntents
+    If ($FailedStorageIntents) {
+        if ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Fixing Invalid storage intent settings. Est Time is less than one minute" -ForegroundColor Cyan
+            Foreach ($FailedStrIntent in $FailedStorageIntents) {
+                $dnetAdapter=@()
+                $dnetAdapter+=($GetNetAdapterAll | ? {($FailedStrIntent.NetAdapterNamesAsList) -match $_.name})
+                $NDTech=($dnetAdapter | Get-NetAdapterAdvancedProperty  -DisplayName "NetworkDirect Technology").DisplayValue | sort -Unique | Select -First 1
+                $NDTechIndex=@("","iWARP","InfiniBand","RoCE","RoCEV2").IndexOf(@("","iWARP","InfiniBand","RoCE","RoCEV2").where({$_ -eq $NDTech})[0])
+                $AdapOver=(Get-NetIntent -Name "$($FailedStrIntent.IntentName)").AdapterAdvancedParametersOverride
+                $AdapOver.NetworkDirectTechnology=$NDTechIndex
+                Set-NetIntent -Name "$($FailedStrIntent.IntentName)" -AdapterPropertyOverrides $AdapOver
+            }
+            $FailedStorageIntents=Test-NetworkDirectOnComputeIntents
+            If ($FailedStorageIntents) {Write-ToHost "Fix invalid Net Intent Network Direct Technology configuration failed!!!" -Level 4 -Checkmark 4}
+        } else {
+            Write-Host "Recommendation: Define Network Direct Technology setting on storage intents"
         }
     }
     Write-Host ""
