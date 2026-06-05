@@ -1578,7 +1578,7 @@ v$ver
             $disksFixed=foreach ($disk in $disksInMaint) {
                 try {
                     if (($disk | Get-PhysicalDisk).OperationalStatus -ne "OK") {
-                        $node=(Get-ClusterNode | ? Id -eq ($disk | Get-PhysicalDisk).DeviceID.substring(0,1)).name
+                        $node=($disk | Get-PhysicalDisk | Get-StorageNode -PhysicallyConnected).Name
                         If ($node) {
                             Invoke-Command -ComputerName $node -ScriptBlock {$using:disk | Get-PhysicalDisk | Disable-StorageMaintenanceMode} -ErrorAction Stop
                         } else {
