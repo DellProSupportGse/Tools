@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.86"
+$Ver="1.87"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -324,16 +324,18 @@ Function ShowMenu{
          Write-Host "2)  PowerEdge logs (TSR)"
          Write-Host "3)  Switch logs (Show Tech)"
          Write-Host "4)  Windows Failover Clustering, Hyper-v and Standalone Server (TSS)"
+         Write-Host "5)  Test Dell Azure Local Issues (TALI)"
          Write-Host "Q to Quit"
          Write-Host ""
-         $selection = Read-Host "Type a number(s) and press [Enter]"
+         $selection = Read-Host "Type a number(s) (ex. 15) and press [Enter]"
      }
-    until ($selection -match '[0-4,qQ,hH]')
+    until ($selection -match '[0-5,qQ,hH]')
     $Global:CollectACPECE  = "N"
     $Global:CollectSTS     = "N"
     $Global:CollectSDDC    = "N"
     $Global:CollectTSR     = "N"
     $Global:CollectTSS     = "N"
+    $Global:CollectTALI    = "N"
     IF($selection -imatch 'h'){
         Clear-Host
         Write-Host ""
@@ -376,6 +378,15 @@ Function ShowMenu{
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'))
             $iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
         }
+    }
+    IF($selection -match 5){
+        if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
+        If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
+        Write-Host "Collecting Test Dell Azure Local Issues script (TALI)..."
+        $Global:CollectTALI = "Y"
+        Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1'))
+        Test-DellAzureLocalIssues
+
     }
     IF($selection -match 1){
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
@@ -458,7 +469,7 @@ Function UploadLogs {
         IF($ACPLogPath){
             $s=Upload-FileToCase -FilePath $ACPLogPath -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
         if ($s -eq 0) {Write-Host "ACP/ECE logs uploaded to case $CaseNumber"}
-            else {Write-Warning "ACP/ECE logs upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
+            else {Write-Warning "ACP/ECE logs upload FAILED!!. Please upload $($ACPLogPath) using https://tdm.dell.com/file-upload"}
         }
 
     #Upload SDDC
@@ -480,7 +491,7 @@ Function UploadLogs {
         #Upload File...
         #$resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
         if ($s -eq 0) {Write-Host "SDDC uploaded to case $CaseNumber"}
-        else {Write-Warning "SDDC upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
+        else {Write-Warning "SDDC upload FAILED!!. Please upload $($HealthZip.Fullname) using https://tdm.dell.com/file-upload"}
     }
     #Upload ShowTech
     IF(Test-Path -Path "$MyTemp\logs\ShowTechs_$CaseNumber*"){
@@ -490,7 +501,7 @@ Function UploadLogs {
         Remove-Item ($env:temp + "\$($ZipPath.BaseName)") -Recurse -Force
         $parsed=($content | Select-String -context 0,2 -SimpleMatch "Svc Tag").ToString()
         $servicetag=(($parsed.split("`r")[2]) -split "  ")[-2]
-        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag $servicetag
+        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
 
         #Get the File-Name without path
         #$name = (Get-Item $ZipPath).Name
@@ -506,7 +517,7 @@ Function UploadLogs {
         #Upload File...
         #$resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
         if ($s -eq 0) {Write-Host "Showtech uploaded to case $CaseNumber"}
-        else {Write-Warning "Showtech upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
+        else {Write-Warning "Showtech upload FAILED!!. Please upload $($ZipPath.Fullname) using https://tdm.dell.com/file-upload"}
     }
     #Upload TSS
     IF((Get-ChildItem -Path "C:\Dell\Logs" -Filter "$($CaseNumber).zip" -Recurse).count){
@@ -515,15 +526,22 @@ Function UploadLogs {
         #Upload File...
         $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
         if ($s -eq 0) {Write-Host "TSS uploaded on case $CaseNumber"}
-        else {Write-Warning "TSS upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
+        else {Write-Warning "TSS upload FAILED!!. Please upload $($ZipPath.Fullname) using https://tdm.dell.com/file-upload"}
     }
     #Upload TSR
     IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse).count){
         $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
         #Upload File...
-        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag $servicetag
+        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
         if ($s -eq 0) {Write-Host "TSRs uploaded on case $CaseNumber"}
-        else {Write-Warning "TSRs upload FAILED!!. Please upload using https://tdm.dell.com/file-upload"}
+        else {Write-Warning "TSRs upload FAILED!!. Please upload $($ZipPath.Fullname) using https://tdm.dell.com/file-upload"}
+    }
+    IF($Global:CollectTALI -eq "Y" -and  (Get-ChildItem -Path "C:\ProgramData\Dell\Test-DellAzureLocalIssues-*").count){
+        $TALI=Get-ChildItem "C:\ProgramData\Dell\Test-DellAzureLocalIssues-*" | sort lastwritetime | select -last 1 
+        #Upload File...
+        $s=Upload-FileToCase -FilePath $TALI.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
+        if ($s -eq 0) {Write-Host "TALI uploaded on case $CaseNumber"}
+        else {Write-Warning "TALI upload FAILED!!. Please upload $($TALI.FullName) using https://tdm.dell.com/file-upload"}
     }
 }
 ShowMenu
