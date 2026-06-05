@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.54"
+    $ver="0.55"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1662,10 +1662,9 @@ v$ver
             Foreach ($FailedStrIntent in $FailedStorageIntents) {
                 $dnetAdapter=@()
                 $dnetAdapter+=($GetNetAdapterAll | ? {($FailedStrIntent.NetAdapterNamesAsList) -match $_.name})
-                $NDTech=($dnetAdapter | Get-NetAdapterAdvancedProperty  -DisplayName "NetworkDirect Technology").DisplayValue | sort -Unique | Select -First 1
-                $NDTechIndex=@("","iWARP","InfiniBand","RoCE","RoCEV2").IndexOf(@("","iWARP","InfiniBand","RoCE","RoCEV2").where({$_ -eq $NDTech})[0])
+                $NDTech=($dnetAdapter | Get-NetAdapterAdvancedProperty  -DisplayName "NetworkDirect Technology").RegistryValue | sort -Unique | Select -First 1
                 $AdapOver=(Get-NetIntent -Name "$($FailedStrIntent.IntentName)").AdapterAdvancedParametersOverride
-                $AdapOver.NetworkDirectTechnology=$NDTechIndex
+                $AdapOver.NetworkDirectTechnology=$NDTech
                 Set-NetIntent -Name "$($FailedStrIntent.IntentName)" -AdapterPropertyOverrides $AdapOver
             }
             $FailedStorageIntents=Test-NetworkDirectOnComputeIntents
