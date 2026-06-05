@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.55"
+    $ver="0.56"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1577,7 +1577,15 @@ v$ver
             Repair-ClusterS2D -DisableStorageMaintenenceMode -Verbose
             $disksFixed=foreach ($disk in $disksInMaint) {
                 try {
-                    $disk | Get-PhysicalDisk | Disable-StorageMaintenanceMode -ErrorAction Stop
+                    if (($disk | Get-PhysicalDisk).OperationalStatus -ne "OK") {
+                        $node=(Get-ClusterNode | ? Id -eq ($disk | Get-PhysicalDisk).DeviceID.substring(0,1)).name
+                        If ($node) {
+                            Invoke-Command -ComputerName $node -ScriptBlock {$using:disk | Get-PhysicalDisk | Disable-StorageMaintenanceMode} -ErrorAction Stop
+                        } else {
+                            $disk | Get-PhysicalDisk | Disable-StorageMaintenanceMode -ErrorAction Stop
+                        }
+                        
+                    }
                     [PSCustomObject]@{
                         Disk         = $disk.FriendlyName
                         SerialNumber = $disk.SerialNumber
