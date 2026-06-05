@@ -241,7 +241,7 @@ param(
         If ($FailedStorageIntents) {
             Write-ToHost "Storage Net Intent(s) do not have NetworkDirectTechnology defined" -Checkmark 3 -Level 3
         } else {
-            Write-ToHost "Storage Net Intent(s) Network Direct are configured correctly"
+            Write-ToHost "Storage Net Intents Network Direct Technology are configured correctly"
         }
         return $FailedStorageIntents
     }
