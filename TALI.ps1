@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.56"
+    $ver="0.561"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1671,6 +1671,7 @@ v$ver
                 $dnetAdapter=@()
                 $dnetAdapter+=($GetNetAdapterAll | ? {($FailedStrIntent.NetAdapterNamesAsList) -match $_.name})
                 $NDTech=($dnetAdapter | Get-NetAdapterAdvancedProperty  -DisplayName "NetworkDirect Technology").RegistryValue | sort -Unique | Select -First 1
+                if ($NDTech -le "") {$NDTech=4}
                 $AdapOver=(Get-NetIntent -Name "$($FailedStrIntent.IntentName)").AdapterAdvancedParametersOverride
                 $AdapOver.NetworkDirectTechnology=$NDTech
                 Set-NetIntent -Name "$($FailedStrIntent.IntentName)" -AdapterPropertyOverrides $AdapOver
