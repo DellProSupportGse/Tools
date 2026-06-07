@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.57"
+    $ver="0.571"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1104,7 +1104,10 @@ param(
     Function Test-AksArcIssues {
         $failedAksArcIssues=@()
         Write-Host "Testing Arks Arc Known Issues..."
-        Install-Module -Name Support.AksArc -AllowClobber -Force -ErrorAction SilentlyContinue
+        if (!(gcm Test-SupportAksArcKnownIssues)) {
+            Install-Module -Name Support.AksArc -AllowClobber -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
         Update-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
         Import-Module -Name Support.AksArc -Force
         if (gcm Test-SupportAksArcKnownIssues) {
