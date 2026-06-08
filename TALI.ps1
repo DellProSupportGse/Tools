@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.561"
+    $ver="0.571"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1101,6 +1101,32 @@ param(
         }
         return $result
     }
+    Function Test-AksArcIssues {
+        $failedAksArcIssues=@()
+        Write-Host "Testing Arks Arc Known Issues..."
+        if (!(gcm Test-SupportAksArcKnownIssues)) {
+            Install-Module -Name Support.AksArc -AllowClobber -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
+        Update-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
+        Import-Module -Name Support.AksArc -Force
+        if (gcm Test-SupportAksArcKnownIssues) {
+            $Tests=Test-SupportAksArcKnownIssues
+            $failedTests=$Tests | ? Status -eq "Failed"
+            $failedTests | ft -AutoSize
+            if ($failedTests) {
+                $failedTests
+                Write-ToHost "Some tests failed" -Level 3 -Checkmark 3
+                return $failedTests
+            } else {
+                Write-ToHost "All Aks Arc Issues tests passed"
+                return $failedTests
+            }
+        } else {
+            Write-ToHost "Could not install Aks Arc Issues module" -Level 2 -Checkmark 2
+            return $null
+        }
+    }
 
     #endregion Test Scripts
 
@@ -1874,6 +1900,20 @@ v$ver
                 Write-Host "Recommendation: Reboot the Control Plane VM"
             } 
         }
+    }
+    Write-Host ""
+    $FailedArcIssues=Test-AksArcIssues
+    If ($FailedArcIssues) {
+       <# if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
+            Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
+            Invoke-Command -ComputerName $nodes -ScriptBlock {
+                Restart-Service Winmgmt -Force
+            }
+            Sleep 5
+            If ((Test-GetHealthFault) -eq $true) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4}
+        } else {#>
+            Write-Host "Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem"
+        #}
     }
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}

@@ -440,24 +440,27 @@ param(
 
         # Extract the wave from the latest SBE version (e.g., "2603" from "5.0.2603.1641")
         $sbeWave = $latestSbeStr.Split('.')[2]
-        $releaseNotesUrl = "https://dell.github.io/azurestack-docs/docs/hci/supportmatrix/$sbeWave/sbereleasenotes/"
-
-        try {
-            Write-Host "  -> Scraping: $releaseNotesUrl" -ForegroundColor Cyan
-            $releaseNotesResponse = Invoke-WebRequest -Uri $releaseNotesUrl -UseBasicParsing -ErrorAction Stop
+        $releaseNotesUrl = "https://dell.github.io/azurestack-docs/docs/hci/supportmatrix/2603/sbereleasenotes/"
+        If ($sbeWave -ge "2506") {
+            try {
+                Write-Host "  -> Scraping: $releaseNotesUrl" -ForegroundColor Cyan
+                $releaseNotesResponse = Invoke-WebRequest -Uri $releaseNotesUrl -UseBasicParsing -ErrorAction Stop
     
-            # Anchor Regex: Find the exact SBE version <td>, then non-greedily (.*?) find the NEXT Dell driver URL
-            $searchPattern = "(?si)<td>\s*$([regex]::Escape($latestSbeStr))\s*</td>.*?href=`"(https://www\.dell\.com/support/[^`"]+driverid=[a-zA-Z0-9]+)`""
+                # Anchor Regex: Find the exact SBE version <td>, then non-greedily (.*?) find the NEXT Dell driver URL
+                $searchPattern = "(?si)<td>\s*$([regex]::Escape($latestSbeStr))\s*</td>.*?href=`"(https://www\.dell\.com/support/[^`"]+driverid=[a-zA-Z0-9]+)`""
     
-            if ($releaseNotesResponse.Content -match $searchPattern) {
-                $driverPageUrl = $matches[1]
-            } else {
-                Write-Error "CRITICAL: Could not locate the version '$latestSbeStr' or its adjacent driver URL on the release notes page." -ErrorAction Stop
+                if ($releaseNotesResponse.Content -match $searchPattern) {
+                    $driverPageUrl = $matches[1]
+                } else {
+                    Write-Error "CRITICAL: Could not locate the version '$latestSbeStr' or its adjacent driver URL on the release notes page." -ErrorAction Stop
+                }
+    
+                Write-Host "Found exact driver page: $driverPageUrl" -ForegroundColor Green
+            } catch {
+                Write-Error "CRITICAL: Failed to scrape Dell GitHub release notes. Error: $_" -ErrorAction Stop
             }
-    
-            Write-Host "Found exact driver page: $driverPageUrl" -ForegroundColor Green
-        } catch {
-            Write-Error "CRITICAL: Failed to scrape Dell GitHub release notes. Error: $_" -ErrorAction Stop
+        } else {
+            Write-Error "CRITICAL: Current SBE version is too low to peform the update" -ErrorAction Stop
         }
 
         Write-Host "`n Locating exact SBE zip file for $targetFamily (v$latestSbeStr)..." -ForegroundColor Yellow
