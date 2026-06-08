@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.572"
+    $ver="0.573"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1112,8 +1112,9 @@ param(
         Remove-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
         Update-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
         Import-Module -Name Support.AksArc -Force
-        if (gcm Test-SupportAksArcKnownIssues) {
-            $Tests=Test-SupportAksArcKnownIssues
+        if (gcm *SupportAksArcKnownIssues) {
+            $testErr=$null
+            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr
             Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy
             $failedTests=$Tests | ? Status -eq "Failed"
             $failedTests | ft -AutoSize
@@ -1121,9 +1122,12 @@ param(
                 $failedTests
                 Write-ToHost "Some tests failed" -Level 3 -Checkmark 3
                 return $failedTests
-            } else {
+            } elseif ($testErr -eq $null) {
                 Write-ToHost "All Aks Arc Issues tests passed"
                 return $failedTests
+            } else {
+                Write-ToHost "Some tests failed" -Level 3 -Checkmark 3
+                Return "Some tests failed"
             }
         } else {
             Write-ToHost "Could not install Aks Arc Issues module" -Level 2 -Checkmark 2
