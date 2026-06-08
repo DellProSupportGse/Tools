@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.571"
+    $ver="0.572"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1104,7 +1104,9 @@ param(
     Function Test-AksArcIssues {
         $failedAksArcIssues=@()
         Write-Host "Testing Arks Arc Known Issues..."
-        if (!(gcm Test-SupportAksArcKnownIssues)) {
+        $iPolicy=(Get-PSRepository "PSGallery").InstallationPolicy
+        Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy Trusted
+        if (!(gcm *SupportAksArcKnownIssues)) {
             Install-Module -Name Support.AksArc -AllowClobber -Force -ErrorAction SilentlyContinue
         }
         Remove-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
@@ -1112,6 +1114,7 @@ param(
         Import-Module -Name Support.AksArc -Force
         if (gcm Test-SupportAksArcKnownIssues) {
             $Tests=Test-SupportAksArcKnownIssues
+            Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy
             $failedTests=$Tests | ? Status -eq "Failed"
             $failedTests | ft -AutoSize
             if ($failedTests) {
