@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.573"
+    $ver="0.58"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -305,7 +305,15 @@ param(
             # Survivable capacity
             $usableCapacity = $pool.Size - $pool.Reserved - $failureReserve
             if ($totalAllocatedMax -gt $usableCapacity) {
-                If ($ErrorOnlyCheck -eq $false) { Write-ToHost "If volumes are filled, there will not be enough space for disk repairs. $([int](($usableCapacity-$totalAllocatedMax)/1gb)) GB" -Checkmark 2 -Level 2}
+                If ($ErrorOnlyCheck -eq $false) { 
+                    $userVdisks=$vDisks | ? FriendlyName -notlike "Infrastructure*" | ? FriendlyName -notlike "ClusterPerformanceHistory*"
+                    $sysVdisks=$vDisks | ?{$_.FriendlyName -like "Infrastructure*" -or $_.FriendlyName -like "ClusterPerformanceHistory*"}
+                    $sysVdiskSize=0
+                    $sysVdisks | %{$sysVdiskSize=$sysVdiskSize+($_.size * $_.NumberOfDataCopies)}
+                    $eachVD=($usableCapacity-$sysVdiskSize)/($userVdisks.count)/($userVdisks[0].NumberOfDataCopies)
+                    Write-ToHost "If volumes are filled, there will not be enough space for disk repairs. $([int](($usableCapacity-$totalAllocatedMax)/1gb)) GB" -Checkmark 2 -Level 2
+                    Write-Host "Each node virtual disk can be up to $([math]::Round($eachVD/1TB,2)) TB"
+                }
             } else {
                 Write-ToHost "Storage Pool space looks good"
             }
