@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.581"
+    $ver="0.582"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1164,7 +1164,7 @@ v$ver
         [CmdletBinding()]
         param(
             [Parameter(Mandatory=$true)]
-            [string]$TableName,
+            [string]$TaliTableName,
 
             [Parameter(Mandatory=$true)]
             [string]$PartitionKey,
@@ -1182,15 +1182,19 @@ v$ver
         try {$Data=[HashTable]$Data
 
         $RowKey = [guid]::NewGuid().Guid
-        
-        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/?SECRET REMOVED'
+        $uriText = @'
+        https://gsetools.table.core.windows.net/TaliTelemetryData?SECRET REMOVED
+'@.Trim()
 
-        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
+         
+        $uri = [System.Uri]$uriText
 
         $headers = @{
             "Accept"       = "application/json;odata=nometadata"
             "Content-Type" = "application/json"
             "x-ms-version" = "2019-02-02"
+            "DataServiceVersion"    = "3.0"
+            "MaxDataServiceVersion" = "3.0"
         }
 
         $Data["PartitionKey"] = $PartitionKey
@@ -1234,7 +1238,6 @@ v$ver
         Write-Host "$prefix$Message" -ForegroundColor $Color
     }
 
-    <#
     # Unique report id
     $CReportID = [guid]::NewGuid().Guid
 
@@ -1286,10 +1289,9 @@ v$ver
     $PartitionKey = "Tali"
 
     Add-TableData `
-        -TableName "TaliTelemetryData" `
+        -TaliTableName "TaliTelemetryData" `
         -PartitionKey $PartitionKey `
         -Data $data 
-#>
 
 <#
     $scriptBlock = $MyInvocation.MyCommand.ScriptBlock
