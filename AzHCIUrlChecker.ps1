@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker{
-$Ver="1.10"
+$Ver="1.11"
 Clear-Host
 $text = @"
 v$Ver
@@ -188,50 +188,41 @@ v$Ver
 
 
 # Step: 10 Test endpoint access
-    function Test-PortFast {
-        param (
-            [string]$ComputerName,
-            [int]$Port,
-            [int]$TimeoutMs = 2000
-        )
-
-        try {
-            $ComputerName=$ComputerName -replace "http://" -replace "https://"
-            $client = New-Object System.Net.Sockets.TcpClient
-            $async = $client.BeginConnect($ComputerName, $Port, $null, $null)
-            $wait = $async.AsyncWaitHandle.WaitOne($TimeoutMs, $false)
-
-            if ($wait -and $client.Connected) {
-                $client.Close()
-                return $true
-            } else {
-                $client.Close()
-                return $false
-            }
-        } catch {
-            return $false
-        }
-    }
 
     $total = $testableEndpoints.Count
     $counter = 0
     $testedendpoints = @()
 
-    foreach ($endpoint in $testableEndpoints) {
-        $counter++
-        $ep2test = $endpoint.'Endpoint URL'.Trim()
-        $port = [int]$endpoint.Port
+foreach ($endpoint in $testableEndpoints) {
+    $counter++
+    $ep2test = $endpoint.'Endpoint URL'.Trim()
+    $port = [int]$endpoint.Port
 
-        Write-Progress -Activity "Testing Endpoints" -Status "$counter of $($total):$($ep2test):$($port)" -PercentComplete (($counter / $total) * 100)
+    Write-Progress -Activity "Testing Endpoints" -Status "$counter of $($total):$($ep2test):$($port)" -PercentComplete (($counter / $total) * 100)
 
-        $isUp = Test-PortFast -ComputerName $ep2test -Port $port
+    try {
+        $testUrl = if ($port -eq 443) {
+            "https://$ep2test"
+        }
+        elseif ($port -eq 80) {
+            "http://$ep2test"
+        }
+        else {
+            "https://$ep2test`:$port"
+        }
 
-        # Clone the object to make sure it’s not shared reference
-        $obj = $endpoint.PSObject.Copy()
-        $obj | Add-Member -NotePropertyName 'Accessible' -NotePropertyValue $isUp -Force
-
-        $testedendpoints += $obj
+        $null = & curl.exe -sS --connect-timeout 15 -m 18 $testUrl 2>&1
+        $isUp = ($LASTEXITCODE -eq 0)
     }
+    catch {
+        $isUp = $false
+    }
+
+    $obj = $endpoint.PSObject.Copy()
+    $obj | Add-Member -NotePropertyName 'Accessible' -NotePropertyValue $isUp -Force
+
+    $testedendpoints += $obj
+}
 
 # Step 11: Output the parsed endpoint table
     Write-Host "`n===== Testable Endpoints =====" -ForegroundColor Green
