@@ -10,7 +10,7 @@
 #>
 
 Function Invoke-AzHCIUrlChecker {
-    $Ver = "1.12"
+    $Ver = "1.13"
     Clear-Host
 
     $text = @"
@@ -185,6 +185,44 @@ v$Ver
     }
 
     # Step 10: Test endpoint access using curl.exe
+    function Test-NtpTimeServer {
+        param (
+            [string]$ComputerName
+        )
+
+        try {
+            $server = $ComputerName -replace '^https?://', ''
+            $server = $server -replace ':123$', ''
+
+            $output = & w32tm /stripchart /computer:$server /samples:1 /dataonly 2>&1
+            $exitCode = $LASTEXITCODE
+
+            $outputText = if ($output -is [array]) {
+                $output -join '; '
+            }
+            else {
+                "$output"
+            }
+
+            $success = ($exitCode -eq 0 -and $outputText -match '\d{1,2}:\d{2}:\d{2}')
+
+            return [PSCustomObject]@{
+                Accessible   = $success
+                CurlExitCode = $exitCode
+                CurlResponse = $outputText.Trim()
+                TestUrl      = "ntp://$server`:123"
+            }
+        }
+        catch {
+            return [PSCustomObject]@{
+                Accessible   = $false
+                CurlExitCode = -1
+                CurlResponse = $_.Exception.Message
+                TestUrl      = "ntp://$ComputerName`:123"
+            }
+        }
+    }
+
     $total = $testableEndpoints.Count
     $counter = 0
     $testedendpoints = @()
@@ -200,6 +238,15 @@ v$Ver
             -Status "$counter of $($total): $($ep2test):$($port)" `
             -PercentComplete (($counter / $total) * 100)
 
+    if ($port -eq 123) {
+        $timeResult = Test-NtpTimeServer -ComputerName $ep2test
+
+        $testUrl = $timeResult.TestUrl
+        $curlExitCode = $timeResult.CurlExitCode
+        $curlOutput = $timeResult.CurlResponse
+        $isUp = $timeResult.Accessible
+    }
+    else {
         try {
             $cleanEndpoint = $ep2test -replace '^https?://', ''
 
@@ -221,7 +268,6 @@ v$Ver
             }
 
             $curlOutput = "$curlOutput".Trim()
-
             $isUp = ($curlExitCode -eq 0)
         }
         catch {
@@ -230,6 +276,7 @@ v$Ver
             $curlOutput = $_.Exception.Message
             $isUp = $false
         }
+    }
 
         $obj = $endpoint.PSObject.Copy()
 
