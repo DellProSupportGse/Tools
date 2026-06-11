@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.43"
+    $ver="0.44"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -128,8 +128,8 @@ param(
             $eceClient = create-ECEClientSimple;$eceClient.SetOemVersion("2.1.0.0").GetAwaiter().GetResult()
             Get-ClusterGroup "Azure Stack HCI*Orchestrator*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
             Get-ClusterGroup "Azure Stack HCI*Update*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
-            Write-Host "Waiting 30 seconds for services to populate solution update information..."
-            Sleep 30
+            Write-Host "Please wait a full 15 minutes and re-run this script. Current time is "
+            break
             $sbeEnv = Get-SolutionUpdateEnvironment -ErrorAction Stop
             $currentSbeStr = $sbeEnv.CurrentSbeVersion.ToString().Trim()
             if ([version]$currentSbeStr -lt [version]"4.2.2511" -and $currentSbeStr -ne "2.1.0.0") {
@@ -414,7 +414,10 @@ param(
                 $compatibleUpdates += $update
             }
         }
-    
+        if ([version]$currentSbeStr -lt [version]"4.2.2511" -and $currentSbeStr -ne "2.1.0.0") {
+            $isCompatible = $false
+            $compatibleUpdates = @()
+        }
         if (-not $compatibleUpdates) {
             Write-Warning "No SBE updates found in the manifest compatible with Family [$targetFamily] AND Solution Version [$currentSolutionVersion]."
             if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }
