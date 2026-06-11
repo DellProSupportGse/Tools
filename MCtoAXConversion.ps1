@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.4"
+    $ver="0.41"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -117,15 +117,31 @@ param(
     $sbeEnv = Get-SolutionUpdateEnvironment -ErrorAction Stop
     $currentSbeStr = $sbeEnv.CurrentSbeVersion.ToString().Trim()
     if ([version]$currentSbeStr -lt [version]"4.2.2511" -and $currentSbeStr -ne "2.1.0.0") {
-        #Write-Host "WARNING: You must be at or above SBE 4.2.2511.* before converting." -ForegroundColor Yellow;break
-        Set-OverrideUpdateConfiguration -OverrideOemUpdateUri https://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/UpdateManifest/SBE_Discovery_nomatch.xml
-        $currentVersion = (Get-SolutionUpdateEnvironment).CurrentSbeVersion
-        $currentVersion # Write this value down as you will need it later to set the value back to normal
-        #Write-Host "Removing installed SBE version of '$currentVersion'. Make sure to undo this later"
-        $eceClient = Create-ECEClientSimple
-        $eceClient.GetOemVersion()
-        $eceClient.SetOemVersion("2.1.0.0")
+        IF ($DoConversion) {
+            #Write-Host "WARNING: You must be at or above SBE 4.2.2511.* before converting." -ForegroundColor Yellow;break
+            Set-OverrideUpdateConfiguration -ResetDefaultOemUpdateUri
+            #Set-OverrideUpdateConfiguration -OverrideOemUpdateUri htps://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/UpdateManifest/SBE_Discovery_nomatch.xml
+            Write-Host "Removing installed SBE version of '$currentSbeStr'. Make sure to undo this later"
+            $eceClient = Create-ECEClientSimple
+            $eceClient.GetOemVersion()
+            $eceClient.SetOemVersion("2.1.0.0")
+            Get-ClusterGroup "Azure Stack HCI*Orchestrator*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
+            Get-ClusterGroup "Azure Stack HCI*Update*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
+            Write-Host "Waiting 30 seconds for services to populate"
+            Sleep 30
+            $sbeEnv = Get-SolutionUpdateEnvironment -ErrorAction Stop
+            $currentSbeStr = $sbeEnv.CurrentSbeVersion.ToString().Trim()
+            if ([version]$currentSbeStr -lt [version]"4.2.2511" -and $currentSbeStr -ne "2.1.0.0") {
+                Write-Host "Could not change oem vesion to 2.1.0.0" -ForegroundColor DarkYellow
+                $conversionDone=$false
+            }
+        } else {
+            Write-Host "SBE version cannot directly upgrade to AX SBE. Will need to set SBE OEM version to 2.1.0.0" -ForegroundColor Yellow
+            $conversionDone=$false
+        }
         
+    } else {
+        Write-Host "Current SBE version $currentSbeStr is good"
     }
     # ══════════════════════════════════════════════════════════════════════════════
     # SECTION 3 — ACP Parameter Cleanup, Core Resource, and Group Health Validation
