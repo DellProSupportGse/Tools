@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.41"
+    $ver="0.42"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -121,13 +121,14 @@ param(
             #Write-Host "WARNING: You must be at or above SBE 4.2.2511.* before converting." -ForegroundColor Yellow;break
             Set-OverrideUpdateConfiguration -ResetDefaultOemUpdateUri
             #Set-OverrideUpdateConfiguration -OverrideOemUpdateUri htps://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/UpdateManifest/SBE_Discovery_nomatch.xml
-            Write-Host "Removing installed SBE version of '$currentSbeStr'. Make sure to undo this later"
-            $eceClient = Create-ECEClientSimple
-            $eceClient.GetOemVersion()
-            $eceClient.SetOemVersion("2.1.0.0")
+            Write-Host "Removing installed SBE version of '$currentSbeStr'"
+            #$eceClient = Create-ECEClientSimple
+            #$eceClient.GetOemVersion()
+            #$eceClient.SetOemVersion("2.1.0.0")
+            $eceClient = create-ECEClientSimple;$eceClient.SetOemVersion("2.1.0.0").GetAwaiter().GetResult()
             Get-ClusterGroup "Azure Stack HCI*Orchestrator*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
             Get-ClusterGroup "Azure Stack HCI*Update*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
-            Write-Host "Waiting 30 seconds for services to populate"
+            Write-Host "Waiting 30 seconds for services to populate solution update information..."
             Sleep 30
             $sbeEnv = Get-SolutionUpdateEnvironment -ErrorAction Stop
             $currentSbeStr = $sbeEnv.CurrentSbeVersion.ToString().Trim()
