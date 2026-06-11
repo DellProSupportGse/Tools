@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.44"
+    $ver="0.45"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -121,19 +121,24 @@ param(
             #Write-Host "WARNING: You must be at or above SBE 4.2.2511.* before converting." -ForegroundColor Yellow;break
             Set-OverrideUpdateConfiguration -ResetDefaultOemUpdateUri
             #Set-OverrideUpdateConfiguration -OverrideOemUpdateUri htps://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/UpdateManifest/SBE_Discovery_nomatch.xml
-            Write-Host "Removing installed SBE version of '$currentSbeStr'"
+            Write-Host "Changing oem version from '$currentSbeStr' to 2.1.0.0"
             #$eceClient = Create-ECEClientSimple
             #$eceClient.GetOemVersion()
             #$eceClient.SetOemVersion("2.1.0.0")
-            $eceClient = create-ECEClientSimple;$eceClient.SetOemVersion("2.1.0.0").GetAwaiter().GetResult()
+            $clusterNodes | %{Invoke-Command -ComputerName $_ -ScriptBlock {$eceClient = create-ECEClientSimple;$eceClient.SetOemVersion("2.1.0.0").GetAwaiter().GetResult()}}
             Get-ClusterGroup "Azure Stack HCI*Orchestrator*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
             Get-ClusterGroup "Azure Stack HCI*Update*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
-            Write-Host "Please wait a full 15 minutes and re-run this script. Current time is "
-            break
-            $sbeEnv = Get-SolutionUpdateEnvironment -ErrorAction Stop
-            $currentSbeStr = $sbeEnv.CurrentSbeVersion.ToString().Trim()
-            if ([version]$currentSbeStr -lt [version]"4.2.2511" -and $currentSbeStr -ne "2.1.0.0") {
-                Write-Host "Could not change oem vesion to 2.1.0.0" -ForegroundColor DarkYellow
+            Write-Host "Waiting up to 30 minutes for change. Feel free to end script and re-run in 30 minutes. Current time is $((Get-Date).ToLongTimeString())"
+            While ($currentSbeStr -ne "2.1.0.0" -and $xx -lt 30) {
+                $sbeEnv = Get-SolutionUpdateEnvironment -ErrorAction Stop
+                $currentSbeStr = $sbeEnv.CurrentSbeVersion.ToString().Trim()
+                sleep 60
+                Write-Host "." -NoNewline
+                $xx++
+            }
+            Write-Host ""
+            If ($xx -eq 30) {
+                Write-Host "Could not set SBE version to 2.1.0.0. Failed conversion. Rerun script in an hour to recheck"
                 $conversionDone=$false
             }
         } else {
