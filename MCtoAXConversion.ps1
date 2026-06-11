@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.45"
+    $ver="0.46"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -425,7 +425,7 @@ param(
         }
         if (-not $compatibleUpdates) {
             Write-Warning "No SBE updates found in the manifest compatible with Family [$targetFamily] AND Solution Version [$currentSolutionVersion]."
-            if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }
+            if (Test-Path $xmlPath -ErrorAction SilentlyContinue) { Remove-Item $xmlPath -Force }
             #return
         }
 
@@ -433,13 +433,13 @@ param(
         $sortedUpdates=@()
         $sortedUpdates += $compatibleUpdates | Sort-Object { [version]([string]$_.version) }
         $latestSbeStr = [string]$sortedUpdates[-1].version
-        $latestSbeVer = [version]$latestSbeStr
+        if ($latestSbeStr -gt "") {$latestSbeVer = [version]$latestSbeStr}
     
         Write-Host "  -> Maximum Compatible SBE for [$targetFamily] on OS [$currentSolutionVersion]: $latestSbeStr" -ForegroundColor Cyan
     } catch {
         Write-Error "CRITICAL: Failed to download or parse the Dell SBE manifest. Error: $_" -ErrorAction Stop
     } finally {
-        if (Test-Path $xmlPath) { Remove-Item $xmlPath -Force }
+        if (Test-Path $xmlPath -ErrorAction SilentlyContinue) { Remove-Item $xmlPath -Force }
     }
 
     Write-Host "`n Comparing SBE versions..." -ForegroundColor Yellow
