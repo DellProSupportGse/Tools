@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.42"
+    $ver="0.43"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -324,7 +324,7 @@ param(
 
     # Query the Machine scope directly instead of the Process scope ($env:)
     $currentEnv = [System.Environment]::GetEnvironmentVariable($envVarName, 'Machine')
-    $filesMoved=(gci $destPath).count
+    $filesMoved=(gci $destPath -ErrorAction SilentlyContinue).count
 
     if ($currentEnv -eq $destPath -and $filesMoved -gt 0) {
         Write-Host "Machine scope '$envVarName' evaluates to: $currentEnv and files exist in the correct path" -ForegroundColor Green
