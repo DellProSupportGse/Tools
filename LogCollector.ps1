@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.88"
+$Ver="1.89"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -379,14 +379,24 @@ Function ShowMenu{
             $iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
         }
     }
+    $SignalFile = $null
     IF($selection -match 5){
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
         If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
         Write-Host "Collecting Test Dell Azure Local Issues script (TALI)..."
         $Global:CollectTALI = "Y"
-        Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1'))
-        Test-DellAzureLocalIssues
+        If ($selection -notmatch "0|1|2|3|4|6|7|8|9") {
+            Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1'))
+            Test-DellAzureLocalIssues
+        } else {
+            $SignalFile = Join-Path $env:TEMP "TALI_Signal_$([Guid]::NewGuid().Guid).tmp"
+            # Ensure the file does not exist beforehand
+            if (Test-Path $SignalFile) { Remove-Item $SignalFile -Force }
+            $Payload = '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(''$module=''''TALI'''';$repo=''''PowershellScripts''''; ''+(new-object net.webclient).DownloadString(''http''+''s://raw.g''+''ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1''));Test-DellAzureLocalIssues'
+            $CommandToRun = "$Payload; New-Item -Path '$SignalFile' -ItemType File -Force | Out-Null"
 
+            Start-Process powershell -ArgumentList '-NoExit', '-Command', $CommandToRun
+        }
     }
     IF($selection -match 1){
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
@@ -436,6 +446,12 @@ Function ShowMenu{
         Write-Host "Bye Bye..."
         EndScript
     }
+    If (-not (Test-Path $SignalFile -ErrorAction SilentlyContinue) -and $SignalFile -ne $null) {Write-Host "Waiting for TALI remote window to finish execution..."}
+    while (-not (Test-Path $SignalFile -ErrorAction SilentlyContinue) -and $SignalFile -ne $null) {
+        Start-Sleep -Milliseconds 500
+    }
+    # 5. Cleanup the signal file and resume execution
+    If ($SignalFile -ne $null) {Remove-Item $SignalFile -Force -ErrorAction SilentlyContinue}
     IF($consent -eq "Y") {UploadLogs}
 }#End of ShowMenu
 Function ZipNClean{
