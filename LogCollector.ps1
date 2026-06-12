@@ -446,12 +446,14 @@ Function ShowMenu{
         Write-Host "Bye Bye..."
         EndScript
     }
-    If (-not (Test-Path $SignalFile -ErrorAction SilentlyContinue) -and $SignalFile -ne $null) {Write-Host "Waiting for TALI remote window to finish execution..."}
-    while (-not (Test-Path $SignalFile -ErrorAction SilentlyContinue) -and $SignalFile -ne $null) {
-        Start-Sleep -Milliseconds 500
+    If ($SignalFile -ne $null) {
+        If (-not (Test-Path $SignalFile -ErrorAction SilentlyContinue)) {Write-Host "Waiting for TALI remote window to finish execution..."}
+        while (-not (Test-Path $SignalFile -ErrorAction SilentlyContinue)) {
+            Start-Sleep -Milliseconds 250
+        }
+        # 5. Cleanup the signal file and resume execution
+        Remove-Item $SignalFile -Force -ErrorAction SilentlyContinue
     }
-    # 5. Cleanup the signal file and resume execution
-    If ($SignalFile -ne $null) {Remove-Item $SignalFile -Force -ErrorAction SilentlyContinue}
     IF($consent -eq "Y") {UploadLogs}
 }#End of ShowMenu
 Function ZipNClean{
