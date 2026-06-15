@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.47"
+    $ver="0.48"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -313,13 +313,15 @@ param(
     if ([version]$currentSbeStr -lt [version]"4.2.2511" -and $currentSbeStr -ne "2.1.0.0") {
         IF ($DoConversion) {
             #Write-Host "WARNING: You must be at or above SBE 4.2.2511.* before converting." -ForegroundColor Yellow;break
-            Set-OverrideUpdateConfiguration -ResetDefaultOemUpdateUri
-            #Set-OverrideUpdateConfiguration -OverrideOemUpdateUri htps://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/UpdateManifest/SBE_Discovery_nomatch.xml
+            Set-OverrideUpdateConfiguration -OverrideOemUpdateUri htps://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/UpdateManifest/SBE_Discovery_nomatch.xml
             Write-Host "Changing oem version from '$currentSbeStr' to 2.1.0.0"
             #$eceClient = Create-ECEClientSimple
             #$eceClient.GetOemVersion()
             #$eceClient.SetOemVersion("2.1.0.0")
             $clusterNodes | %{Invoke-Command -ComputerName $_ -ScriptBlock {$eceClient = create-ECEClientSimple;$eceClient.SetOemVersion("2.1.0.0").GetAwaiter().GetResult()}}
+            Set-OverrideUpdateConfiguration -ResetDefaultOemUpdateUri
+            mkdir C:\ClusterStorage\Infrastructure_1\Shares\SU1_Infrastructure_1\CloudMedia\oldSBE -ErrorAction SilentlyContinue -Force
+            Move-Item "C:\ClusterStorage\Infrastructure_1\Shares\SU1_Infrastructure_1\CloudMedia\SBE\*" "C:\ClusterStorage\Infrastructure_1\Shares\SU1_Infrastructure_1\CloudMedia\oldSBE" -ErrorAction SilentlyContinue
             Get-ClusterGroup "Azure Stack HCI*Orchestrator*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
             Get-ClusterGroup "Azure Stack HCI*Update*" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
             Write-Host "Waiting up to 30 minutes for change. Feel free to end script and re-run in 30 minutes. Current time is $((Get-Date).ToLongTimeString())"
@@ -335,6 +337,7 @@ param(
                 Write-Host "Could not set SBE version to 2.1.0.0. Failed conversion. Rerun script in an hour to recheck"
                 $conversionDone=$false
             }
+
         } else {
             Write-Host "SBE version cannot directly upgrade to AX SBE. Will need to set SBE OEM version to 2.1.0.0" -ForegroundColor Yellow
             $conversionDone=$false
