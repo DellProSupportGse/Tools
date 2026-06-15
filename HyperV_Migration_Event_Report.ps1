@@ -25,6 +25,9 @@
 
 .EXAMPLE
     .\HyperV_Migration_Event_Report.ps1 -SourceHost WIN-1LL61BEGCHE -DestinationHost WIN-1CJ52FKUOIQ -Minutes 15
+
+.Author
+    Jim Gandy
 #>
 
 param(
