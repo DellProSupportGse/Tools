@@ -72,7 +72,9 @@ try {
 # Event signals (last 14 days)
 # ------------------------------------------------------------
 
-$StartTime = (Get-Date).AddDays(-14)
+$StartTime = $null
+$StartTime = (Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue).LastBootUpTime
+If (!($StartTime)) {$StartTime=(Get-Date).AddDays(-14)}
 
 $Events = Get-WinEvent -FilterHashtable @{
     LogName   = 'System'
@@ -105,6 +107,8 @@ if ($CapState -eq "Blocked") {
 } elseif ($CapState -eq "Optimal") {
     if ($AvailableUpdates -eq 0x4000 -and $DbUpdated -and $HasSuccess) {
         $State = "Ready"
+    } else {
+        $State = "Transitional"
     }
 } else {
     # 2. Firmware readiness checks
