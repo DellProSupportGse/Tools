@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.48"
+    $ver="0.49"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -313,7 +313,7 @@ param(
     if ([version]$currentSbeStr -lt [version]"4.2.2511" -and $currentSbeStr -ne "2.1.0.0") {
         IF ($DoConversion) {
             #Write-Host "WARNING: You must be at or above SBE 4.2.2511.* before converting." -ForegroundColor Yellow;break
-            Set-OverrideUpdateConfiguration -OverrideOemUpdateUri htps://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/UpdateManifest/SBE_Discovery_nomatch.xml
+            Set-OverrideUpdateConfiguration -OverrideOemUpdateUri https://azurestackreleases.download.prss.microsoft.com/dbazure/AzureStackHCI/UpdateManifest/SBE_Discovery_nomatch.xml
             Write-Host "Changing oem version from '$currentSbeStr' to 2.1.0.0"
             #$eceClient = Create-ECEClientSimple
             #$eceClient.GetOemVersion()
