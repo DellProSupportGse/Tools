@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.49"
+    $ver="0.5"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -394,7 +394,7 @@ param(
     try {
         Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing -OutFile $xmlPath -ErrorAction Stop
         $xmlData = [xml](Get-Content $xmlPath)
-    
+        #MinVersionRequired - can't find in normal output
         # 2a. Filter updates by Family and validate against the Solution package version array
         foreach ($update in $xmlData.SBEUpdatesManifest.ApplicableUpdate) {
         
@@ -407,17 +407,21 @@ param(
         
             # Force into an array to handle single-item vs multi-item returns cleanly
             $reqPatterns = @($solutionPackages.version)
+            $minVersion = $null
+            $minVersion = ($solutionPackages | sort MinVersionRequired | Select -first 1).MinVersionRequired
+            if (!($minVersion)) {$minVersion = "0.0.0.0"}
         
             foreach ($pattern in $reqPatterns) {
                 $cleanPattern = [string]$pattern.Trim()
             
                 # Use PowerShell's -like operator for exact wildcard match against the OS string
-                if ($currentSolutionVersion -like $cleanPattern) {
+                if ($currentSolutionVersion -like $cleanPattern -and [version]$currentSolutionVersion -ge [version]$minVersion) {
+                    
                     $isCompatible = $true
                     break
                 }
             }
-        
+            
             if ($isCompatible) {
                 $compatibleUpdates += $update
             }
