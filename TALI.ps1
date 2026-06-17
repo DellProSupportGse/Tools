@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.596"
+    $ver="0.597"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -19,10 +19,12 @@ param(
     # Check if script is running on a cluster node
     If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a cluster node.";Break}
     #Get-ClusterStorageSpacesDirect
+    $WarningPreference='SilentlyContinue'
     if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue -Verbose:$false) -and !($IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
     $isNotS2d=try {((Get-ClusterStorageSpacesDirect).State -ne 'Enabled')} catch {$true}
     if ($isNotS2d) {
         Write-Host "Script must be run locally on an S2D cluster node" -ForegroundColor DarkYellow
+        $WarningPreference='Continue'
         break
     }
     if ($IgnoreAzureLocalRequired) {
@@ -30,6 +32,7 @@ param(
         $FixErrors=$false
         $FixWarningsAlso=$false
     }
+    $WarningPreference='Continue'
     $testReport=@()
     Function Write-ToHost {
     param(
@@ -1096,8 +1099,7 @@ param(
     Function Test-ControlPlaneVMNetwork {
         Write-Host "Testing Control Plane VM network..."
         $WarningPreference='SilentlyContinue'
-        $arcHciConfig = Get-ArcHciConfig -Verbose:$false -WarningAction Ignore
-        $WarningPreference='Continue'
+        $arcHciConfig = Get-ArcHciConfig
         $controlPlaneIp = $arcHciConfig.controlPlaneIp
         #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
         $tcpClient = New-Object System.Net.Sockets.TcpClient -Verbose:$false -WarningAction Ignore
@@ -1112,6 +1114,7 @@ param(
         } else {
             Write-ToHost "Control Plane VM network checks out"
         }
+        $WarningPreference='Continue'
         return $result
     }
     Function Test-AksArcIssues {
