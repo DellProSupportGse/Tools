@@ -1119,7 +1119,7 @@ param(
     }
     Function Test-AksArcIssues {
         $failedAksArcIssues=@()
-        Write-Host "Testing Arks Arc Known Issues..."
+        Write-Host "Testing Aks Arc Known Issues..."
         $iPolicy=(Get-PSRepository "PSGallery").InstallationPolicy
         Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy Trusted
         if (!(gcm *SupportAksArcKnownIssues)) {
