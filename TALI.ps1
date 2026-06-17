@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.593"
+    $ver="0.594"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -46,7 +46,7 @@ param(
     Function Test-SolutionUpdateCommand {
         $dtime=0
         Write-Host "Checking Solution Update command..."
-        $SUJob=Start-Job -Name "SUJob" -ScriptBlock {Get-Solutionupdate -Verbose:$false}
+        $SUJob=Invoke-Command -AsJob -JobName "SUJob" -ScriptBlock {Get-Solutionupdate -Verbose $false 4>$null} -Verbose $false 4>$null
         $testSU=$null
         While ($dtime -lt 12 -and $SUJob.State -eq "Running") {Write-Host "." -NoNewline;$dtime++;$testSU+=Receive-Job -Name "SUJob";sleep 5}
     	Write-Host "."
@@ -1125,7 +1125,8 @@ param(
         Import-Module -Name Support.AksArc -Force -Verbose:$false
         if (gcm *SupportAksArcKnownIssues) {
             $testErr=$null
-            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr -Verbose:$false -WarningAction SilentlyContinue
+            $arctest=$null
+            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr -WarningAction SilentlyContinue -InformationVariable arctest 4> $null
             try {$testErr=$testErr | ? {$_.Trim() -ne "System error."}} catch {}
             Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy -Verbose:$false -WarningAction SilentlyContinue
             $failedTests=$Tests | ? Status -eq "Failed"
@@ -1134,7 +1135,7 @@ param(
                 $failedTests | ft -AutoSize
                 Write-ToHost "Some Aks Arc tests failed" -Level 3 -Checkmark 3
                 return $failedTests
-            } elseif ($testErr -eq $null -or $testErr.count -eq 0) {
+            } elseif ($testErr -eq $null -or $testErr.count -eq 0 -or $arctest -match "All tests passed") {
                 Write-ToHost "All Aks Arc Issues tests passed"
                 return $failedTests
             } else {
