@@ -18,7 +18,6 @@
 
 .NOTES
     Name: iDRACCMan
-    Version: 1.0.7
     Created By: Jim Gandy
 
     One-liner usage:
@@ -28,8 +27,6 @@
     powershell.exe -STA -ExecutionPolicy Bypass -File .\iDRAC-ConnectionManager.ps1
 #>
 
-Function Invoke-iDRACCMan {
-
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Security
@@ -37,7 +34,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.7"
+$script:AppVersion   = "1.0.8"
 $script:DocumentsRoot = [Environment]::GetFolderPath("MyDocuments")
 $script:AppRoot      = Join-Path $script:DocumentsRoot "iDRACCMan"
 $script:LibRoot      = Join-Path $script:AppRoot "lib"
@@ -1615,8 +1612,67 @@ function Open-MultiViewForSelectedGroup {
         $title.Text = $srv.Name
         $title.TextAlign = "MiddleLeft"
         $title.Cursor = [System.Windows.Forms.Cursors]::Hand
+        # Inline double-click handler instead of calling Toggle-MultiViewCell by name.
+        # This avoids PowerShell scope loss when the tool is loaded with Invoke-Expression from GitHub.
         $title.Add_DoubleClick({
-            Toggle-MultiViewCell -Cell $cell -Table $table -Tab $tab
+            try {
+                if (-not $tab.Tag) { return }
+
+                if (-not $tab.Tag.IsCellMaximized) {
+                    foreach ($ctrl in @($table.Controls)) {
+                        if ($ctrl -ne $cell) {
+                            $ctrl.Visible = $false
+                        }
+                    }
+
+                    $table.SetColumn($cell, 0)
+                    $table.SetRow($cell, 0)
+                    $table.SetColumnSpan($cell, $table.ColumnCount)
+                    $table.SetRowSpan($cell, $table.RowCount)
+
+                    $cell.Visible = $true
+                    $cell.BringToFront()
+
+                    $tab.Tag.IsCellMaximized = $true
+                    $tab.Tag.MaximizedCell = $cell
+
+                    if ($script:Status) {
+                        $script:Status.Text = "Multi View maximized. Double-click the title again to restore."
+                    }
+                }
+                else {
+                    foreach ($ctrl in @($table.Controls)) {
+                        try {
+                            if ($ctrl.Tag) {
+                                $table.SetColumn($ctrl, [int]$ctrl.Tag.OriginalColumn)
+                                $table.SetRow($ctrl, [int]$ctrl.Tag.OriginalRow)
+                                $table.SetColumnSpan($ctrl, 1)
+                                $table.SetRowSpan($ctrl, 1)
+                            }
+
+                            $ctrl.Visible = $true
+                        }
+                        catch {}
+                    }
+
+                    $tab.Tag.IsCellMaximized = $false
+                    $tab.Tag.MaximizedCell = $null
+
+                    if ($script:Status) {
+                        $script:Status.Text = "Multi View restored."
+                    }
+                }
+
+                $table.PerformLayout()
+            }
+            catch {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Unable to toggle Multi View.`r`n`r`n$($_.Exception.Message)",
+                    "Multi View Error",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Error
+                ) | Out-Null
+            }
         }.GetNewClosure())
 
         $web = New-Object Microsoft.Web.WebView2.WinForms.WebView2
@@ -1754,25 +1810,6 @@ function Show-ServerContextMenu {
     $cm.Show($script:Tree, $Location)
 }
 
-
-function New-iDRACCManIconImage {
-    $bytes = [Convert]::FromBase64String(@"
-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
-"@)
-    $ms = New-Object System.IO.MemoryStream(,$bytes)
-    return [System.Drawing.Image]::FromStream($ms)
-}
-
-function Set-iDRACCManFormIcon {
-    param([Parameter(Mandatory=$true)]$Form)
-    try {
-        $bmp = New-Object System.Drawing.Bitmap (New-iDRACCManIconImage)
-        $hicon = $bmp.GetHicon()
-        $Form.Icon = [System.Drawing.Icon]::FromHandle($hicon)
-    }
-    catch {}
-}
-
 function Build-Gui {
     $script:MainForm = New-Object System.Windows.Forms.Form
     $script:MainForm.Text = "$script:AppName - Created By: Jim Gandy"
@@ -1780,7 +1817,6 @@ function Build-Gui {
     $script:MainForm.StartPosition = "CenterScreen"
     $script:MainForm.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $script:MainForm.BackColor = [System.Drawing.Color]::FromArgb(245,247,250)
-    Set-iDRACCManFormIcon -Form $script:MainForm
 
     # iDRAC 10 inspired colors
     $colorBlue      = [System.Drawing.Color]::FromArgb(0,120,215)
@@ -1884,15 +1920,9 @@ function Build-Gui {
         $withServerCreds = @($script:Servers | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Username) }).Count
         $groupCreds = @($script:GroupCredentials).Count
 
-        $cardTotal = New-Card -Title "Total iDRACs" -Value ([string]$total) -SubText "$groups groups configured" -Accent $colorBlue -Left 10 -Top 110 -Width 270 -Height 120
-        $cardTotal.Tag = "Card1"
-        $surface.Controls.Add($cardTotal)
-        $cardCreds = New-Card -Title "Credentials" -Value ([string]($withServerCreds + $groupCreds)) -SubText "$withServerCreds server / $groupCreds group" -Accent $colorHealthy -Left 295 -Top 110 -Width 270 -Height 120
-        $cardCreds.Tag = "Card2"
-        $surface.Controls.Add($cardCreds)
-        $cardWebView = New-Card -Title "WebView2" -Value $(if ($script:WebViewReady) { "Ready" } else { "Issue" }) -SubText "Runtime: $(Get-WebView2RuntimeVersion)" -Accent $(if ($script:WebViewReady) { $colorHealthy } else { $colorWarn }) -Left 580 -Top 110 -Width 330 -Height 120
-        $cardWebView.Tag = "Card3"
-        $surface.Controls.Add($cardWebView)
+        $surface.Controls.Add((New-Card -Title "Total iDRACs" -Value ([string]$total) -SubText "$groups groups configured" -Accent $colorBlue -Left 10 -Top 110 -Width 270 -Height 120))
+        $surface.Controls.Add((New-Card -Title "Credentials" -Value ([string]($withServerCreds + $groupCreds)) -SubText "$withServerCreds server / $groupCreds group" -Accent $colorHealthy -Left 295 -Top 110 -Width 270 -Height 120))
+        $surface.Controls.Add((New-Card -Title "WebView2" -Value $(if ($script:WebViewReady) { "Ready" } else { "Issue" }) -SubText "Runtime: $(Get-WebView2RuntimeVersion)" -Accent $(if ($script:WebViewReady) { $colorHealthy } else { $colorWarn }) -Left 580 -Top 110 -Width 330 -Height 120))
 
         $recentPanel = New-Object System.Windows.Forms.Panel
         $recentPanel.Left = 10; $recentPanel.Top = 250; $recentPanel.Width = 900; $recentPanel.Height = 360
@@ -1932,38 +1962,6 @@ function Build-Gui {
         $list.Add_DoubleClick({ Open-KvmEmbedded })
         $recentPanel.Controls.Add($list)
 
-        # Responsive dashboard layout so the cards and connection table do not get chopped off
-        # when the window/splitter size changes.
-        $layoutDashboard = {
-            try {
-                $availableWidth = [Math]::Max(760, ($surface.ClientSize.Width - 30))
-                $gap = 15
-                $cardWidth = [int](($availableWidth - ($gap * 2)) / 3)
-
-                $card1 = $surface.Controls | Where-Object { $_.Tag -eq "Card1" } | Select-Object -First 1
-                $card2 = $surface.Controls | Where-Object { $_.Tag -eq "Card2" } | Select-Object -First 1
-                $card3 = $surface.Controls | Where-Object { $_.Tag -eq "Card3" } | Select-Object -First 1
-
-                if ($card1 -and $card2 -and $card3) {
-                    $card1.Left = 10
-                    $card1.Width = $cardWidth
-                    $card2.Left = 10 + $cardWidth + $gap
-                    $card2.Width = $cardWidth
-                    $card3.Left = 10 + (($cardWidth + $gap) * 2)
-                    $card3.Width = $cardWidth
-                }
-
-                $recentPanel.Width = $availableWidth
-                $recentPanel.Height = [Math]::Max(320, ($surface.ClientSize.Height - $recentPanel.Top - 25))
-                $list.Width = [Math]::Max(500, ($recentPanel.Width - 30))
-                $list.Height = [Math]::Max(220, ($recentPanel.Height - 65))
-            }
-            catch {}
-        }
-
-        $surface.Add_Resize($layoutDashboard)
-        & $layoutDashboard
-
         [void]$script:Tabs.TabPages.Add($dash)
         $script:Tabs.SelectedTab = $dash
     }
@@ -1977,15 +1975,16 @@ function Build-Gui {
     $top.Height = 50
     $top.BackColor = $colorBlue
 
-    $logo = New-Object System.Windows.Forms.PictureBox
-    $logo.Left = 12; $logo.Top = 6; $logo.Width = 38; $logo.Height = 38
-    $logo.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
-    $logo.Image = New-iDRACCManIconImage
+    $logo = New-Object System.Windows.Forms.Label
+    $logo.Text = "▣"
+    $logo.Left = 12; $logo.Top = 8; $logo.Width = 32; $logo.Height = 32
+    $logo.Font = New-Object System.Drawing.Font("Segoe UI Symbol", 20, [System.Drawing.FontStyle]::Bold)
+    $logo.ForeColor = [System.Drawing.Color]::White
     $top.Controls.Add($logo)
 
     $appTitle = New-Object System.Windows.Forms.Label
-    $appTitle.Text = "iDRAC Connection Manager"
-    $appTitle.Left = 58; $appTitle.Top = 13; $appTitle.Width = 520; $appTitle.Height = 26
+    $appTitle.Text = "iDRAC Connection Manager | Enterprise"
+    $appTitle.Left = 50; $appTitle.Top = 13; $appTitle.Width = 520; $appTitle.Height = 26
     $appTitle.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
     $appTitle.ForeColor = [System.Drawing.Color]::White
     $top.Controls.Add($appTitle)
@@ -2233,5 +2232,4 @@ function Invoke-iDRACCMan {
 # If loaded with Invoke-Expression/dot-source, call Invoke-iDRACCMan manually.
 if ($MyInvocation.InvocationName -ne '.') {
     Invoke-iDRACCMan
-}
 }
