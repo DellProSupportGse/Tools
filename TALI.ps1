@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.583"
+    $ver="0.584"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -274,7 +274,7 @@ param(
             $largestDisk     = ($physicalDisks | Measure-Object Size -Maximum).Maximum
             $totalAllocatedMax = ($vDisks | ForEach-Object {
                 $copies = $_.NumberOfDataCopies
-                $multiplier = if ($copies -in 1..3) {
+                $multiplier = if ($copies -in 1..6) {
                     $copies
                 } else {
                     2
@@ -286,7 +286,7 @@ param(
 
                 $copies = $_.NumberOfDataCopies
 
-                $multiplier = if ($copies -in 1..3) {
+                $multiplier = if ($copies -in 1..6) {
                     $copies
                 } else {
                     2
