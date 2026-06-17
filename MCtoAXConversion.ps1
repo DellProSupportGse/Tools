@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.5"
+    $ver="0.51"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -444,7 +444,7 @@ param(
             $latestSbeVer = [version]$latestSbeStr
             Write-Host "  -> Maximum Compatible SBE for [$targetFamily] on OS [$currentSolutionVersion]: $latestSbeStr" -ForegroundColor Cyan
         } else {
-            $latestSbeStr=$currentSbeStr
+            $latestSbeStr=[version]$currentSbeStr
         }
     } catch {
         Write-Error "CRITICAL: Failed to download or parse the Dell SBE manifest. Error: $_" -ErrorAction Stop
@@ -454,9 +454,9 @@ param(
 
     Write-Host "`n Comparing SBE versions..." -ForegroundColor Yellow
 
-    if ($latestSbeVer -gt $currentSbeVer) {
+    if ($latestSbeVer -gt [version]$currentSbeStr) {
         Write-Host "A compatible SBE update is available ($latestSbeStr > $currentSbeStr)." -ForegroundColor Green
-    } elseif ($latestSbeVer -eq $currentSbeVer) {
+    } elseif ($latestSbeVer -eq [version]$currentSbeStr) {
         Write-Host "The cluster is already running the maximum compatible SBE version ($currentSbeStr)." -ForegroundColor Green
     } else {
         Write-Warning "Anomaly detected: Current SBE ($currentSbeStr) is HIGHER than the catalog's maximum compatible update ($latestSbeStr)."
