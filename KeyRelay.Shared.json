@@ -208,7 +208,12 @@
     "Name": "Last xMins Logs",
     "Command": "$xMins=15; Get-ChildItem C:\\ -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge (Get-Date).AddMinutes(-$xMins) -and $_.Extension -match '\\.(log|txt|out|err|trace)$' } | Sort-Object LastWriteTime -Descending | Select-Object FullName, LastWriteTime, Length | Format-Table -AutoSize",
     "Description": "Find all logs that changed in the last X minutes"
-  }
+  },
+  {
+    "Name":  "Search For Text ($SS)",
+    "Command":  "$SS = \"ADD YOUR TEXT HERE\"; $SP = \"C:\\\"; $SF = \"*\" ; Get-ChildItem -Path $SP -Filter $SF -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $File = $_; $SS | ForEach-Object { try { Select-String -Path $File.FullName -SimpleMatch $_ -ErrorAction SilentlyContinue | Select-Object @{Name=\"FullName\";Expression={$File.FullName}}, LineNumber, Line } catch { } } } | Sort-Object Filename -Unique | Format-List",
+    "Description":  "Recursively searches files under the target path for the string stored in $SS and returns matching file names, line numbers, and lines."
+  }  
 ],
   "Storage Spaces Direct": [
     {
