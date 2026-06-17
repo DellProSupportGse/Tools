@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.595"
+    $ver="0.596"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -19,7 +19,7 @@ param(
     # Check if script is running on a cluster node
     If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a cluster node.";Break}
     #Get-ClusterStorageSpacesDirect
-    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue) -and !($IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
+    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue -Verbose:$false) -and !($IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
     $isNotS2d=try {((Get-ClusterStorageSpacesDirect).State -ne 'Enabled')} catch {$true}
     if ($isNotS2d) {
         Write-Host "Script must be run locally on an S2D cluster node" -ForegroundColor DarkYellow
@@ -1095,7 +1095,9 @@ param(
     }
     Function Test-ControlPlaneVMNetwork {
         Write-Host "Testing Control Plane VM network..."
+        $WarningPreference='SilentlyContinue'
         $arcHciConfig = Get-ArcHciConfig -Verbose:$false -WarningAction Ignore
+        $WarningPreference='Continue'
         $controlPlaneIp = $arcHciConfig.controlPlaneIp
         #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
         $tcpClient = New-Object System.Net.Sockets.TcpClient -Verbose:$false -WarningAction Ignore
@@ -1325,7 +1327,9 @@ v$ver
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
     Write-Host "Checking for running action plans"
+    $WarningPreference='SilentlyContinue'
     $MasUpdateNotRunning=(!((Get-ActionPlanInstances -Verbose:$false| ? Status -eq Running | ? ActionPlanName -like "MAS Update*").count))
+    $WarningPreference='Continue'
     If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
         Write-Warning "Solution Update is running. Some fixes will be disabled"
     }
