@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.59"
+    $ver="0.591"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1826,6 +1826,7 @@ v$ver
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
     If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
         $changed=$false
+        $testPass=2
         If ($FixErrors -and $failed.CurrentPercent -lt 100 -and $failed.CurrentPercent -gt $failed.Threshold) {
             Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
@@ -1839,18 +1840,19 @@ v$ver
         }
         if ($changed) {
             If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4;$testPass=2}
-        }
-    } else {
-        If ($failed.CurrentPercent -gt $failed.Threshold) {
-            Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)"
-        } elseif ($failed.MaxPercent -gt $failed.Threshold) {
-            if ($failed.MaxPercent -lt 100) {
-                Write-Host "Recommendation: Set Thin Provision Threshold to $($failed.MaxPercent)"
-            } else {
-                Write-Host "Recommendation: Make sure Vdisk usage does not exceed $($failed.Threshold)%"
+        } else {
+            If ($failed.CurrentPercent -gt $failed.Threshold) {
+                $testPass=2
+                Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)"
+            } elseif ($failed.MaxPercent -gt $failed.Threshold) {
+                $testPass=1
+                if ($failed.MaxPercent -lt 100) {
+                    Write-Host "Recommendation: Set Thin Provision Threshold to $($failed.MaxPercent)"
+                } else {
+                    Write-Host "Recommendation: Make sure Vdisk usage does not exceed $($failed.Threshold)%"
+                }
             }
-        }
-        
+        }        
     }
     $testReport+= [PSCustomObject] @{TestName="Test-AzLocalThinProvisioningUtilization";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
     Write-Host ""
