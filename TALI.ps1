@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.594"
+    $ver="0.595"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -46,12 +46,12 @@ param(
     Function Test-SolutionUpdateCommand {
         $dtime=0
         Write-Host "Checking Solution Update command..."
-        $SUJob=Invoke-Command -AsJob -JobName "SUJob" -ScriptBlock {Get-Solutionupdate -Verbose $false 4>$null} -Verbose $false 4>$null
+        $SUJob=Invoke-Command -computername (hostname) -AsJob -JobName "SUJob" -ScriptBlock {Get-Solutionupdate -Verbose:$false}
         $testSU=$null
-        While ($dtime -lt 12 -and $SUJob.State -eq "Running") {Write-Host "." -NoNewline;$dtime++;$testSU+=Receive-Job -Name "SUJob";sleep 5}
+        While ($dtime -lt 12 -and $SUJob.State -eq "Running") {Write-Host "." -NoNewline;$dtime++;sleep 5} #$testSU+=Receive-Job -Name "SUJob" -Verbose:$false;
     	Write-Host "."
-	    $testSU+=Receive-Job -Name "SUJob"
-        If ($dtime -lt 12 -and ($testSU.resourceid -gt "" -or ($testSU -le "" -and $SUJob.State -eq "Completed"))) {
+	    #$testSU+=Receive-Job -Name "SUJob" -Verbose:$false
+        If ($dtime -lt 12 -and $SUJob.State -eq "Completed") {
             Write-ToHost "Get Solution Update command successful" -Checkmark 1 -Level 1
             return $false
         } else {
