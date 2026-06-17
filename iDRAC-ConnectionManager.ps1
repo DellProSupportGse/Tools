@@ -34,7 +34,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.9"
+$script:AppVersion   = "1.0.10"
 $script:DocumentsRoot = [Environment]::GetFolderPath("MyDocuments")
 $script:AppRoot      = Join-Path $script:DocumentsRoot "iDRACCMan"
 $script:LibRoot      = Join-Path $script:AppRoot "lib"
@@ -1812,7 +1812,7 @@ function Show-ServerContextMenu {
 
 function Build-Gui {
     $script:MainForm = New-Object System.Windows.Forms.Form
-    $script:MainForm.Text = "$script:AppName - Created By: Jim Gandy"
+    $script:MainForm.Text = "$script:AppName $script:AppVersion - Simplified iDRAC Access. By: Jim Gandy"
     $script:MainForm.WindowState = "Maximized"
     $script:MainForm.StartPosition = "CenterScreen"
     $script:MainForm.Font = New-Object System.Drawing.Font("Segoe UI", 9)
