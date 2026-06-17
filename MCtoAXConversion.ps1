@@ -444,7 +444,8 @@ param(
             $latestSbeVer = [version]$latestSbeStr
             Write-Host "  -> Maximum Compatible SBE for [$targetFamily] on OS [$currentSolutionVersion]: $latestSbeStr" -ForegroundColor Cyan
         } else {
-            $latestSbeStr=[version]$currentSbeStr
+            $latestSbeStr=$currentSbeStr
+            $latestSbeVer=$currentSbeVer
         }
     } catch {
         Write-Error "CRITICAL: Failed to download or parse the Dell SBE manifest. Error: $_" -ErrorAction Stop
@@ -454,9 +455,9 @@ param(
 
     Write-Host "`n Comparing SBE versions..." -ForegroundColor Yellow
 
-    if ($latestSbeVer -gt [version]$currentSbeStr) {
+    if ($latestSbeVer -gt $currentSbeVer) {
         Write-Host "A compatible SBE update is available ($latestSbeStr > $currentSbeStr)." -ForegroundColor Green
-    } elseif ($latestSbeVer -eq [version]$currentSbeStr) {
+    } elseif ($latestSbeVer -eq $currentSbeVer) {
         Write-Host "The cluster is already running the maximum compatible SBE version ($currentSbeStr)." -ForegroundColor Green
     } else {
         Write-Warning "Anomaly detected: Current SBE ($currentSbeStr) is HIGHER than the catalog's maximum compatible update ($latestSbeStr)."
