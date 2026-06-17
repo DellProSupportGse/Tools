@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.591"
+    $ver="0.592"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -46,7 +46,7 @@ param(
     Function Test-SolutionUpdateCommand {
         $dtime=0
         Write-Host "Checking Solution Update command..."
-        $SUJob=Start-Job -Name "SUJob" -ScriptBlock {Get-Solutionupdate}
+        $SUJob=Start-Job -Name "SUJob" -ScriptBlock {Get-Solutionupdate -Verbose:$false}
         $testSU=$null
         While ($dtime -lt 12 -and $SUJob.State -eq "Running") {Write-Host "." -NoNewline;$dtime++;$testSU+=Receive-Job -Name "SUJob";sleep 5}
     	Write-Host "."
@@ -781,7 +781,7 @@ param(
         param(
             [string]$ReportPath = "C:\Windows\Cluster\Reports"
         )
-        if ((Get-SolutionUpdate).State -match "InstallationFailed") { 
+        if ((Get-SolutionUpdate -ErrorAction SilentlyContinue -Verbose:$false).State -match "InstallationFailed") { 
             Write-Host "Testing recent failures in CAU reports over the last 12 hours since last update attempt..."
             $AllReports = Invoke-Command -Computername $nodes {Get-ChildItem -Path "$using:ReportPath" -Filter "CauReport*.xml"}
             $AllReports = $AllReports | Group-Object -Property Name | %{$_.Group | sort LastWriteTime,PSComputerName -Descending | Select -First 1} | Sort LastWriteTime -Descending
@@ -858,7 +858,7 @@ param(
     }
     function Test-MismatchedPSModules {
         Write-Host "Testing for mismatched PS module errors"
-        $HealthCheckTime=[TimeZoneInfo]::ConvertTimeFromUtc((Get-SolutionUpdateEnvironment).HealthCheckDate,[TimeZoneInfo]::Local)
+        $HealthCheckTime=[TimeZoneInfo]::ConvertTimeFromUtc((Get-SolutionUpdateEnvironment -Verbose:$false).HealthCheckDate,[TimeZoneInfo]::Local)
         try {
             $startTime = $HealthCheckTime.AddHours(-1)
             $endTime = $HealthCheckTime.AddHours(1)
@@ -1118,16 +1118,16 @@ param(
         $iPolicy=(Get-PSRepository "PSGallery").InstallationPolicy
         Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy Trusted
         if (!(gcm *SupportAksArcKnownIssues)) {
-            Install-Module -Name Support.AksArc -AllowClobber -Force -ErrorAction SilentlyContinue
+            Install-Module -Name Support.AksArc -AllowClobber -Force -ErrorAction SilentlyContinue -Verbose:$false
         }
         #Remove-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
-        Update-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue
-        Import-Module -Name Support.AksArc -Force
+        Update-Module -Name Support.AksArc -Force -ErrorAction SilentlyContinue -Verbose:$false
+        Import-Module -Name Support.AksArc -Force -Verbose:$false
         if (gcm *SupportAksArcKnownIssues) {
             $testErr=$null
-            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr
+            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr -Verbose:$false
             try {$testErr=$testErr | ? {$_.Trim() -ne "System error."}} catch {}
-            Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy
+            Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy -Verbose:$false
             $failedTests=$Tests | ? Status -eq "Failed"
             $failedTests | ft -AutoSize
             if ($failedTests) {
@@ -1324,7 +1324,7 @@ v$ver
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
     Write-Host "Checking for running action plans"
-    $MasUpdateNotRunning=(!((Get-ActionPlanInstances | ? Status -eq Running | ? ActionPlanName -like "MAS Update*").count))
+    $MasUpdateNotRunning=(!((Get-ActionPlanInstances -Verbose:$false| ? Status -eq Running | ? ActionPlanName -like "MAS Update*").count))
     If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
         Write-Warning "Solution Update is running. Some fixes will be disabled"
     }
@@ -1894,7 +1894,7 @@ v$ver
     If ($badModules.count) {
         if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
-            $solutionState=(Get-SolutionUpdate).State
+            $solutionState=(Get-SolutionUpdate -Verbose:$false).State
             if ($solutionState -eq "Installing" -or $solutionState -eq "InstallationFailed") {
                 Write-ToHost "Cannot fix modules while a solution update is in process. Please complete the solution update" -Level 4 -Checkmark 4
             } else {
