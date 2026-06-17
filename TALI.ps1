@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.592"
+    $ver="0.593"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1095,10 +1095,10 @@ param(
     }
     Function Test-ControlPlaneVMNetwork {
         Write-Host "Testing Control Plane VM network..."
-        $arcHciConfig = Get-ArcHciConfig
+        $arcHciConfig = Get-ArcHciConfig -Verbose:$false -WarningAction Ignore
         $controlPlaneIp = $arcHciConfig.controlPlaneIp
         #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
-        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $tcpClient = New-Object System.Net.Sockets.TcpClient -Verbose:$false -WarningAction Ignore
         $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500) | Out-Null
         $pingablecount=0
         #Foreach ($IP in $CPIPs.IPAddressToString) {
@@ -1125,9 +1125,9 @@ param(
         Import-Module -Name Support.AksArc -Force -Verbose:$false
         if (gcm *SupportAksArcKnownIssues) {
             $testErr=$null
-            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr -Verbose:$false
+            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr -Verbose:$false -WarningAction SilentlyContinue
             try {$testErr=$testErr | ? {$_.Trim() -ne "System error."}} catch {}
-            Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy -Verbose:$false
+            Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy -Verbose:$false -WarningAction SilentlyContinue
             $failedTests=$Tests | ? Status -eq "Failed"
             $failedTests | ft -AutoSize
             if ($failedTests) {
@@ -1138,7 +1138,7 @@ param(
                 Write-ToHost "All Aks Arc Issues tests passed"
                 return $failedTests
             } else {
-                Write-ToHost "Some tests failed" -Level 3 -Checkmark 3
+                Write-ToHost "Aks Arc test failed hard" -Level 3 -Checkmark 3
                 return "Aks Arc test failed hard"
             }
         } else {
