@@ -34,7 +34,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.10"
+$script:AppVersion   = "1.0.52"
 $script:DocumentsRoot = [Environment]::GetFolderPath("MyDocuments")
 $script:AppRoot      = Join-Path $script:DocumentsRoot "iDRACCMan"
 $script:LibRoot      = Join-Path $script:AppRoot "lib"
@@ -80,7 +80,105 @@ function Initialize-iDRACCManSettings {
             AutoResizeSideMenu = $true
             DefaultDoubleClickAction = "Console"
             MultiViewEnabled = $true
+            AutoContinueConsole = $true
+            AutoContinueGui = $true
+            AutoLoginGui = $true
+            ConnectionsCollapsed = $false
+            ConnectionsWidth = 260
         } | ConvertTo-Json -Depth 5 | Set-Content -Path $script:SettingsFile -Encoding UTF8
+    }
+    else {
+        try {
+            $settings = Get-Content $script:SettingsFile -Raw | ConvertFrom-Json
+            $changed = $false
+
+            if (-not ($settings.PSObject.Properties.Name -contains "AutoContinueConsole")) {
+                $settings | Add-Member -NotePropertyName AutoContinueConsole -NotePropertyValue $true -Force
+                $changed = $true
+            }
+
+            if (-not ($settings.PSObject.Properties.Name -contains "AutoContinueGui")) {
+                $settings | Add-Member -NotePropertyName AutoContinueGui -NotePropertyValue $true -Force
+                $changed = $true
+            }
+
+            if (-not ($settings.PSObject.Properties.Name -contains "AutoLoginGui")) {
+                $settings | Add-Member -NotePropertyName AutoLoginGui -NotePropertyValue $true -Force
+                $changed = $true
+            }
+
+            if (-not ($settings.PSObject.Properties.Name -contains "ConnectionsCollapsed")) {
+                $settings | Add-Member -NotePropertyName ConnectionsCollapsed -NotePropertyValue $false -Force
+                $changed = $true
+            }
+
+            if (-not ($settings.PSObject.Properties.Name -contains "ConnectionsWidth")) {
+                $settings | Add-Member -NotePropertyName ConnectionsWidth -NotePropertyValue 260 -Force
+                $changed = $true
+            }
+
+            if (-not ($settings.PSObject.Properties.Name -contains "Version")) {
+                $settings | Add-Member -NotePropertyName Version -NotePropertyValue $script:AppVersion -Force
+                $changed = $true
+            }
+            else {
+                $settings.Version = $script:AppVersion
+                $changed = $true
+            }
+
+            if ($changed) {
+                $settings | ConvertTo-Json -Depth 5 | Set-Content -Path $script:SettingsFile -Encoding UTF8
+            }
+        }
+        catch {}
+    }
+}
+
+function Get-iDRACCManSetting {
+    param(
+        [Parameter(Mandatory=$true)][string]$Name,
+        $Default = $null
+    )
+
+    try {
+        if (-not (Test-Path $script:SettingsFile)) {
+            Initialize-iDRACCManSettings
+        }
+
+        $settings = Get-Content $script:SettingsFile -Raw | ConvertFrom-Json
+        $prop = $settings.PSObject.Properties[$Name]
+        if ($prop) { return $prop.Value }
+    }
+    catch {}
+
+    return $Default
+}
+
+function Set-iDRACCManSetting {
+    param(
+        [Parameter(Mandatory=$true)][string]$Name,
+        [Parameter(Mandatory=$true)]$Value
+    )
+
+    try {
+        if (-not (Test-Path $script:SettingsFile)) {
+            Initialize-iDRACCManSettings
+        }
+
+        $settings = Get-Content $script:SettingsFile -Raw | ConvertFrom-Json
+        if (-not $settings) { $settings = [pscustomobject]@{} }
+
+        if ($settings.PSObject.Properties.Name -contains $Name) {
+            $settings.$Name = $Value
+        }
+        else {
+            $settings | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force
+        }
+
+        $settings | ConvertTo-Json -Depth 5 | Set-Content -Path $script:SettingsFile -Encoding UTF8
+    }
+    catch {
+        Write-iDRACCManLog "Failed to save setting $Name. $($_.Exception.Message)" "WARN"
     }
 }
 
@@ -571,17 +669,89 @@ function Invoke-iDRACWebRequest {
     return Invoke-WebRequest @params
 }
 
-function New-iDRACKvmUrlDellMethod {
-    param([Parameter(Mandatory=$true)]$Server)
+
+function Get-iDRACCredentialCandidates {
+    param(
+        [Parameter(Mandatory=$true)]$Server,
+        [switch]$AllowPrompt
+    )
+
+    $candidates = New-Object System.Collections.ArrayList
+
+    # Preferred order: group credentials first, then server/node credentials.
+    # This lets one shared group credential drive health refresh and console connect,
+    # but still allows a node-level override/fallback when the group credential fails.
+    try {
+        $groupCred = Get-GroupCredential -GroupName $Server.Group
+        if ($groupCred) {
+            [void]$candidates.Add([pscustomobject]@{
+                Source = "Group '$($Server.Group)'"
+                Credential = $groupCred
+            })
+        }
+    }
+    catch {}
+
+    try {
+        $serverUser = [string]$Server.Username
+        $serverPass = ConvertFrom-ProtectedString $Server.Password
+        if (-not [string]::IsNullOrWhiteSpace($serverUser) -and -not [string]::IsNullOrWhiteSpace($serverPass)) {
+            $sec = ConvertTo-SecureString $serverPass -AsPlainText -Force
+            $serverCred = New-Object Management.Automation.PSCredential($serverUser, $sec)
+
+            $isDuplicate = $false
+            foreach ($existing in @($candidates)) {
+                try {
+                    $e = $existing.Credential.GetNetworkCredential()
+                    if ($e.UserName -eq $serverUser -and $e.Password -eq $serverPass) {
+                        $isDuplicate = $true
+                        break
+                    }
+                }
+                catch {}
+            }
+
+            if (-not $isDuplicate) {
+                [void]$candidates.Add([pscustomobject]@{
+                    Source = "Node '$($Server.Name)'"
+                    Credential = $serverCred
+                })
+            }
+        }
+    }
+    catch {}
+
+    if ($AllowPrompt -and $candidates.Count -eq 0) {
+        try {
+            $promptCred = Get-Credential -Message "Credentials for $($Server.Name)"
+            if ($promptCred) {
+                [void]$candidates.Add([pscustomobject]@{
+                    Source = "Prompt"
+                    Credential = $promptCred
+                })
+            }
+        }
+        catch {}
+    }
+
+    return @($candidates)
+}
+
+function New-iDRACKvmUrlDellMethodUsingCredential {
+    param(
+        [Parameter(Mandatory=$true)]$Server,
+        [Parameter(Mandatory=$true)]$Credential,
+        [string]$CredentialSource = "Credential"
+    )
 
     $idracHost = Get-iDRACHost $Server.Address
     $base = "https://$idracHost"
-    $cred = Get-iDRACCredentialFromServer -Server $Server
+    $cred = $Credential
     $userName = $cred.GetNetworkCredential().UserName
     $password = $cred.GetNetworkCredential().Password
 
     # 1. Create X-Auth-Token session.
-    $script:Status.Text = "Creating X-Auth-Token session for $($Server.Name)..."
+    $script:Status.Text = "Creating X-Auth-Token session for $($Server.Name) using $CredentialSource credentials..."
     [System.Windows.Forms.Application]::DoEvents()
 
     $sessionBody = @{
@@ -711,6 +881,30 @@ return [pscustomobject]@{
     }
 }
 
+
+function New-iDRACKvmUrlDellMethod {
+    param([Parameter(Mandatory=$true)]$Server)
+
+    $candidates = @(Get-iDRACCredentialCandidates -Server $Server -AllowPrompt)
+    if ($candidates.Count -eq 0) {
+        throw "No group, node, or prompted credentials are available for $($Server.Name)."
+    }
+
+    $errors = New-Object System.Collections.ArrayList
+    foreach ($candidate in $candidates) {
+        try {
+            return New-iDRACKvmUrlDellMethodUsingCredential -Server $Server -Credential $candidate.Credential -CredentialSource $candidate.Source
+        }
+        catch {
+            [void]$errors.Add("$($candidate.Source): $($_.Exception.Message)")
+            if ($script:Status) { $script:Status.Text = "Console credential failed for $($Server.Name): $($candidate.Source). Trying next credential..." }
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+    }
+
+    throw "Console connection failed for $($Server.Name) using available credentials.`r`n`r`n$($errors -join "`r`n")"
+}
+
 function Invoke-iDRACRestMethod {
     param(
         [Parameter(Mandatory=$true)]$Server,
@@ -735,6 +929,396 @@ function Invoke-iDRACRestMethod {
     return ($response.Content | ConvertFrom-Json)
 }
 
+
+function Get-RedfishValue {
+    param(
+        $Object,
+        [string[]]$Paths
+    )
+
+    foreach ($path in $Paths) {
+        try {
+            $current = $Object
+            foreach ($part in ($path -split '\.')) {
+                if ($null -eq $current) { break }
+                $prop = $current.PSObject.Properties[$part]
+                if ($prop) {
+                    $current = $prop.Value
+                }
+                else {
+                    $current = $null
+                    break
+                }
+            }
+
+            if ($null -ne $current -and -not [string]::IsNullOrWhiteSpace([string]$current)) {
+                return [string]$current
+            }
+        }
+        catch {}
+    }
+
+    return ""
+}
+
+function Get-iDRACInventory {
+    param(
+        [Parameter(Mandatory=$true)][string]$Address,
+        [Parameter(Mandatory=$true)][string]$Username,
+        [Parameter(Mandatory=$true)][string]$Password
+    )
+
+    # Newer iDRAC/Redfish versions can reject Basic authentication on inventory GETs.
+    # Create a Redfish session first, then use X-Auth-Token for all discovery calls.
+    $base = Get-iDRACBaseUrl $Address
+    $sessionLocation = $null
+    $headers = $null
+
+    try {
+        $sessionBody = @{
+            UserName = $Username
+            Password = $Password
+        }
+
+        $sessionResp = Invoke-iDRACWebRequest `
+            -Uri "$base/redfish/v1/SessionService/Sessions" `
+            -Method "POST" `
+            -Body $sessionBody `
+            -Headers @{ "Accept" = "application/json" }
+
+        $xAuthToken = $null
+        try { $xAuthToken = $sessionResp.Headers["X-Auth-Token"] } catch {}
+        if ([string]::IsNullOrWhiteSpace([string]$xAuthToken)) {
+            try { $xAuthToken = $sessionResp.Headers.'X-Auth-Token' } catch {}
+        }
+
+        $sessionLocation = $null
+        try { $sessionLocation = $sessionResp.Headers["Location"] } catch {}
+        if ([string]::IsNullOrWhiteSpace([string]$sessionLocation)) {
+            try { $sessionLocation = $sessionResp.Headers.Location } catch {}
+        }
+
+        if ($xAuthToken -is [array]) { $xAuthToken = $xAuthToken[0] }
+        if ($sessionLocation -is [array]) { $sessionLocation = $sessionLocation[0] }
+
+        if ([string]::IsNullOrWhiteSpace([string]$xAuthToken)) {
+            throw "The iDRAC login succeeded but did not return an X-Auth-Token."
+        }
+
+        $headers = @{
+            "Accept" = "application/json"
+            "X-Auth-Token" = [string]$xAuthToken
+        }
+
+        $systemResp = Invoke-iDRACWebRequest `
+            -Uri "$base/redfish/v1/Systems/System.Embedded.1" `
+            -Method "GET" `
+            -Headers $headers
+
+        if ([string]::IsNullOrWhiteSpace($systemResp.Content)) {
+            throw "The iDRAC responded, but no Redfish system inventory was returned."
+        }
+
+        $system = $systemResp.Content | ConvertFrom-Json
+
+        $idrac = $null
+        try {
+            $idracResp = Invoke-iDRACWebRequest `
+                -Uri "$base/redfish/v1/Managers/iDRAC.Embedded.1" `
+                -Method "GET" `
+                -Headers $headers
+
+            if (-not [string]::IsNullOrWhiteSpace($idracResp.Content)) {
+                $idrac = $idracResp.Content | ConvertFrom-Json
+            }
+        }
+        catch {}
+
+        $serviceTag = Get-RedfishValue -Object $system -Paths @("SKU","SerialNumber","Oem.Dell.DellSystem.ChassisServiceTag")
+        $model      = Get-RedfishValue -Object $system -Paths @("Model","Oem.Dell.DellSystem.SystemModelName")
+        $osHost     = Get-RedfishValue -Object $system -Paths @("HostName","Oem.Dell.DellSystem.HostName","Oem.Dell.HostName")
+        $health     = Get-RedfishValue -Object $system -Paths @("Status.HealthRollup","Status.Health")
+        $powerState = Get-RedfishValue -Object $system -Paths @("PowerState")
+
+        if ([string]::IsNullOrWhiteSpace($health) -and $idrac) {
+            $health = Get-RedfishValue -Object $idrac -Paths @("Status.HealthRollup","Status.Health")
+        }
+
+        if ([string]::IsNullOrWhiteSpace($serviceTag)) { $serviceTag = "Unknown" }
+        if ([string]::IsNullOrWhiteSpace($model))      { $model = "Unknown" }
+        if ([string]::IsNullOrWhiteSpace($osHost))     { $osHost = "" }
+        if ([string]::IsNullOrWhiteSpace($health))     { $health = "Unknown" }
+        if ([string]::IsNullOrWhiteSpace($powerState)) { $powerState = "Unknown" }
+
+        $displayName = if (-not [string]::IsNullOrWhiteSpace($osHost)) {
+            $osHost
+        }
+        elseif ($serviceTag -ne "Unknown") {
+            $serviceTag
+        }
+        else {
+            $Address
+        }
+
+        return [pscustomobject]@{
+            Name = $displayName
+            Address = $Address
+            Username = $Username
+            Password = ConvertTo-ProtectedString $Password
+            ServiceTag = $serviceTag
+            Model = $model
+            OSHostname = $osHost
+            Health = $health
+            PowerState = $powerState
+        }
+    }
+    catch {
+        throw $_
+    }
+    finally {
+        # Close the temporary Redfish discovery session.
+        try {
+            if ($headers -and -not [string]::IsNullOrWhiteSpace([string]$sessionLocation)) {
+                $deleteUri = if ($sessionLocation -match '^https?://') { $sessionLocation } else { "$base$sessionLocation" }
+                Invoke-iDRACWebRequest `
+                    -Uri $deleteUri `
+                    -Method "DELETE" `
+                    -Headers $headers | Out-Null
+            }
+        }
+        catch {}
+    }
+}
+
+function Update-iDRACInventoryForServer {
+    param([Parameter(Mandatory=$true)]$Server)
+
+    $candidates = @(Get-iDRACCredentialCandidates -Server $Server)
+    if ($candidates.Count -eq 0) {
+        throw "No group or node credentials are available to refresh inventory."
+    }
+
+    $errors = New-Object System.Collections.ArrayList
+
+    foreach ($candidate in $candidates) {
+        try {
+            if ($script:Status) { $script:Status.Text = "Refreshing $($Server.Name) health using $($candidate.Source) credentials..." }
+            [System.Windows.Forms.Application]::DoEvents()
+
+            $nc = $candidate.Credential.GetNetworkCredential()
+            $inv = Get-iDRACInventory -Address $Server.Address -Username $nc.UserName -Password $nc.Password
+
+            $Server.Name = $inv.Name
+            $Server.ServiceTag = $inv.ServiceTag
+            $Server.Model = $inv.Model
+            $Server.OSHostname = $inv.OSHostname
+            $Server.Health = $inv.Health
+            $Server.PowerState = $inv.PowerState
+
+            if ([string]::IsNullOrWhiteSpace($Server.Notes)) {
+                $Server.Notes = "Service Tag: $($inv.ServiceTag); Model: $($inv.Model); Health: $($inv.Health)"
+            }
+
+            Save-Servers
+            Refresh-Tree
+            return $inv
+        }
+        catch {
+            [void]$errors.Add("$($candidate.Source): $($_.Exception.Message)")
+        }
+    }
+
+    throw "Inventory refresh failed using group credentials first, then node credentials.`r`n$($errors -join "`r`n")"
+}
+
+
+function Refresh-iDRACHealthBatch {
+    param(
+        [Parameter(Mandatory=$true)][object[]]$ServersToRefresh,
+        [string]$Title = "Refresh Health"
+    )
+
+    $servers = @($ServersToRefresh | Where-Object { $_ })
+    if ($servers.Count -eq 0) { return }
+
+    $okCount = 0
+    $failCount = 0
+    $log = New-Object System.Text.StringBuilder
+    [void]$log.AppendLine("$Title")
+    [void]$log.AppendLine("Started: $(Get-Date)")
+    [void]$log.AppendLine("")
+
+    foreach ($srv in $servers) {
+        try {
+            if ($script:Status) { $script:Status.Text = "Refreshing health for $($srv.Name)..." }
+            [System.Windows.Forms.Application]::DoEvents()
+
+            $oldHealth = $srv.Health
+            $oldPower = $srv.PowerState
+            $inv = Update-iDRACInventoryForServer -Server $srv
+            $okCount++
+
+            [void]$log.AppendLine("OK: $($srv.Name) [$($srv.Address)] Health: $oldHealth -> $($inv.Health), Power: $oldPower -> $($inv.PowerState)")
+        }
+        catch {
+            $failCount++
+            [void]$log.AppendLine("FAILED: $($srv.Name) [$($srv.Address)] - $($_.Exception.Message)")
+        }
+    }
+
+    Save-Servers
+    Refresh-Tree
+    Update-DashboardServerList
+
+    if ($script:Status) {
+        $script:Status.Text = "Health refresh complete. Success: $okCount  Failed: $failCount  Time: $(Get-Date -Format 'h:mm:ss tt')"
+    }
+
+    if ($failCount -gt 0) {
+        Add-LogTab -Title "Health Refresh" -Text $log.ToString()
+        [System.Windows.Forms.MessageBox]::Show(
+            "Health refresh completed with $failCount failure(s). A Health Refresh tab was added with details.",
+            "Refresh Health",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+    }
+    else {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Health refresh complete.`r`n`r`nUpdated: $okCount iDRAC(s).",
+            "Refresh Health",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) | Out-Null
+    }
+}
+
+function Refresh-SelectediDRACHealth {
+    $s = Get-SelectedServer
+    if (-not $s) {
+        [System.Windows.Forms.MessageBox]::Show("Select an iDRAC first.","Refresh Health") | Out-Null
+        return
+    }
+
+    Refresh-iDRACHealthBatch -ServersToRefresh @($s) -Title "Refresh selected iDRAC health"
+}
+
+function Refresh-SelectedGroupHealth {
+    $groupName = Get-SelectedGroupName
+    if ([string]::IsNullOrWhiteSpace($groupName)) { return }
+
+    $servers = @($script:Servers | Where-Object { $_.Group -eq $groupName })
+    if ($servers.Count -eq 0) { return }
+
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        "Refresh health for all $($servers.Count) iDRAC(s) in group '$groupName'?",
+        "Refresh Group Health",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+    Refresh-iDRACHealthBatch -ServersToRefresh $servers -Title "Refresh group health: $groupName"
+}
+
+function Refresh-AlliDRACHealth {
+    $servers = @($script:Servers)
+    if ($servers.Count -eq 0) { return }
+
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        "Refresh health for all $($servers.Count) configured iDRAC(s)?",
+        "Refresh All Health",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+    Refresh-iDRACHealthBatch -ServersToRefresh $servers -Title "Refresh all iDRAC health"
+}
+
+function Add-MissingServerInventoryProperties {
+    foreach ($s in @($script:Servers)) {
+        if (-not ($s.PSObject.Properties.Name -contains "ServiceTag")) { $s | Add-Member -NotePropertyName ServiceTag -NotePropertyValue "" -Force }
+        if (-not ($s.PSObject.Properties.Name -contains "Model")) { $s | Add-Member -NotePropertyName Model -NotePropertyValue "" -Force }
+        if (-not ($s.PSObject.Properties.Name -contains "OSHostname")) { $s | Add-Member -NotePropertyName OSHostname -NotePropertyValue "" -Force }
+        if (-not ($s.PSObject.Properties.Name -contains "Health")) { $s | Add-Member -NotePropertyName Health -NotePropertyValue "" -Force }
+        if (-not ($s.PSObject.Properties.Name -contains "PowerState")) { $s | Add-Member -NotePropertyName PowerState -NotePropertyValue "" -Force }
+    }
+}
+
+
+function New-iDRACServerRecordFromInventory {
+    param(
+        [Parameter(Mandatory=$true)]$Inventory,
+        [Parameter(Mandatory=$true)][string]$GroupName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($GroupName)) { $GroupName = "Ungrouped" }
+
+    $record = [pscustomobject]@{
+        Name       = [string]$Inventory.Name
+        Address    = [string]$Inventory.Address
+        Group      = [string]$GroupName
+        Username   = [string]$Inventory.Username
+        Password   = [string]$Inventory.Password
+        Notes      = "Service Tag: $($Inventory.ServiceTag); Model: $($Inventory.Model); Health: $($Inventory.Health)"
+        ServiceTag = [string]$Inventory.ServiceTag
+        Model      = [string]$Inventory.Model
+        OSHostname = [string]$Inventory.OSHostname
+        Health     = [string]$Inventory.Health
+        PowerState = [string]$Inventory.PowerState
+    }
+
+    foreach ($propName in @("Name","Address","Group","Username","Password","Notes","ServiceTag","Model","OSHostname","Health","PowerState")) {
+        if ($null -eq $record.$propName) { $record.$propName = "" }
+    }
+
+    return $record
+}
+
+function Add-iDRACServerRecord {
+    param(
+        [Parameter(Mandatory=$true)]$Inventory,
+        [Parameter(Mandatory=$true)][string]$GroupName
+    )
+
+    $record = New-iDRACServerRecordFromInventory -Inventory $Inventory -GroupName $GroupName
+
+    # Force a new array assignment so TreeView and dashboard refresh read the same updated collection.
+    $script:Servers = @($script:Servers) + @($record)
+
+    Add-MissingServerInventoryProperties
+    Save-Servers
+
+    try { Load-Servers } catch {}
+
+    if ($script:Tree) {
+        Refresh-Tree
+        try {
+            foreach ($gNode in $script:Tree.Nodes) {
+                if ($gNode.Tag -and $gNode.Tag.Group -eq $record.Group) {
+                    $gNode.Expand()
+                    foreach ($child in $gNode.Nodes) {
+                        if ($child.Tag -and $child.Tag.Address -eq $record.Address) {
+                            $script:Tree.SelectedNode = $child
+                            $child.EnsureVisible()
+                            break
+                        }
+                    }
+                    break
+                }
+            }
+            $script:Tree.Refresh()
+        }
+        catch {}
+    }
+
+    Update-DashboardServerList
+    try { [System.Windows.Forms.Application]::DoEvents() } catch {}
+
+    return $record
+}
+
 function Load-Servers {
     if (Test-Path $script:DataFile) {
         try {
@@ -755,10 +1339,17 @@ function Load-Servers {
                 Username = "root"
                 Password = ""
                 Notes = ""
+                ServiceTag = ""
+                Model = ""
+                OSHostname = ""
+                Health = ""
+                PowerState = ""
             }
         )
         Save-Servers
     }
+
+    Add-MissingServerInventoryProperties
 }
 
 function Save-Servers {
@@ -802,8 +1393,24 @@ function Refresh-Tree {
                 $credTag = ""
             }
 
-            $node = New-Object System.Windows.Forms.TreeNode("$($s.Name) [$($s.Address)]$credTag")
+            $healthText = ""
+            try {
+                if (-not [string]::IsNullOrWhiteSpace($s.Health)) {
+                    $healthText = " - $($s.Health)"
+                }
+            }
+            catch {}
+
+            $node = New-Object System.Windows.Forms.TreeNode("$($s.Name) [$($s.Address)]$healthText$credTag")
             $node.Tag = $s
+            try {
+                switch -Regex ($s.Health) {
+                    "Critical" { $node.ForeColor = [System.Drawing.Color]::FromArgb(222,43,43); break }
+                    "Warning"  { $node.ForeColor = [System.Drawing.Color]::FromArgb(245,146,0); break }
+                    "OK"       { $node.ForeColor = [System.Drawing.Color]::FromArgb(36,152,50); break }
+                }
+            }
+            catch {}
             [void]$gNode.Nodes.Add($node)
         }
 
@@ -815,78 +1422,365 @@ function Refresh-Tree {
     if ($script:MainSplit) { Resize-SideMenuToContent }
 }
 
+function Update-DashboardServerList {
+    try {
+        if (-not $script:Tabs) { return }
+
+        $dash = $script:Tabs.TabPages | Where-Object { $_.Text -eq "Dashboard" } | Select-Object -First 1
+        if (-not $dash) { return }
+
+        $queue = New-Object System.Collections.Queue
+        $queue.Enqueue($dash)
+        $lists = @()
+
+        while ($queue.Count -gt 0) {
+            $ctrl = $queue.Dequeue()
+            if ($ctrl -is [System.Windows.Forms.ListView]) { $lists += $ctrl }
+            foreach ($child in $ctrl.Controls) { $queue.Enqueue($child) }
+        }
+
+        foreach ($list in $lists) {
+            if ($list.Columns.Count -ge 7) {
+                $list.BeginUpdate()
+                $list.Items.Clear()
+                foreach ($srv in @($script:Servers | Sort-Object Group,Name)) {
+                    $item = New-Object System.Windows.Forms.ListViewItem($srv.Name)
+                    [void]$item.SubItems.Add($srv.Address)
+                    [void]$item.SubItems.Add($srv.ServiceTag)
+                    [void]$item.SubItems.Add($srv.Model)
+                    [void]$item.SubItems.Add($srv.OSHostname)
+                    [void]$item.SubItems.Add($srv.Health)
+                    [void]$item.SubItems.Add($srv.Group)
+                    if ($list.Columns.Count -ge 8) {
+                        $credText = if (-not [string]::IsNullOrWhiteSpace($srv.Username)) { "Server" } elseif (Get-GroupCredentialRecord -GroupName $srv.Group) { "Group" } else { "Prompt" }
+                        [void]$item.SubItems.Add($credText)
+                    }
+                    [void]$list.Items.Add($item)
+                }
+                $list.EndUpdate()
+            }
+        }
+    }
+    catch {}
+}
+
 function Show-ServerDialog {
     param($Server)
 
     $isEdit = $null -ne $Server
+    $selectedGroup = Get-SelectedGroupName
+    if ([string]::IsNullOrWhiteSpace($selectedGroup)) { $selectedGroup = "iDRAC" }
+    try {
+        if ($Server -and $selectedGroup -eq $Server.Name) { $selectedGroup = $Server.Group }
+    }
+    catch {}
+    if ([string]::IsNullOrWhiteSpace($selectedGroup)) { $selectedGroup = "iDRAC" }
 
     $f = New-Object System.Windows.Forms.Form
-    $f.Text = if ($isEdit) { "Edit iDRAC" } else { "Add iDRAC" }
-    $f.Width = 440
-    $f.Height = 350
+    $f.Text = if ($isEdit) { "Edit iDRAC" } else { "Add iDRAC - Connect and Discover" }
+    $f.Width = if ($isEdit) { 520 } else { 720 }
+    $f.Height = if ($isEdit) { 560 } else { 620 }
     $f.StartPosition = "CenterParent"
     $f.FormBorderStyle = "FixedDialog"
     $f.Font = $script:AppFont
     $f.MaximizeBox = $false
     $f.MinimizeBox = $false
 
-    $labels = @("Name","Address/IP","Group","Username","Password","Notes")
+    if (-not $isEdit) {
+        $script:PendingDiscoveredInventory = $null
+        $discoveredInventory = $null
+
+        $lblInfo = New-Object System.Windows.Forms.Label
+        $lblInfo.Text = "Enter the iDRAC connection info, then click Connect. After discovery completes, choose an existing group or type a new group, then click Add."
+        $lblInfo.Left = 12
+        $lblInfo.Top = 12
+        $lblInfo.Width = 665
+        $lblInfo.Height = 42
+        $f.Controls.Add($lblInfo)
+
+        $labels = @("IP / Hostname","Username","Password")
+        $boxes = @{}
+
+        for ($i=0; $i -lt $labels.Count; $i++) {
+            $lbl = New-Object System.Windows.Forms.Label
+            $lbl.Text = $labels[$i]
+            $lbl.Left = 12
+            $lbl.Top = 65 + ($i * 34)
+            $lbl.Width = 105
+            $f.Controls.Add($lbl)
+
+            $tb = New-Object System.Windows.Forms.TextBox
+            $tb.Left = 125
+            $tb.Top = 61 + ($i * 34)
+            $tb.Width = 545
+            if ($labels[$i] -eq "Password") { $tb.UseSystemPasswordChar = $true }
+            $boxes[$labels[$i]] = $tb
+            $f.Controls.Add($tb)
+        }
+
+        $lblGroup = New-Object System.Windows.Forms.Label
+        $lblGroup.Text = "Group"
+        $lblGroup.Left = 12
+        $lblGroup.Top = 167
+        $lblGroup.Width = 105
+        $f.Controls.Add($lblGroup)
+
+        $cmbGroup = New-Object System.Windows.Forms.ComboBox
+        $cmbGroup.Left = 125
+        $cmbGroup.Top = 163
+        $cmbGroup.Width = 545
+        $cmbGroup.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
+        $groups = @($script:Servers | ForEach-Object { $_.Group } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+        if ($groups.Count -eq 0) { $groups = @("iDRAC") }
+        foreach ($g in $groups) { [void]$cmbGroup.Items.Add($g) }
+        $cmbGroup.Text = $selectedGroup
+        $f.Controls.Add($cmbGroup)
+
+        $resultBox = New-Object System.Windows.Forms.TextBox
+        $resultBox.Left = 12
+        $resultBox.Top = 205
+        $resultBox.Width = 665
+        $resultBox.Height = 235
+        $resultBox.Multiline = $true
+        $resultBox.ReadOnly = $true
+        $resultBox.ScrollBars = "None"
+        $resultBox.Text = "Not connected yet."
+        $f.Controls.Add($resultBox)
+
+        $status = New-Object System.Windows.Forms.Label
+        $status.Left = 12
+        $status.Top = 455
+        $status.Width = 665
+        $status.Height = 22
+        $status.Text = "Connect first. Add will enable after discovery and a group is provided."
+        $f.Controls.Add($status)
+
+        $connect = New-Object System.Windows.Forms.Button
+        $connect.Text = "Connect"
+        $connect.Left = 415
+        $connect.Top = 505
+        $connect.Width = 82
+
+        $add = New-Object System.Windows.Forms.Button
+        $add.Text = "Add"
+        $add.Left = 505
+        $add.Top = 505
+        $add.Width = 82
+        $add.Enabled = $false
+        # Store the discovered inventory directly on the Add button.
+        # This is more reliable than relying on PowerShell closure/script scope in WinForms events.
+        $add.Tag = $null
+
+        $cancel = New-Object System.Windows.Forms.Button
+        $cancel.Text = "Cancel"
+        $cancel.Left = 595
+        $cancel.Top = 505
+        $cancel.Width = 82
+        $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+
+        $enableAdd = {
+            $hasDiscovery = ($null -ne $add.Tag)
+            $hasGroup = -not [string]::IsNullOrWhiteSpace(($cmbGroup.Text).Trim())
+            $add.Enabled = ($hasDiscovery -and $hasGroup)
+        }
+
+        $cmbGroup.Add_TextChanged({ & $enableAdd }.GetNewClosure())
+        $cmbGroup.Add_SelectedIndexChanged({ & $enableAdd }.GetNewClosure())
+
+        $connect.Add_Click({
+            if ([string]::IsNullOrWhiteSpace($boxes["IP / Hostname"].Text) -or
+                [string]::IsNullOrWhiteSpace($boxes["Username"].Text) -or
+                [string]::IsNullOrWhiteSpace($boxes["Password"].Text)) {
+                [System.Windows.Forms.MessageBox]::Show("IP/Hostname, Username, and Password are required.","Add iDRAC") | Out-Null
+                return
+            }
+
+            try {
+                $script:PendingDiscoveredInventory = $null
+                $discoveredInventory = $null
+                $add.Tag = $null
+                $f.AcceptButton = $connect
+                & $enableAdd
+                $connect.Enabled = $false
+                $status.Text = "Connecting and reading Redfish inventory..."
+                $resultBox.Text = "Connecting..."
+                if ($script:Status) { $script:Status.Text = $status.Text }
+                [System.Windows.Forms.Application]::DoEvents()
+
+                $inv = Get-iDRACInventory `
+                    -Address $boxes["IP / Hostname"].Text.Trim() `
+                    -Username $boxes["Username"].Text.Trim() `
+                    -Password $boxes["Password"].Text
+
+                $script:PendingDiscoveredInventory = $inv
+                $discoveredInventory = $inv
+                $add.Tag = $inv
+                $f.Tag = $inv
+                $resultBox.Text = "Connected successfully.`r`n`r`nName: $($inv.Name)`r`nService Tag: $($inv.ServiceTag)`r`nModel: $($inv.Model)`r`nOS Hostname: $($inv.OSHostname)`r`nHealth: $($inv.Health)`r`nPower: $($inv.PowerState)"
+                $status.Text = "Discovery complete. Choose or type a group, then click Add."
+                if ($script:Status) { $script:Status.Text = "Discovery complete for $($inv.Name)" }
+                & $enableAdd
+                if (-not [string]::IsNullOrWhiteSpace(($cmbGroup.Text).Trim())) { $add.Enabled = $true }
+                $f.AcceptButton = $add
+            }
+            catch {
+                $script:PendingDiscoveredInventory = $null
+                $discoveredInventory = $null
+                $add.Tag = $null
+                $f.Tag = $null
+                $status.Text = "Connection failed."
+                $resultBox.Text = "Connection failed.`r`n`r`n$($_.Exception.Message)"
+                if ($script:Status) { $script:Status.Text = "Add iDRAC discovery failed" }
+
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Could not connect to the iDRAC or read Redfish inventory.`r`n`r`n$($_.Exception.Message)",
+                    "Add iDRAC Failed",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Error
+                ) | Out-Null
+            }
+            finally {
+                $connect.Enabled = $true
+            }
+        }.GetNewClosure())
+
+        $add.Add_Click({
+            # Use the inventory stored directly on this button. This avoids scope/closure issues
+            # when the script is loaded through Invoke-Expression from GitHub.
+            $inv = $add.Tag
+            if ($null -eq $inv) { $inv = $f.Tag }
+            if ($null -eq $inv) { $inv = $script:PendingDiscoveredInventory }
+            $groupName = $cmbGroup.Text.Trim()
+
+            if ($null -eq $inv) {
+                [System.Windows.Forms.MessageBox]::Show("Click Connect first so the iDRAC can be discovered.","Add iDRAC") | Out-Null
+                return
+            }
+
+            if ([string]::IsNullOrWhiteSpace($groupName)) {
+                [System.Windows.Forms.MessageBox]::Show("Select an existing group or type a new group name.","Add iDRAC") | Out-Null
+                return
+            }
+
+            $exists = @($script:Servers | Where-Object { $_.Address -eq $inv.Address -or ($_.ServiceTag -and $_.ServiceTag -eq $inv.ServiceTag -and $inv.ServiceTag -ne "Unknown") })
+            if ($exists.Count -gt 0) {
+                $answer = [System.Windows.Forms.MessageBox]::Show(
+                    "This iDRAC appears to already exist.`r`n`r`nAdd it anyway?",
+                    "Possible Duplicate",
+                    [System.Windows.Forms.MessageBoxButtons]::YesNo,
+                    [System.Windows.Forms.MessageBoxIcon]::Warning
+                )
+                if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+            }
+
+            $addedRecord = Add-iDRACServerRecord -Inventory $inv -GroupName $groupName
+
+            if ($script:Status) { $script:Status.Text = "Added $($addedRecord.Name) to group $($addedRecord.Group)" }
+
+            [System.Windows.Forms.MessageBox]::Show(
+                "Added successfully.`r`n`r`nName: $($inv.Name)`r`nGroup: $groupName`r`nService Tag: $($inv.ServiceTag)`r`nModel: $($inv.Model)`r`nOS Hostname: $($inv.OSHostname)`r`nHealth: $($inv.Health)",
+                "iDRAC Added",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            ) | Out-Null
+
+            $script:PendingDiscoveredInventory = $null
+            $discoveredInventory = $null
+            $add.Tag = $null
+            $f.Tag = $null
+            $f.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $f.Close()
+        }.GetNewClosure())
+
+        $f.AcceptButton = $connect
+        $f.CancelButton = $cancel
+        $f.Controls.Add($connect)
+        $f.Controls.Add($add)
+        $f.Controls.Add($cancel)
+        [void]$f.ShowDialog($script:MainForm)
+        return
+    }
+
+    $labels = @("Name","Address/IP","Group","Username","Password","Service Tag","Model","OS Hostname","Health","Power State","Notes")
     $boxes = @{}
 
     for ($i=0; $i -lt $labels.Count; $i++) {
         $lbl = New-Object System.Windows.Forms.Label
         $lbl.Text = $labels[$i]
         $lbl.Left = 12
-        $lbl.Top = 18 + ($i * 38)
-        $lbl.Width = 90
+        $lbl.Top = 18 + ($i * 32)
+        $lbl.Width = 100
         $f.Controls.Add($lbl)
 
         $tb = New-Object System.Windows.Forms.TextBox
-        $tb.Left = 110
-        $tb.Top = 14 + ($i * 38)
-        $tb.Width = 290
+        $tb.Left = 120
+        $tb.Top = 14 + ($i * 32)
+        $tb.Width = 350
 
-        if ($labels[$i] -eq "Password") {
-            $tb.UseSystemPasswordChar = $true
-        }
-
-        if ($labels[$i] -eq "Notes") {
-            $tb.Multiline = $true
-            $tb.Height = 48
-        }
-        else {
-            $tb.Height = 23
-        }
+        if ($labels[$i] -eq "Password") { $tb.UseSystemPasswordChar = $true }
+        if ($labels[$i] -in @("Service Tag","Model","OS Hostname","Health","Power State")) { $tb.ReadOnly = $true }
+        if ($labels[$i] -eq "Notes") { $tb.Multiline = $true; $tb.Height = 45 } else { $tb.Height = 23 }
 
         $boxes[$labels[$i]] = $tb
         $f.Controls.Add($tb)
     }
 
-    if ($isEdit) {
-        $boxes["Name"].Text = $Server.Name
-        $boxes["Address/IP"].Text = $Server.Address
-        $boxes["Group"].Text = $Server.Group
-        $boxes["Username"].Text = $Server.Username
-        $boxes["Password"].Text = ConvertFrom-ProtectedString $Server.Password
-        $boxes["Notes"].Text = $Server.Notes
-    }
+    $boxes["Name"].Text = $Server.Name
+    $boxes["Address/IP"].Text = $Server.Address
+    $boxes["Group"].Text = $Server.Group
+    $boxes["Username"].Text = $Server.Username
+    $boxes["Password"].Text = ConvertFrom-ProtectedString $Server.Password
+    $boxes["Service Tag"].Text = $Server.ServiceTag
+    $boxes["Model"].Text = $Server.Model
+    $boxes["OS Hostname"].Text = $Server.OSHostname
+    $boxes["Health"].Text = $Server.Health
+    $boxes["Power State"].Text = $Server.PowerState
+    $boxes["Notes"].Text = $Server.Notes
+
+    $refresh = New-Object System.Windows.Forms.Button
+    $refresh.Text = "Refresh Info"
+    $refresh.Left = 190
+    $refresh.Top = 450
+    $refresh.Width = 100
+    $refresh.Add_Click({
+        try {
+            $Server.Address = $boxes["Address/IP"].Text.Trim()
+            $Server.Username = $boxes["Username"].Text.Trim()
+            $Server.Password = ConvertTo-ProtectedString $boxes["Password"].Text
+
+            $inv = Update-iDRACInventoryForServer -Server $Server
+            $boxes["Name"].Text = $Server.Name
+            $boxes["Service Tag"].Text = $inv.ServiceTag
+            $boxes["Model"].Text = $inv.Model
+            $boxes["OS Hostname"].Text = $inv.OSHostname
+            $boxes["Health"].Text = $inv.Health
+            $boxes["Power State"].Text = $inv.PowerState
+            Update-DashboardServerList
+
+            [System.Windows.Forms.MessageBox]::Show("Inventory refreshed.","iDRAC") | Out-Null
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show("Refresh failed.`r`n`r`n$($_.Exception.Message)","iDRAC Refresh Failed") | Out-Null
+        }
+    }.GetNewClosure())
 
     $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = "OK"
-    $ok.Left = 235
-    $ok.Top = 260
+    $ok.Text = "Save"
+    $ok.Left = 305
+    $ok.Top = 450
     $ok.Width = 75
     $ok.DialogResult = [System.Windows.Forms.DialogResult]::OK
 
     $cancel = New-Object System.Windows.Forms.Button
     $cancel.Text = "Cancel"
-    $cancel.Left = 325
-    $cancel.Top = 260
+    $cancel.Left = 395
+    $cancel.Top = 450
     $cancel.Width = 75
     $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
 
     $f.AcceptButton = $ok
     $f.CancelButton = $cancel
+    $f.Controls.Add($refresh)
     $f.Controls.Add($ok)
     $f.Controls.Add($cancel)
 
@@ -896,27 +1790,16 @@ function Show-ServerDialog {
             return
         }
 
-        if ($isEdit) {
-            $Server.Name = $boxes["Name"].Text.Trim()
-            $Server.Address = $boxes["Address/IP"].Text.Trim()
-            $Server.Group = $boxes["Group"].Text.Trim()
-            $Server.Username = $boxes["Username"].Text.Trim()
-            $Server.Password = ConvertTo-ProtectedString $boxes["Password"].Text
-            $Server.Notes = $boxes["Notes"].Text
-        }
-        else {
-            $script:Servers += [pscustomobject]@{
-                Name = $boxes["Name"].Text.Trim()
-                Address = $boxes["Address/IP"].Text.Trim()
-                Group = $boxes["Group"].Text.Trim()
-                Username = $boxes["Username"].Text.Trim()
-                Password = ConvertTo-ProtectedString $boxes["Password"].Text
-                Notes = $boxes["Notes"].Text
-            }
-        }
+        $Server.Name = $boxes["Name"].Text.Trim()
+        $Server.Address = $boxes["Address/IP"].Text.Trim()
+        $Server.Group = $boxes["Group"].Text.Trim()
+        $Server.Username = $boxes["Username"].Text.Trim()
+        $Server.Password = ConvertTo-ProtectedString $boxes["Password"].Text
+        $Server.Notes = $boxes["Notes"].Text
 
         Save-Servers
         Refresh-Tree
+        Update-DashboardServerList
     }
 }
 
@@ -983,6 +1866,726 @@ function Initialize-iDRACWebViewControl {
     $Web.CoreWebView2.Navigate($Url)
 }
 
+
+
+function ConvertTo-JavaScriptStringLiteral {
+    param([string]$Text)
+
+    if ($null -eq $Text) { $Text = "" }
+    return ($Text | ConvertTo-Json -Compress)
+}
+
+function Get-iDRACCredentialForBrowserLogin {
+    param([Parameter(Mandatory=$true)]$Server)
+
+    try {
+        $candidates = @(Get-iDRACCredentialCandidates -Server $Server)
+        if ($candidates.Count -gt 0) {
+            return $candidates[0].Credential
+        }
+    }
+    catch {}
+
+    try {
+        return Get-iDRACCredentialFromServer -Server $Server
+    }
+    catch {
+        return $null
+    }
+}
+
+function Set-ClipboardTextSafely {
+    param([string]$Text)
+
+    try {
+        if ($null -eq $Text) { $Text = "" }
+        [System.Windows.Forms.Clipboard]::SetText($Text)
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+
+function New-iDRACGuiAutoLoginJavaScript {
+    param([Parameter(Mandatory=$true)]$Server)
+
+    $cred = Get-iDRACCredentialForBrowserLogin -Server $Server
+    if (-not $cred) { return "" }
+
+    $nc = $cred.GetNetworkCredential()
+    $userName = $nc.UserName
+    $password = $nc.Password
+
+    if ([string]::IsNullOrWhiteSpace($userName) -or [string]::IsNullOrWhiteSpace($password)) { return "" }
+
+    $userJson = ConvertTo-JavaScriptStringLiteral $userName
+    $passJson = ConvertTo-JavaScriptStringLiteral $password
+
+    return @"
+(function(){
+  try {
+    // iDRAC10 is an Angular hash-route app.  At first load the URL can briefly be
+    // /restgui/index.html before the #/login route and fields exist.  Older builds
+    // saw that and stopped before typing.  This build waits for the actual fields.
+    if (window.__idracCManAutoLoginTimer) {
+      try { clearInterval(window.__idracCManAutoLoginTimer); } catch(e) {}
+      window.__idracCManAutoLoginTimer = null;
+    }
+
+    window.__idracCManAutoLoginInstalled = true;
+    window.__idracCManLoginSubmitted = false;
+    window.__idracCManLoginState = 'installed-waiting-for-fields url=' + location.href;
+
+    var USER = $userJson;
+    var PASS = $passJson;
+    var attempts = 0;
+
+    function q(sel){ try { return document.querySelector(sel); } catch(e) { return null; } }
+    function qa(sel){ try { return Array.prototype.slice.call(document.querySelectorAll(sel)); } catch(e) { return []; } }
+
+    function visible(el){
+      try {
+        if (!el || el.disabled) { return false; }
+        var r = el.getBoundingClientRect();
+        var s = getComputedStyle(el);
+        return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+      } catch(e) { return false; }
+    }
+
+    function fire(el, type, opts){
+      try {
+        var ev;
+        opts = opts || {};
+        if (type === 'input') {
+          try { ev = new InputEvent('input', Object.assign({bubbles:true,cancelable:true,composed:true,inputType:'insertText'}, opts)); }
+          catch(x) { ev = new Event('input', {bubbles:true,cancelable:true,composed:true}); }
+        }
+        else if (type.indexOf('key') === 0) {
+          ev = new KeyboardEvent(type, Object.assign({bubbles:true,cancelable:true,composed:true}, opts));
+        }
+        else {
+          ev = new Event(type, {bubbles:true,cancelable:true,composed:true});
+        }
+        el.dispatchEvent(ev);
+      } catch(e) {}
+    }
+
+    function nativeSet(el, value){
+      try {
+        var proto = Object.getPrototypeOf(el);
+        var desc = Object.getOwnPropertyDescriptor(proto, 'value') || Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        if (desc && desc.set) { desc.set.call(el, value); }
+        else { el.value = value; }
+      } catch(e) {
+        try { el.value = value; } catch(x) {}
+      }
+    }
+
+    function userField(){
+      return q('input[name="username"]') || q('#clr-form-control-1') || qa('input').filter(function(x){ return (x.type || '').toLowerCase() === 'text'; })[0] || null;
+    }
+
+    function passField(){
+      var p = q('input[name="password"]') || q('#clr-form-control-2');
+      if (p) { return p; }
+      var visiblePass = qa('input[type="password"]').filter(function(x){
+        try {
+          var r = x.getBoundingClientRect();
+          var s = getComputedStyle(x);
+          return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+        } catch(e) { return false; }
+      })[0];
+      return visiblePass || q('input[type="password"]');
+    }
+
+    function loginButton(){
+      return q('button.btn-login') || q('button[type="submit"]') || qa('button').filter(function(b){ return /log\s*in|login|sign\s*in/i.test((b.innerText || b.textContent || '')); })[0] || null;
+    }
+
+    function fillField(el, value){
+      try {
+        if (!el) { return false; }
+        try { el.scrollIntoView({block:'center', inline:'center'}); } catch(e) {}
+        // iDRAC9 / 16G often leaves the visible password box readonly until Angular sees username input.
+        // Force it writable before setting the password.
+        try { el.readOnly = false; el.removeAttribute('readonly'); } catch(e) {}
+        try { el.disabled = false; el.removeAttribute('disabled'); } catch(e) {}
+        try { el.focus(); } catch(e) {}
+        try { el.click(); } catch(e) {}
+        fire(el,'focus');
+
+        // Clear then set using the native setter so Angular/Clarity sees an actual input update.
+        nativeSet(el, '');
+        fire(el,'input',{data:null,inputType:'deleteContentBackward'});
+        fire(el,'change');
+
+        nativeSet(el, value);
+        fire(el,'keydown',{key:'a',code:'KeyA',keyCode:65,which:65});
+        fire(el,'beforeinput',{data:value,inputType:'insertText'});
+        fire(el,'input',{data:value,inputType:'insertText'});
+        fire(el,'keyup',{key:'a',code:'KeyA',keyCode:65,which:65});
+        fire(el,'change');
+
+        // Some iDRAC10 builds only enable Log In after key events/blur.
+        fire(el,'keydown',{key:'Tab',code:'Tab',keyCode:9,which:9});
+        fire(el,'keyup',{key:'Tab',code:'Tab',keyCode:9,which:9});
+        try { el.blur(); } catch(e) {}
+        fire(el,'blur');
+        return ((el.value || '') === value);
+      } catch(e) { return false; }
+    }
+
+    function enableAndSubmit(btn, pass){
+      try {
+        if (btn) {
+          btn.disabled = false;
+          btn.removeAttribute('disabled');
+          btn.classList.remove('disabled');
+          btn.setAttribute('aria-disabled','false');
+          fire(btn,'mouseover');
+          fire(btn,'mousedown');
+          fire(btn,'mouseup');
+          btn.click();
+          return 'clicked';
+        }
+        if (pass) {
+          pass.focus();
+          fire(pass,'keydown',{key:'Enter',code:'Enter',keyCode:13,which:13});
+          fire(pass,'keypress',{key:'Enter',code:'Enter',keyCode:13,which:13});
+          fire(pass,'keyup',{key:'Enter',code:'Enter',keyCode:13,which:13});
+          return 'enter';
+        }
+      } catch(e) { return 'submit-error=' + e.message; }
+      return 'no-submit-target';
+    }
+
+    function tick(){
+      try {
+        attempts++;
+        var u = userField();
+        var p = passField();
+        var b = loginButton();
+
+        if (!visible(u) || !visible(p)) {
+          window.__idracCManLoginState = 'waiting-for-visible-fields attempt=' + attempts + ' url=' + location.href + ' inputCount=' + qa('input').length + ' userVisible=' + visible(u) + ' passVisible=' + visible(p) + ' passReadonly=' + (p ? p.readOnly : 'none');
+          if (attempts > 120) { clearInterval(window.__idracCManAutoLoginTimer); }
+          return;
+        }
+
+        var uok = fillField(u, USER);
+        // Re-find password after username events because iDRAC9 may swap/enable the password control.
+        p = passField();
+        try { if (p) { p.readOnly = false; p.removeAttribute('readonly'); } } catch(e) {}
+        var pok = fillField(p, PASS);
+        var ulen = (u.value || '').length;
+        var plen = (p.value || '').length;
+        var disabled = b ? !!b.disabled : null;
+        window.__idracCManLoginState = 'filled attempt=' + attempts + ' uok=' + uok + ' pok=' + pok + ' ulen=' + ulen + ' plen=' + plen + ' buttonDisabled=' + disabled + ' url=' + location.href;
+
+        if (ulen > 0 && plen > 0) {
+          window.__idracCManLoginSubmitted = true;
+          clearInterval(window.__idracCManAutoLoginTimer);
+          setTimeout(function(){
+            var b2 = loginButton();
+            var p2 = passField();
+            var result = enableAndSubmit(b2, p2);
+            window.__idracCManLoginState = 'submitted result=' + result + ' url=' + location.href;
+          }, 350);
+          return;
+        }
+
+        if (attempts > 120) {
+          window.__idracCManLoginState = 'gave-up ' + window.__idracCManLoginState;
+          clearInterval(window.__idracCManAutoLoginTimer);
+        }
+      } catch(e) {
+        window.__idracCManLoginState = 'tick-error=' + e.message;
+      }
+    }
+
+    tick();
+    window.__idracCManAutoLoginTimer = setInterval(tick, 700);
+    return 'installed';
+  } catch(e) {
+    window.__idracCManLoginState = 'install-error=' + e.message;
+    return window.__idracCManLoginState;
+  }
+})();
+"@
+}
+
+function Invoke-WebView2iDRACAutoLogin {
+    param(
+        [Parameter(Mandatory=$true)]$Web,
+        [Parameter(Mandatory=$true)]$Server
+    )
+
+    try {
+        if (-not $Web -or -not $Web.CoreWebView2 -or -not $Server) { return }
+
+        $js = New-iDRACGuiAutoLoginJavaScript -Server $Server
+        if ([string]::IsNullOrWhiteSpace($js)) {
+            if ($script:Status) { $script:Status.Text = "GUI Auto Login skipped for $($Server.Name): no usable saved credentials." }
+            return
+        }
+
+        [void]$Web.CoreWebView2.ExecuteScriptAsync($js)
+        if ($script:Status) { $script:Status.Text = "GUI Auto Login attempted for $($Server.Name)" }
+    }
+    catch {
+        try { Write-iDRACCManLog "GUI Auto Login failed for $($Server.Name): $($_.Exception.Message)" "WARN" } catch {}
+    }
+}
+
+function Invoke-WebView2AdvancedContinue {
+    param(
+        [Parameter(Mandatory=$true)]$Web
+    )
+
+    try {
+        if (-not $Web -or -not $Web.CoreWebView2) { return }
+
+        # Edge/Chromium SSL interstitial uses details-button and proceed-link.
+        # Run this a few times because the privacy page can finish rendering after NavigationCompleted.
+        $js = @"
+(function() {
+    function clickBypass() {
+        try {
+            var advanced = document.getElementById('details-button') || document.querySelector('button[id="details-button"]');
+            if (advanced) { advanced.click(); }
+
+            setTimeout(function() {
+                try {
+                    var proceed = document.getElementById('proceed-link') || document.querySelector('a[id="proceed-link"]');
+                    if (proceed) { proceed.click(); }
+                } catch(e) {}
+            }, 350);
+        } catch(e) {}
+    }
+
+    clickBypass();
+    setTimeout(clickBypass, 750);
+    setTimeout(clickBypass, 1500);
+    setTimeout(clickBypass, 2500);
+    return 'advanced-continue-attempted';
+})();
+"@
+
+        [void]$Web.CoreWebView2.ExecuteScriptAsync($js)
+    }
+    catch {}
+}
+
+
+
+function Start-WebView2GuiAutomationTimer {
+    param(
+        [Parameter(Mandatory=$true)]$Web,
+        [Parameter(Mandatory=$false)]$Server,
+        [Parameter(Mandatory=$true)]$AutoContinueCheckBox,
+        [Parameter(Mandatory=$false)]$AutoLoginCheckBox,
+        [bool]$IsKvm = $false
+    )
+
+    try {
+        if (-not $Web -or -not $Web.CoreWebView2) { return }
+
+        $tickCount = 0
+        $loginAttempted = $false
+        $timer = New-Object System.Windows.Forms.Timer
+        $timer.Interval = 1000
+        $timer.Add_Tick({
+            try {
+                $tickCount++
+
+                # Do not let the status bar stay on Loading forever while WebView2 is sitting
+                # on the Chromium SSL privacy interstitial or while an iDRAC page does slow rendering.
+                if ($script:Status -and $tickCount -ge 3) {
+                    if ($script:Status.Text -like 'Loading*') {
+                        $script:Status.Text = "Waiting for $($Server.Name)... Auto Continue active."
+                    }
+                }
+
+                if ($AutoContinueCheckBox -and $AutoContinueCheckBox.Checked) {
+                    Invoke-WebView2AdvancedContinue -Web $Web
+                }
+
+                # For GUI tabs, Auto Continue must get past the certificate page first.
+                # Auto Login is fire-and-forget, so it is safe to retry without freezing WebView2.
+                if (-not $IsKvm -and $AutoLoginCheckBox -and $AutoLoginCheckBox.Checked -and $tickCount -ge 5 -and (($tickCount % 2) -eq 1)) {
+                    if ($Server) { Invoke-WebView2iDRACAutoLogin -Web $Web -Server $Server }
+                }
+
+                if ($tickCount -ge 45) {
+                    $timer.Stop()
+                    $timer.Dispose()
+                    if ($script:Status -and $script:Status.Text -like 'Loading*') {
+                        $script:Status.Text = "Opened $($Server.Name)."
+                    }
+                }
+            }
+            catch {
+                try {
+                    if ($tickCount -ge 18) {
+                        $timer.Stop()
+                        $timer.Dispose()
+                    }
+                }
+                catch {}
+            }
+        }.GetNewClosure())
+
+        $timer.Start()
+    }
+    catch {}
+}
+
+
+function Split-SetCookieHeaderValue {
+    param($HeaderValue)
+
+    $items = @()
+    if (-not $HeaderValue) { return @() }
+
+    foreach ($raw in @($HeaderValue)) {
+        if ([string]::IsNullOrWhiteSpace([string]$raw)) { continue }
+
+        $text = [string]$raw
+        # Some PowerShell versions collapse multiple Set-Cookie headers into one comma-delimited string.
+        # Split only on commas that look like the start of another cookie name=value pair.
+        $parts = [regex]::Split($text, ',\s*(?=[^;,\s]+=)')
+        foreach ($part in $parts) {
+            if (-not [string]::IsNullOrWhiteSpace($part)) { $items += $part.Trim() }
+        }
+    }
+
+    return @($items)
+}
+
+function New-iDRACGuiWebSession {
+    param([Parameter(Mandatory=$true)]$Server)
+
+    $hostName = Get-iDRACHost $Server.Address
+    $base = "https://$hostName"
+    $candidates = @(Get-iDRACCredentialCandidates -Server $Server -AllowPrompt)
+    $lastError = $null
+
+    foreach ($candidate in $candidates) {
+        try {
+            $nc = $candidate.Credential.GetNetworkCredential()
+            if ([string]::IsNullOrWhiteSpace($nc.UserName) -or [string]::IsNullOrWhiteSpace($nc.Password)) { continue }
+
+            $bodies = @(
+                (@{ UserName = $nc.UserName; Password = $nc.Password } | ConvertTo-Json -Compress),
+                (@{ username = $nc.UserName; password = $nc.Password } | ConvertTo-Json -Compress)
+            )
+
+            foreach ($body in $bodies) {
+                try {
+                    Enable-IgnoreSslCertificatePolicy
+                    $params = @{
+                        Uri = "$base/sysmgmt/2015/bmc/session"
+                        Method = "POST"
+                        Body = $body
+                        ContentType = "application/json"
+                        UseBasicParsing = $true
+                        ErrorAction = "Stop"
+                        TimeoutSec = 12
+                        Headers = @{
+                            "Accept" = "application/json, text/plain, */*"
+                            "X-Requested-With" = "XMLHttpRequest"
+                            "Origin" = $base
+                            "Referer" = "$base/"
+                        }
+                    }
+                    if ($PSVersionTable.PSVersion.Major -ge 6) {
+                        $params.SkipCertificateCheck = $true
+                        $params.SkipHeaderValidation = $true
+                    }
+
+                    $resp = Invoke-WebRequest @params
+                    $setCookies = @()
+                    try { $setCookies = @(Split-SetCookieHeaderValue $resp.Headers['Set-Cookie']) } catch {}
+
+                    if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 300) {
+                        return [pscustomobject]@{
+                            BaseUrl = $base
+                            Host = $hostName
+                            CredentialSource = $candidate.Source
+                            SetCookies = $setCookies
+                            RawResponse = $resp.Content
+                        }
+                    }
+                }
+                catch {
+                    $lastError = $_.Exception.Message
+                }
+            }
+        }
+        catch {
+            $lastError = $_.Exception.Message
+        }
+    }
+
+    if ($lastError) { throw "GUI session login failed. Last error: $lastError" }
+    throw "GUI session login failed. No usable credentials were available."
+}
+
+function Add-iDRACGuiSessionCookiesToWebView2 {
+    param(
+        [Parameter(Mandatory=$true)]$Web,
+        [Parameter(Mandatory=$true)]$Session
+    )
+
+    try {
+        if (-not $Web -or -not $Web.CoreWebView2 -or -not $Session) { return $false }
+        $mgr = $Web.CoreWebView2.CookieManager
+        if (-not $mgr) { return $false }
+
+        $added = 0
+        foreach ($cookieText in @($Session.SetCookies)) {
+            try {
+                if ([string]::IsNullOrWhiteSpace($cookieText)) { continue }
+                $first = ($cookieText -split ';', 2)[0]
+                if ($first -notmatch '=') { continue }
+                $name = ($first -split '=', 2)[0].Trim()
+                $value = ($first -split '=', 2)[1]
+                if ([string]::IsNullOrWhiteSpace($name)) { continue }
+
+                $path = "/"
+                $domain = $Session.Host
+                foreach ($attr in ($cookieText -split ';')) {
+                    $a = $attr.Trim()
+                    if ($a -match '^path=(.+)$') { $path = $Matches[1] }
+                    elseif ($a -match '^domain=(.+)$') { $domain = $Matches[1].TrimStart('.') }
+                }
+
+                $cookie = $mgr.CreateCookie($name, $value, $domain, $path)
+                try { $cookie.IsSecure = $true } catch {}
+                try { if ($cookieText -match '(?i)httponly') { $cookie.IsHttpOnly = $true } } catch {}
+                $mgr.AddOrUpdateCookie($cookie)
+                $added++
+            }
+            catch {}
+        }
+
+        return ($added -gt 0)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Open-iDRACGuiWithSessionLogin {
+    param(
+        [Parameter(Mandatory=$true)]$Web,
+        [Parameter(Mandatory=$true)]$Server,
+        [Parameter(Mandatory=$true)][string]$Url
+    )
+
+    try {
+        if (-not $Web -or -not $Web.CoreWebView2 -or -not $Server) { return $false }
+
+        if ($script:Status) { $script:Status.Text = "Creating GUI web session for $($Server.Name)..." }
+        [System.Windows.Forms.Application]::DoEvents()
+
+        $session = New-iDRACGuiWebSession -Server $Server
+        $cookiesAdded = Add-iDRACGuiSessionCookiesToWebView2 -Web $Web -Session $session
+
+        if ($cookiesAdded) {
+            if ($script:Status) { $script:Status.Text = "GUI session created for $($Server.Name) using $($session.CredentialSource) credentials." }
+            $Web.CoreWebView2.Navigate($Url)
+            return $true
+        }
+        else {
+            if ($script:Status) { $script:Status.Text = "GUI session created but no cookies were returned for $($Server.Name)." }
+            return $false
+        }
+    }
+    catch {
+        if ($script:Status) { $script:Status.Text = "GUI session login failed for $($Server.Name). Falling back to normal GUI." }
+        Write-iDRACCManLog "GUI session login failed for $($Server.Name): $($_.Exception.Message)" "WARN"
+        return $false
+    }
+}
+
+
+function Show-WebView2GuiLoginDebug {
+    param(
+        $Web,
+        $Server
+    )
+
+    try {
+        if (-not $Server) {
+            try {
+                if ($script:Tabs -and $script:Tabs.SelectedTab -and $script:Tabs.SelectedTab.Tag) {
+                    $Server = $script:Tabs.SelectedTab.Tag.Server
+                }
+            } catch {}
+        }
+
+        if (-not $Web) {
+            try {
+                if ($script:Tabs -and $script:Tabs.SelectedTab -and $script:Tabs.SelectedTab.Tag) {
+                    $Web = $script:Tabs.SelectedTab.Tag.WebView
+                }
+            } catch {}
+        }
+
+        if (-not $Web -or -not $Web.CoreWebView2) {
+            Add-LogTab -Title "GUI Login Debug Failed" -Text "No active WebView2 control was found for the selected tab. Close this GUI tab, reopen it, then click Login Debug again after the page starts loading."
+            if ($script:Status) { $script:Status.Text = "GUI login debug failed: WebView2 was not found." }
+            return
+        }
+
+        if (-not $Server) {
+            $Server = [pscustomobject]@{ Name = "Unknown"; Address = "Unknown" }
+        }
+
+        $js = @"
+(function() {
+    function safeText(v) { try { return (v || '').toString().replace(/\s+/g,' ').trim().substring(0,160); } catch(e) { return ''; } }
+    function visible(el) {
+        try {
+            var r = el.getBoundingClientRect();
+            var s = window.getComputedStyle(el);
+            return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+        } catch(e) { return false; }
+    }
+    function describe(el) {
+        try {
+            return {
+                tag: (el.tagName || '').toLowerCase(),
+                type: el.type || '',
+                id: el.id || '',
+                name: el.name || '',
+                className: el.className || '',
+                placeholder: el.placeholder || '',
+                autocomplete: el.autocomplete || '',
+                aria: el.getAttribute('aria-label') || '',
+                text: safeText(el.innerText || el.value || ''),
+                visible: visible(el),
+                disabled: !!el.disabled,
+                readonly: !!el.readOnly
+            };
+        } catch(e) { return { error: e.toString() }; }
+    }
+    var inputs = [];
+    var buttons = [];
+    var frames = [];
+    try { document.querySelectorAll('input,textarea').forEach(function(x){ inputs.push(describe(x)); }); } catch(e) {}
+    try { document.querySelectorAll('button,a,input[type=submit],input[type=button]').forEach(function(x){ buttons.push(describe(x)); }); } catch(e) {}
+    try { document.querySelectorAll('iframe,frame').forEach(function(x){ frames.push({src:x.src||'', id:x.id||'', name:x.name||'', visible:visible(x)}); }); } catch(e) {}
+    return JSON.stringify({
+        href: location.href,
+        title: document.title,
+        readyState: document.readyState,
+        autoLoginInstalled: !!window.__idracCManAutoLoginInstalled,
+        autoLoginState: window.__idracCManLoginState || '',
+        autoLoginSubmitted: !!window.__idracCManLoginSubmitted,
+        bodyTextSample: safeText(document.body ? document.body.innerText : ''),
+        inputCount: inputs.length,
+        buttonCount: buttons.length,
+        frameCount: frames.length,
+        inputs: inputs,
+        buttons: buttons,
+        frames: frames
+    }, null, 2);
+})();
+"@
+
+        if ($script:Status) { $script:Status.Text = "Collecting GUI login debug for $($Server.Name)..." }
+
+        # Do NOT wait synchronously on ExecuteScriptAsync from the WinForms UI thread.
+        # Waiting with GetResult() can deadlock/hang WebView2. Poll the task with a timer instead.
+        $task = $Web.CoreWebView2.ExecuteScriptAsync($js)
+        $started = Get-Date
+        $debugServer = $Server
+        $debugWeb = $Web
+        $timer = New-Object System.Windows.Forms.Timer
+        $timer.Interval = 250
+        $timer.Add_Tick({
+            try {
+                if ($task.IsCompleted) {
+                    $timer.Stop()
+                    $timer.Dispose()
+
+                    if ($task.IsFaulted) {
+                        $err = $task.Exception.InnerException.Message
+                        if ([string]::IsNullOrWhiteSpace($err)) { $err = $task.Exception.Message }
+                        Add-LogTab -Title "$($debugServer.Name) Login Debug Failed" -Text "ExecuteScriptAsync failed.`r`n`r`n$err"
+                        if ($script:Status) { $script:Status.Text = "GUI login debug failed for $($debugServer.Name)" }
+                        return
+                    }
+
+                    $raw = $task.GetAwaiter().GetResult()
+                    $decoded = $raw
+                    try { $decoded = $raw | ConvertFrom-Json } catch {}
+
+                    if ($decoded -isnot [string]) {
+                        try { $decoded = $decoded | ConvertTo-Json -Depth 25 } catch { $decoded = [string]$decoded }
+                    }
+
+                    $text = "GUI Login Debug for $($debugServer.Name)`r`nAddress: $($debugServer.Address)`r`nTime: $(Get-Date)`r`nCurrent URL: $($debugWeb.Source)`r`n`r`n$decoded"
+                    Add-LogTab -Title "$($debugServer.Name) Login Debug" -Text $text
+                    if ($script:Status) { $script:Status.Text = "GUI login debug captured for $($debugServer.Name)" }
+                    return
+                }
+
+                if (((Get-Date) - $started).TotalSeconds -gt 12) {
+                    $timer.Stop()
+                    $timer.Dispose()
+                    $text = "GUI Login Debug timed out waiting for WebView2 script execution.`r`n`r`nServer: $($debugServer.Name)`r`nAddress: $($debugServer.Address)`r`nCurrent URL: $($debugWeb.Source)`r`nTime: $(Get-Date)`r`n`r`nThis usually means the page is still on a browser/security/interstitial page or WebView2 is busy. Try clicking Login Debug after the visible login page fully appears."
+                    Add-LogTab -Title "$($debugServer.Name) Login Debug Timeout" -Text $text
+                    if ($script:Status) { $script:Status.Text = "GUI login debug timed out for $($debugServer.Name)" }
+                    return
+                }
+            }
+            catch {
+                try { $timer.Stop(); $timer.Dispose() } catch {}
+                Add-LogTab -Title "$($debugServer.Name) Login Debug Failed" -Text $_.Exception.Message
+                if ($script:Status) { $script:Status.Text = "GUI login debug failed for $($debugServer.Name)" }
+            }
+        }.GetNewClosure())
+        $timer.Start()
+    }
+    catch {
+        Add-LogTab -Title "$($Server.Name) Login Debug Failed" -Text $_.Exception.Message
+        if ($script:Status) { $script:Status.Text = "GUI login debug failed." }
+    }
+}
+
+
+function New-WebView2IsolatedEnvironment {
+    param(
+        [string]$ServerName,
+        [switch]$IsKvm
+    )
+
+    # KVM temp sessions and normal GUI sessions cannot safely share the same
+    # WebView2 browser profile.  If they share cookies/local storage, opening GUI
+    # from a console tab can authenticate and then immediately hit RAC0508/log out.
+    # Give each GUI/KVM tab its own small profile under Documents\iDRACCMan\WebView2UserData.
+    $mode = if ($IsKvm) { "KVM" } else { "GUI" }
+    $safeName = if ([string]::IsNullOrWhiteSpace($ServerName)) { "iDRAC" } else { $ServerName }
+    $safeName = ($safeName -replace '[^a-zA-Z0-9_.-]', '_')
+    if ($safeName.Length -gt 50) { $safeName = $safeName.Substring(0,50) }
+
+    $folderName = "{0}_{1}_{2}" -f $mode, $safeName, ([DateTime]::Now.ToString('yyyyMMddHHmmssfff'))
+    $folder = Join-Path $script:WebDataRoot $folderName
+    New-Item -ItemType Directory -Path $folder -Force | Out-Null
+
+    $env = [Microsoft.Web.WebView2.Core.CoreWebView2Environment]::CreateAsync($null, $folder).GetAwaiter().GetResult()
+
+    return [pscustomobject]@{
+        Environment = $env
+        UserDataFolder = $folder
+    }
+}
+
 function Add-WebViewTab {
     param(
         [Parameter(Mandatory=$true)]$Server,
@@ -1023,10 +2626,86 @@ function Add-WebViewTab {
     $btnKvm.Top = 4
     $btnKvm.Width = 60
     $btnKvm.Height = 28
-    $btnKvm.Add_Click({ Open-WebEmbedded })
+    $btnKvm.Add_Click({
+        try {
+            $targetServer = $null
 
-    $info = New-Object System.Windows.Forms.Label
-    $info.Left = 145
+            # When this button is clicked from a KVM tab, do not trust the PowerShell
+            # closure variable. In PowerShell ISE / Invoke-Expression it can be null.
+            # Always recover the server from the selected tab first.
+            try {
+                if ($script:Tabs -and $script:Tabs.SelectedTab -and $script:Tabs.SelectedTab.Tag -and $script:Tabs.SelectedTab.Tag.Server) {
+                    $targetServer = $script:Tabs.SelectedTab.Tag.Server
+                }
+            } catch {}
+
+            if (-not $targetServer) { $targetServer = $Server }
+
+            if (-not $targetServer) {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Could not determine which iDRAC this tab belongs to.",
+                    "Open GUI",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Warning
+                ) | Out-Null
+                return
+            }
+
+            Add-WebViewTab -Server $targetServer -Url (Get-iDRACBaseUrl $targetServer.Address)
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Unable to open GUI from this console tab.`r`n`r`n$($_.Exception.Message)",
+                "Open GUI Failed",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error
+            ) | Out-Null
+        }
+    }.GetNewClosure())
+
+    $autoContinueSettingName = if ($IsKvm) { "AutoContinueConsole" } else { "AutoContinueGui" }
+
+    $chkAutoContinue = New-Object System.Windows.Forms.CheckBox
+    $chkAutoContinue.Text = "Auto Continue"
+    $chkAutoContinue.Left = if ($IsKvm) { 150 } else { 195 }
+    $chkAutoContinue.Top = 9
+    $chkAutoContinue.Width = 120
+    $chkAutoContinue.Height = 22
+    $chkAutoContinue.Checked = [bool](Get-iDRACCManSetting -Name $autoContinueSettingName -Default $true)
+    $chkAutoContinue.Add_CheckedChanged({
+        try {
+            Set-iDRACCManSetting -Name $autoContinueSettingName -Value ([bool]$chkAutoContinue.Checked)
+            if ($chkAutoContinue.Checked -and $web -and $web.CoreWebView2) {
+                Invoke-WebView2AdvancedContinue -Web $web
+            }
+        }
+        catch {}
+    }.GetNewClosure())
+
+    $chkAutoLogin = New-Object System.Windows.Forms.CheckBox
+    $chkAutoLogin.Text = "Auto Login"
+    $chkAutoLogin.Left = 85
+    $chkAutoLogin.Top = 9
+    $chkAutoLogin.Width = 105
+    $chkAutoLogin.Height = 22
+    $chkAutoLogin.Checked = [bool](Get-iDRACCManSetting -Name "AutoLoginGui" -Default $true)
+    $chkAutoLogin.Add_CheckedChanged({
+        try {
+            Set-iDRACCManSetting -Name "AutoLoginGui" -Value ([bool]$chkAutoLogin.Checked)
+            if ($chkAutoLogin.Checked -and $web -and $web.CoreWebView2) {
+                $loginServer = $Server
+                try {
+                    if (-not $loginServer -and $script:Tabs -and $script:Tabs.SelectedTab -and $script:Tabs.SelectedTab.Tag -and $script:Tabs.SelectedTab.Tag.Server) {
+                        $loginServer = $script:Tabs.SelectedTab.Tag.Server
+                    }
+                } catch {}
+                if ($loginServer) { Invoke-WebView2iDRACAutoLogin -Web $web -Server $loginServer }
+            }
+        }
+        catch {}
+    }.GetNewClosure())
+$info = New-Object System.Windows.Forms.Label
+    $info.Left = if ($IsKvm) { 275 } else { 320 }
     $info.Top = 10
     $info.Width = 1200
     $info.Height = 22
@@ -1038,16 +2717,30 @@ function Add-WebViewTab {
     }
 
     if ($IsKvm) {
-        $bar.Controls.AddRange(@($btnClose,$btnKvm,$info))
+        $bar.Controls.AddRange(@($btnClose,$btnKvm,$chkAutoContinue,$info))
     }
     else {
-        $bar.Controls.AddRange(@($btnClose,$info))
+        $bar.Controls.AddRange(@($btnClose,$chkAutoLogin,$chkAutoContinue,$info))
     }
 
     $web = New-Object Microsoft.Web.WebView2.WinForms.WebView2
     $web.Dock = "Fill"
+
+    $isolatedWebView = $null
+    try {
+        $isolatedWebView = New-WebView2IsolatedEnvironment -ServerName $Server.Name -IsKvm:([bool]$IsKvm)
+    }
+    catch {
+        $isolatedWebView = $null
+    }
+
     $web.CreationProperties = New-Object Microsoft.Web.WebView2.WinForms.CoreWebView2CreationProperties
-    $web.CreationProperties.UserDataFolder = $script:WebDataRoot
+    if ($isolatedWebView -and $isolatedWebView.UserDataFolder) {
+        $web.CreationProperties.UserDataFolder = $isolatedWebView.UserDataFolder
+    }
+    else {
+        $web.CreationProperties.UserDataFolder = $script:WebDataRoot
+    }
 
     $outer.Controls.Add($web)
     $outer.Controls.Add($bar)
@@ -1056,8 +2749,20 @@ function Add-WebViewTab {
     [void]$script:Tabs.TabPages.Add($tab)
     $script:Tabs.SelectedTab = $tab
 
+    # Store the WebView on the tab before navigation/debug buttons can be clicked.
+    # The real KVM session key is filled in later by Open-KvmEmbedded.
+    $tab.Tag = [pscustomobject]@{
+        Server = $Server
+        Url = $Url
+        IsKvm = [bool]$IsKvm
+        WebView = $web
+        KvmSessionKey = $null
+        UserDataFolder = if ($isolatedWebView) { $isolatedWebView.UserDataFolder } else { $script:WebDataRoot }
+    }
+
     try {
-        $null = $web.EnsureCoreWebView2Async($script:WebViewEnvironment)
+        $tabEnvironment = if ($isolatedWebView -and $isolatedWebView.Environment) { $isolatedWebView.Environment } else { $script:WebViewEnvironment }
+        $null = $web.EnsureCoreWebView2Async($tabEnvironment)
 
         if (-not (Wait-WebViewReady -Web $web)) {
             throw "Timed out waiting for CoreWebView2."
@@ -1090,14 +2795,51 @@ function Add-WebViewTab {
             else {
                 $script:Status.Text = "Navigation failed: $($args.WebErrorStatus)"
             }
-        })
+
+            try {
+                if ($IsKvm) {
+                    if ($chkAutoContinue -and $chkAutoContinue.Checked) {
+                        Invoke-WebView2AdvancedContinue -Web $web
+                        $script:Status.Text = "Opened console. Auto Continue attempted."
+                    }
+                }
+                else {
+                    if ($chkAutoContinue -and $chkAutoContinue.Checked) {
+                        Invoke-WebView2AdvancedContinue -Web $web
+                    }
+                    # GUI Auto Login is handled by the non-blocking timer so NavigationCompleted
+                    # never blocks WebView2 during slow iDRAC page loads.
+                    if (($chkAutoContinue -and $chkAutoContinue.Checked) -or ($chkAutoLogin -and $chkAutoLogin.Checked)) {
+                        $script:Status.Text = "Opened GUI. Auto Continue active; Auto Login will retry after the login page appears."
+                    }
+                }
+            }
+            catch {}
+        }.GetNewClosure())
+# For GUI tabs, inject the auto-login retry script before normal navigation.
+# This is more reliable with iDRAC10 because the script starts inside the /restgui page
+# as soon as the login app is created, then keeps retrying until the fields exist.
+if (-not $IsKvm -and $chkAutoLogin -and $chkAutoLogin.Checked -and $Server) {
+    try {
+        $startupLoginJs = New-iDRACGuiAutoLoginJavaScript -Server $Server
+        if (-not [string]::IsNullOrWhiteSpace($startupLoginJs)) {
+            [void]$web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync($startupLoginJs)
+        }
+    } catch {}
+}
 $web.CoreWebView2.Navigate($Url)
+
+# Start a non-blocking automation timer. This fixes cases where NavigationCompleted does not fire
+# while WebView2 is showing the Chromium certificate interstitial. The timer repeatedly tries
+# Advanced/Continue and then runs GUI Auto Login only after the page has had time to move forward.
+Start-WebView2GuiAutomationTimer -Web $web -Server $Server -AutoContinueCheckBox $chkAutoContinue -AutoLoginCheckBox $chkAutoLogin -IsKvm ([bool]$IsKvm)
         $tab.Tag = [pscustomobject]@{
             Server = $Server
             Url = $Url
             IsKvm = [bool]$IsKvm
             WebView = $web
             KvmSessionKey = $null
+            UserDataFolder = if ($isolatedWebView) { $isolatedWebView.UserDataFolder } else { $script:WebDataRoot }
         }
         $script:Status.Text = "Opened: $Url"
         return $tab
@@ -1283,6 +3025,11 @@ function Export-ServersCsv {
                 Address = $s.Address
                 Group = $s.Group
                 Username = $s.Username
+                ServiceTag = $s.ServiceTag
+                Model = $s.Model
+                OSHostname = $s.OSHostname
+                Health = $s.Health
+                PowerState = $s.PowerState
                 Notes = $s.Notes
             }
         }
@@ -1309,11 +3056,17 @@ function Import-ServersCsv {
                 Username = $r.Username
                 Password = ""
                 Notes = $r.Notes
+                ServiceTag = $r.ServiceTag
+                Model = $r.Model
+                OSHostname = $r.OSHostname
+                Health = $r.Health
+                PowerState = $r.PowerState
             }
         }
 
         Save-Servers
         Refresh-Tree
+        Update-DashboardServerList
         $script:Status.Text = "Imported CSV: $($dlg.FileName)"
     }
 }
@@ -1557,14 +3310,39 @@ function Open-MultiViewForSelectedGroup {
     $btnClose.Height = 26
     $btnClose.Add_Click({ Close-CurrentTab })
 
+    $chkAutoContinueMulti = New-Object System.Windows.Forms.CheckBox
+    $chkAutoContinueMulti.Text = "Auto Continue"
+    $chkAutoContinueMulti.Left = 85
+    $chkAutoContinueMulti.Top = 7
+    $chkAutoContinueMulti.Width = 120
+    $chkAutoContinueMulti.Height = 22
+    $chkAutoContinueMulti.Checked = [bool](Get-iDRACCManSetting -Name "AutoContinueConsole" -Default $true)
+    $chkAutoContinueMulti.Add_CheckedChanged({
+        try {
+            Set-iDRACCManSetting -Name "AutoContinueConsole" -Value ([bool]$chkAutoContinueMulti.Checked)
+            if ($chkAutoContinueMulti.Checked -and $tab.Tag -and $tab.Tag.KvmSessions) {
+                foreach ($entry in @($tab.Tag.KvmSessions)) {
+                    try {
+                        if ($entry.WebView -and $entry.WebView.CoreWebView2) {
+                            Invoke-WebView2AdvancedContinue -Web $entry.WebView
+                        }
+                    }
+                    catch {}
+                }
+                if ($script:Status) { $script:Status.Text = "Multi View Auto Continue attempted." }
+            }
+        }
+        catch {}
+    }.GetNewClosure())
+
     $lbl = New-Object System.Windows.Forms.Label
     $lbl.Text = "Multi View: $groupName"
-    $lbl.Left = 85
+    $lbl.Left = 215
     $lbl.Top = 8
     $lbl.Width = 500
     $lbl.Height = 22
 
-    $bar.Controls.AddRange(@($btnClose,$lbl))
+    $bar.Controls.AddRange(@($btnClose,$chkAutoContinueMulti,$lbl))
 
     $table = New-Object System.Windows.Forms.TableLayoutPanel
     $table.Dock = "Fill"
@@ -1696,6 +3474,22 @@ function Open-MultiViewForSelectedGroup {
             $kvm = New-iDRACKvmUrlDellMethod -Server $srv
             Initialize-iDRACWebViewControl -Web $web -Url $kvm.Url
 
+            try {
+                $web.CoreWebView2.add_NavigationCompleted({
+                    try {
+                        if ($chkAutoContinueMulti -and $chkAutoContinueMulti.Checked) {
+                            Invoke-WebView2AdvancedContinue -Web $web
+                        }
+                    }
+                    catch {}
+                }.GetNewClosure())
+            }
+            catch {}
+
+            if ($chkAutoContinueMulti -and $chkAutoContinueMulti.Checked) {
+                Invoke-WebView2AdvancedContinue -Web $web
+            }
+
             [void]$sessionEntries.Add([pscustomobject]@{
                 Server = $srv
                 WebView = $web
@@ -1718,6 +3512,7 @@ function Open-MultiViewForSelectedGroup {
 function Resize-SideMenuToContent {
     try {
         if (-not $script:Tree -or -not $script:MainForm) { return }
+        if ($script:MainSplit -and $script:MainSplit.Panel1Collapsed) { return }
 
         $font = $script:Tree.Font
         $maxWidth = 220
@@ -1751,6 +3546,108 @@ function Resize-SideMenuToContent {
 }
 
 
+
+
+function New-iDRACRoundedRectanglePath {
+    param(
+        [Parameter(Mandatory=$true)][System.Drawing.Rectangle]$Rectangle,
+        [int]$Radius = 8
+    )
+
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $diameter = [Math]::Max(2, ($Radius * 2))
+
+    $arc = New-Object System.Drawing.Rectangle($Rectangle.X, $Rectangle.Y, $diameter, $diameter)
+    $path.AddArc($arc, 180, 90)
+
+    $arc.X = $Rectangle.Right - $diameter
+    $path.AddArc($arc, 270, 90)
+
+    $arc.Y = $Rectangle.Bottom - $diameter
+    $path.AddArc($arc, 0, 90)
+
+    $arc.X = $Rectangle.X
+    $path.AddArc($arc, 90, 90)
+
+    $path.CloseFigure()
+    return $path
+}
+
+function Update-ConnectionsToggleTab {
+    try {
+        if (-not $script:ConnectionsToggleRail -or -not $script:MainSplit) { return }
+
+        $parent = $script:ConnectionsToggleRail.Parent
+        if (-not $parent) { return }
+
+        $h = [int]$script:ConnectionsToggleRail.Height
+        if ($h -lt 1) { $h = 68 }
+
+        $panelH = [int]$parent.ClientSize.Height
+        $script:ConnectionsToggleRail.Left = 0
+        $script:ConnectionsToggleRail.Top = [Math]::Max(65, [int](($panelH - $h) / 2))
+
+        if ($script:ConnectionsToggleButton) {
+            if ($script:MainSplit.Panel1Collapsed) {
+                $script:ConnectionsToggleButton.Text = '›'
+                $script:ConnectionsToggleButton.Tag = 'Open'
+                try { $script:ConnectionsToggleRail.AccessibleName = 'Open Connections menu' } catch {}
+            }
+            else {
+                $script:ConnectionsToggleButton.Text = '‹'
+                $script:ConnectionsToggleButton.Tag = 'Close'
+                try { $script:ConnectionsToggleRail.AccessibleName = 'Collapse Connections menu' } catch {}
+            }
+        }
+
+        try { $script:ConnectionsToggleRail.Invalidate() } catch {}
+        $script:ConnectionsToggleRail.BringToFront()
+    }
+    catch {}
+}
+
+function Toggle-ConnectionsMenu {
+    try {
+        if (-not $script:MainSplit) { return }
+
+        $script:MainSplit.SuspendLayout()
+
+        if ($script:MainSplit.Panel1Collapsed) {
+            $savedWidth = 260
+            try { $savedWidth = [int](Get-iDRACCManSetting -Name 'ConnectionsWidth' -Default 260) } catch {}
+            if ($savedWidth -lt 220) { $savedWidth = 260 }
+            if ($savedWidth -gt 650) { $savedWidth = 650 }
+
+            $script:MainSplit.Panel1Collapsed = $false
+            $script:MainSplit.SplitterDistance = $savedWidth
+            Set-iDRACCManSetting -Name 'ConnectionsCollapsed' -Value $false
+            if ($script:Status) { $script:Status.Text = 'Connections menu opened' }
+        }
+        else {
+            try {
+                $width = [int]$script:MainSplit.SplitterDistance
+                if ($width -ge 160) { Set-iDRACCManSetting -Name 'ConnectionsWidth' -Value $width }
+            } catch {}
+
+            $script:MainSplit.Panel1Collapsed = $true
+            Set-iDRACCManSetting -Name 'ConnectionsCollapsed' -Value $true
+            if ($script:Status) { $script:Status.Text = 'Connections menu collapsed' }
+        }
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Unable to toggle Connections menu.`r`n`r`n$($_.Exception.Message)",
+            'Connections',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+    }
+    finally {
+        try { $script:MainSplit.ResumeLayout($true) } catch {}
+        Update-ConnectionsToggleTab
+    }
+}
+
 function Show-ServerContextMenu {
     param(
         [Parameter(Mandatory=$true)]$Node,
@@ -1779,12 +3676,16 @@ function Show-ServerContextMenu {
         $miConnectAll = New-Object System.Windows.Forms.ToolStripMenuItem("Connect to All")
         $miConnectAll.Add_Click({ Connect-AllInSelectedGroup })
 
+        $miRefreshGroupHealth = New-Object System.Windows.Forms.ToolStripMenuItem("Refresh Group Health")
+        $miRefreshGroupHealth.Add_Click({ Refresh-SelectedGroupHealth })
+
         $miDeleteGroup = New-Object System.Windows.Forms.ToolStripMenuItem("Delete Group")
         $miDeleteGroup.Add_Click({ Delete-SelectedGroup })
 
         [void]$cm.Items.Add($miEditGroupCreds)
         [void]$cm.Items.Add($miMultiView)
         [void]$cm.Items.Add($miConnectAll)
+        [void]$cm.Items.Add($miRefreshGroupHealth)
         [void]$cm.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
         [void]$cm.Items.Add($miDeleteGroup)
     }
@@ -1801,8 +3702,12 @@ function Show-ServerContextMenu {
             if ($s) { Show-ServerDialog -Server $s }
         })
 
+        $miRefreshHealth = New-Object System.Windows.Forms.ToolStripMenuItem("Refresh Health")
+        $miRefreshHealth.Add_Click({ Refresh-SelectediDRACHealth })
+
         [void]$cm.Items.Add($miOpenConsole)
         [void]$cm.Items.Add($miOpenGui)
+        [void]$cm.Items.Add($miRefreshHealth)
         [void]$cm.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
         [void]$cm.Items.Add($miEditCredentials)
     }
@@ -1913,7 +3818,8 @@ function Build-Gui {
         $surface.Controls.Add((New-UiButton -Text "Add iDRAC" -Left 10 -Top 58 -Width 100 -Click { Show-ServerDialog }))
         $surface.Controls.Add((New-UiButton -Text "Open Console" -Left 120 -Top 58 -Width 120 -Click { Open-KvmEmbedded }))
         $surface.Controls.Add((New-UiButton -Text "Open GUI" -Left 250 -Top 58 -Width 100 -Click { Open-WebEmbedded }))
-        $surface.Controls.Add((New-UiButton -Text "Refresh" -Left 360 -Top 58 -Width 90 -Click { Refresh-Tree; $script:Status.Text = "Tree refreshed" }))
+        $surface.Controls.Add((New-UiButton -Text "Refresh" -Left 360 -Top 58 -Width 90 -Click { Refresh-Tree; Update-DashboardServerList; $script:Status.Text = "Tree refreshed" }))
+        $surface.Controls.Add((New-UiButton -Text "Refresh Health" -Left 460 -Top 58 -Width 125 -Click { Refresh-AlliDRACHealth }))
 
         $total = @($script:Servers).Count
         $groups = @($script:Servers | Group-Object Group).Count
@@ -1945,18 +3851,32 @@ function Build-Gui {
         $list.HideSelection = $false
         $list.BackColor = [System.Drawing.Color]::White
         $list.ForeColor = $colorText
-        [void]$list.Columns.Add("Host Name", 210)
-        [void]$list.Columns.Add("IP / Address", 160)
-        [void]$list.Columns.Add("Group", 150)
-        [void]$list.Columns.Add("Credential", 130)
-        [void]$list.Columns.Add("Notes", 210)
+        [void]$list.Columns.Add("Host Name", 170)
+        [void]$list.Columns.Add("IP / Address", 135)
+        [void]$list.Columns.Add("Service Tag", 105)
+        [void]$list.Columns.Add("Model", 170)
+        [void]$list.Columns.Add("OS Hostname", 150)
+        [void]$list.Columns.Add("Health", 80)
+        [void]$list.Columns.Add("Group", 105)
+        [void]$list.Columns.Add("Credential", 95)
         foreach ($srv in @($script:Servers | Sort-Object Group,Name)) {
             $credText = if (-not [string]::IsNullOrWhiteSpace($srv.Username)) { "Server" } elseif (Get-GroupCredentialRecord -GroupName $srv.Group) { "Group" } else { "Prompt" }
             $item = New-Object System.Windows.Forms.ListViewItem($srv.Name)
             [void]$item.SubItems.Add($srv.Address)
+            [void]$item.SubItems.Add($srv.ServiceTag)
+            [void]$item.SubItems.Add($srv.Model)
+            [void]$item.SubItems.Add($srv.OSHostname)
+            [void]$item.SubItems.Add($srv.Health)
             [void]$item.SubItems.Add($srv.Group)
             [void]$item.SubItems.Add($credText)
-            [void]$item.SubItems.Add($srv.Notes)
+            try {
+                switch -Regex ($srv.Health) {
+                    "Critical" { $item.ForeColor = $colorCritical; break }
+                    "Warning"  { $item.ForeColor = $colorWarn; break }
+                    "OK"       { $item.ForeColor = $colorHealthy; break }
+                }
+            }
+            catch {}
             [void]$list.Items.Add($item)
         }
         $list.Add_DoubleClick({ Open-KvmEmbedded })
@@ -2035,7 +3955,7 @@ function Build-Gui {
     $miGroupCreds = New-Object System.Windows.Forms.ToolStripMenuItem("Edit Credentials")
     $miGroupCreds.Add_Click({ Show-GroupCredentialDialog })
     $miRefresh = New-Object System.Windows.Forms.ToolStripMenuItem("Refresh Tree")
-    $miRefresh.Add_Click({ Refresh-Tree })
+    $miRefresh.Add_Click({ Refresh-Tree; Update-DashboardServerList })
 
     $miOpenKvm = New-Object System.Windows.Forms.ToolStripMenuItem("Open Console")
     $miOpenKvm.Add_Click({ Open-KvmEmbedded })
@@ -2043,6 +3963,10 @@ function Build-Gui {
     $miMultiView.Add_Click({ Open-MultiViewForSelectedGroup })
     $miOpenWeb = New-Object System.Windows.Forms.ToolStripMenuItem("Open GUI")
     $miOpenWeb.Add_Click({ Open-WebEmbedded })
+    $miRefreshSelectedHealth = New-Object System.Windows.Forms.ToolStripMenuItem("Refresh Selected Health")
+    $miRefreshSelectedHealth.Add_Click({ Refresh-SelectediDRACHealth })
+    $miRefreshAllHealth = New-Object System.Windows.Forms.ToolStripMenuItem("Refresh All Health")
+    $miRefreshAllHealth.Add_Click({ Refresh-AlliDRACHealth })
 
     $miCloseTab = New-Object System.Windows.Forms.ToolStripMenuItem("Close Current")
     $miCloseTab.Add_Click({ Close-CurrentTab })
@@ -2076,6 +4000,9 @@ function Build-Gui {
     [void]$mActions.DropDownItems.Add($miOpenKvm)
     [void]$mActions.DropDownItems.Add($miMultiView)
     [void]$mActions.DropDownItems.Add($miOpenWeb)
+    [void]$mActions.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+    [void]$mActions.DropDownItems.Add($miRefreshSelectedHealth)
+    [void]$mActions.DropDownItems.Add($miRefreshAllHealth)
     [void]$mTools.DropDownItems.Add($miCloseTab)
     [void]$mTools.DropDownItems.Add($miDiagnostics)
     [void]$mHelp.DropDownItems.Add($miOpenDataFolder)
@@ -2107,11 +4034,24 @@ function Build-Gui {
     $split = New-Object System.Windows.Forms.SplitContainer
     $script:MainSplit = $split
     $split.Dock = "Fill"
-    $split.SplitterDistance = 260
+
+    $savedConnectionsWidth = [int](Get-iDRACCManSetting -Name "ConnectionsWidth" -Default 260)
+    if ($savedConnectionsWidth -lt 220) { $savedConnectionsWidth = 260 }
+    if ($savedConnectionsWidth -gt 650) { $savedConnectionsWidth = 650 }
+
+    $split.SplitterDistance = $savedConnectionsWidth
     $split.FixedPanel = "Panel1"
     $split.BackColor = $colorBorder
     $split.Panel1.BackColor = $colorSide
     $split.Panel2.BackColor = [System.Drawing.Color]::FromArgb(245,247,250)
+    $split.Add_SplitterMoved({
+        try {
+            if (-not $script:MainSplit.Panel1Collapsed) {
+                Set-iDRACCManSetting -Name "ConnectionsWidth" -Value ([int]$script:MainSplit.SplitterDistance)
+            }
+        }
+        catch {}
+    })
 
     $navHeader = New-Object System.Windows.Forms.Panel
     $navHeader.Dock = "Top"
@@ -2166,7 +4106,114 @@ function Build-Gui {
 
     $split.Panel1.Controls.Add($script:Tree)
     $split.Panel1.Controls.Add($navHeader)
+
+    # Small modern centered side-tab used to collapse/open the Connections menu.
+    # This only changes the toggle handle styling; the rest of the UI is left unchanged.
+    $script:ConnectionsToggleHover = $false
+
+    $connectionsToggleRail = New-Object System.Windows.Forms.Panel
+    $script:ConnectionsToggleRail = $connectionsToggleRail
+    $connectionsToggleRail.Width = 20
+    $connectionsToggleRail.Height = 68
+    $connectionsToggleRail.Left = 0
+    $connectionsToggleRail.Top = 220
+    $connectionsToggleRail.BackColor = $split.Panel2.BackColor
+    $connectionsToggleRail.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $connectionsToggleRail.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+    $connectionsToggleRail.TabStop = $false
+    try { $connectionsToggleRail.AccessibleName = 'Collapse Connections menu' } catch {}
+
+    $connectionsToggle = New-Object System.Windows.Forms.Label
+    $script:ConnectionsToggleButton = $connectionsToggle
+    $connectionsToggle.Dock = 'Fill'
+    $connectionsToggle.BackColor = [System.Drawing.Color]::Transparent
+    $connectionsToggle.ForeColor = $colorBlue
+    $connectionsToggle.Font = New-Object System.Drawing.Font('Segoe UI Symbol', 13, [System.Drawing.FontStyle]::Bold)
+    $connectionsToggle.TextAlign = 'MiddleCenter'
+    $connectionsToggle.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $connectionsToggle.Text = '‹'
+    $connectionsToggle.TabStop = $false
+
+    $connectionsToggleRail.Add_Paint({
+        param($sender, $e)
+        try {
+            $g = $e.Graphics
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+
+            $isHover = $false
+            try { $isHover = [bool]$script:ConnectionsToggleHover } catch {}
+
+            $shadowRect = New-Object System.Drawing.Rectangle(2, 2, ($sender.Width - 3), ($sender.Height - 3))
+            $mainRect   = New-Object System.Drawing.Rectangle(0, 0, ($sender.Width - 3), ($sender.Height - 3))
+
+            $shadowPath = New-iDRACRoundedRectanglePath -Rectangle $shadowRect -Radius 9
+            $mainPath   = New-iDRACRoundedRectanglePath -Rectangle $mainRect -Radius 9
+
+            $shadowBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(35, 0, 0, 0))
+            $g.FillPath($shadowBrush, $shadowPath)
+            $shadowBrush.Dispose()
+            $shadowPath.Dispose()
+
+            if ($isHover) {
+                $fillColor = [System.Drawing.Color]::FromArgb(0,120,215)
+                $borderColor = [System.Drawing.Color]::FromArgb(0,90,170)
+            }
+            else {
+                $fillColor = [System.Drawing.Color]::FromArgb(255,255,255)
+                $borderColor = [System.Drawing.Color]::FromArgb(210,216,224)
+            }
+
+            $fillBrush = New-Object System.Drawing.SolidBrush($fillColor)
+            $borderPen = New-Object System.Drawing.Pen($borderColor, 1)
+
+            $g.FillPath($fillBrush, $mainPath)
+            $g.DrawPath($borderPen, $mainPath)
+
+            $fillBrush.Dispose()
+            $borderPen.Dispose()
+            $mainPath.Dispose()
+        }
+        catch {}
+    }.GetNewClosure())
+
+    $setToggleHoverOn = {
+        try {
+            $script:ConnectionsToggleHover = $true
+            $connectionsToggle.ForeColor = [System.Drawing.Color]::White
+            $connectionsToggleRail.Invalidate()
+        }
+        catch {}
+    }.GetNewClosure()
+
+    $setToggleHoverOff = {
+        try {
+            $script:ConnectionsToggleHover = $false
+            $connectionsToggle.ForeColor = $colorBlue
+            $connectionsToggleRail.Invalidate()
+        }
+        catch {}
+    }.GetNewClosure()
+
+    $connectionsToggleRail.Add_MouseEnter($setToggleHoverOn)
+    $connectionsToggleRail.Add_MouseLeave($setToggleHoverOff)
+    $connectionsToggle.Add_MouseEnter($setToggleHoverOn)
+    $connectionsToggle.Add_MouseLeave($setToggleHoverOff)
+
+    $connectionsToggle.Add_Click({ Toggle-ConnectionsMenu })
+    $connectionsToggleRail.Add_Click({ Toggle-ConnectionsMenu })
+    $connectionsToggleRail.Controls.Add($connectionsToggle)
+
     $split.Panel2.Controls.Add($script:Tabs)
+    $split.Panel2.Controls.Add($connectionsToggleRail)
+    $connectionsToggleRail.BringToFront()
+    $split.Panel2.Add_Resize({ Update-ConnectionsToggleTab })
+
+    $startCollapsed = $false
+    try { $startCollapsed = [bool](Get-iDRACCManSetting -Name 'ConnectionsCollapsed' -Default $false) } catch {}
+    if ($startCollapsed) {
+        $split.Panel1Collapsed = $true
+    }
+    Update-ConnectionsToggleTab
 
     $script:Status = New-Object System.Windows.Forms.StatusBar
     $script:Status.Text = "Ready"
