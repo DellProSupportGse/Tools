@@ -1140,7 +1140,7 @@ param(
                 $failedTests | ft -AutoSize
                 Write-ToHost "Some Aks Arc tests failed" -Level 3 -Checkmark 3
                 return $failedTests
-            } elseif ($testErr -eq $null -or $testErr.count -eq 0 -or $arctest -match "All tests passed") {
+            } elseif ($testErr -eq $null -or $testErr.count -eq 0 -or $arctest -match "All tests passed successfully") {
                 Write-ToHost "All Aks Arc Issues tests passed"
                 return $failedTests
             } else {
