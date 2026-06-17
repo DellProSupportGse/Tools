@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.592"
+    $ver="0.597"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -19,10 +19,12 @@ param(
     # Check if script is running on a cluster node
     If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This script MUST be run locally on a cluster node.";Break}
     #Get-ClusterStorageSpacesDirect
-    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue) -and !($IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
+    $WarningPreference='SilentlyContinue'
+    if (!(gcm Get-SolutionUpdate -ErrorAction SilentlyContinue -Verbose:$false) -and !($IgnoreAzureLocalRequired)) {Write-Host -ForegroundColor DarkYellow "This script must be run locally on a Dell Azure local node";break}
     $isNotS2d=try {((Get-ClusterStorageSpacesDirect).State -ne 'Enabled')} catch {$true}
     if ($isNotS2d) {
         Write-Host "Script must be run locally on an S2D cluster node" -ForegroundColor DarkYellow
+        $WarningPreference='Continue'
         break
     }
     if ($IgnoreAzureLocalRequired) {
@@ -30,6 +32,7 @@ param(
         $FixErrors=$false
         $FixWarningsAlso=$false
     }
+    $WarningPreference='Continue'
     $testReport=@()
     Function Write-ToHost {
     param(
@@ -46,12 +49,12 @@ param(
     Function Test-SolutionUpdateCommand {
         $dtime=0
         Write-Host "Checking Solution Update command..."
-        $SUJob=Start-Job -Name "SUJob" -ScriptBlock {Get-Solutionupdate -Verbose:$false}
+        $SUJob=Invoke-Command -computername (hostname) -AsJob -JobName "SUJob" -ScriptBlock {Get-Solutionupdate -Verbose:$false}
         $testSU=$null
-        While ($dtime -lt 12 -and $SUJob.State -eq "Running") {Write-Host "." -NoNewline;$dtime++;$testSU+=Receive-Job -Name "SUJob";sleep 5}
+        While ($dtime -lt 12 -and $SUJob.State -eq "Running") {Write-Host "." -NoNewline;$dtime++;sleep 5} #$testSU+=Receive-Job -Name "SUJob" -Verbose:$false;
     	Write-Host "."
-	    $testSU+=Receive-Job -Name "SUJob"
-        If ($dtime -lt 12 -and ($testSU.resourceid -gt "" -or ($testSU -le "" -and $SUJob.State -eq "Completed"))) {
+	    #$testSU+=Receive-Job -Name "SUJob" -Verbose:$false
+        If ($dtime -lt 12 -and $SUJob.State -eq "Completed") {
             Write-ToHost "Get Solution Update command successful" -Checkmark 1 -Level 1
             return $false
         } else {
@@ -1095,10 +1098,11 @@ param(
     }
     Function Test-ControlPlaneVMNetwork {
         Write-Host "Testing Control Plane VM network..."
+        $WarningPreference='SilentlyContinue'
         $arcHciConfig = Get-ArcHciConfig
         $controlPlaneIp = $arcHciConfig.controlPlaneIp
         #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
-        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $tcpClient = New-Object System.Net.Sockets.TcpClient -Verbose:$false -WarningAction Ignore
         $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500) | Out-Null
         $pingablecount=0
         #Foreach ($IP in $CPIPs.IPAddressToString) {
@@ -1110,11 +1114,12 @@ param(
         } else {
             Write-ToHost "Control Plane VM network checks out"
         }
+        $WarningPreference='Continue'
         return $result
     }
     Function Test-AksArcIssues {
         $failedAksArcIssues=@()
-        Write-Host "Testing Arks Arc Known Issues..."
+        Write-Host "Testing Aks Arc Known Issues..."
         $iPolicy=(Get-PSRepository "PSGallery").InstallationPolicy
         Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy Trusted
         if (!(gcm *SupportAksArcKnownIssues)) {
@@ -1125,20 +1130,21 @@ param(
         Import-Module -Name Support.AksArc -Force -Verbose:$false
         if (gcm *SupportAksArcKnownIssues) {
             $testErr=$null
-            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr -Verbose:$false
+            $arctest=$null
+            $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr -WarningAction SilentlyContinue -InformationVariable arctest 4> $null
             try {$testErr=$testErr | ? {$_.Trim() -ne "System error."}} catch {}
-            Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy -Verbose:$false
+            Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy -Verbose:$false -WarningAction SilentlyContinue
             $failedTests=$Tests | ? Status -eq "Failed"
             $failedTests | ft -AutoSize
             if ($failedTests) {
                 $failedTests | ft -AutoSize
                 Write-ToHost "Some Aks Arc tests failed" -Level 3 -Checkmark 3
                 return $failedTests
-            } elseif ($testErr -eq $null -or $testErr.count -eq 0) {
+            } elseif ($testErr -eq $null -or $testErr.count -eq 0 -or $arctest -match "All tests passed successfully") {
                 Write-ToHost "All Aks Arc Issues tests passed"
                 return $failedTests
             } else {
-                Write-ToHost "Some tests failed" -Level 3 -Checkmark 3
+                Write-ToHost "Aks Arc test failed hard" -Level 3 -Checkmark 3
                 return "Aks Arc test failed hard"
             }
         } else {
@@ -1324,7 +1330,9 @@ v$ver
     If (($FixErrors -or $FixWarningsAlso) -and $ApproveAllFixesAutomatically) {Write-Warning "ApproveAllFixesAutomatically selected. All fixes will be applied!";sleep 10}
     $nodes=(Get-ClusterNode).Name
     Write-Host "Checking for running action plans"
+    $WarningPreference='SilentlyContinue'
     $MasUpdateNotRunning=(!((Get-ActionPlanInstances -Verbose:$false| ? Status -eq Running | ? ActionPlanName -like "MAS Update*").count))
+    $WarningPreference='Continue'
     If (!($MasUpdateNotRunning) -and ($FixErrors -or $FixWarningsAlso)) {
         Write-Warning "Solution Update is running. Some fixes will be disabled"
     }
