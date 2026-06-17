@@ -154,7 +154,7 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
    How To Use: 
       From PowerShell as admin execute the following and follow the prompts:
 ```Powershell
-Echo iDCMan;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;$wc=New-Object Net.WebClient;$wc.Encoding=[System.Text.Encoding]::UTF8;Invoke-Expression('$module="iDCMan";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/iDRAC-ConnectionManager.ps1'))
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;$wc=New-Object Net.WebClient;$wc.Encoding=[System.Text.Encoding]::UTF8;Invoke-Expression('$module="iDRACCMan";$repo="PowershellScripts"'+$wc.DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/iDRAC-ConnectionManager.ps1'))
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ## KeyRelay
