@@ -144,6 +144,19 @@ Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.Security
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetHyperVBottlenecks";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/GetHyperVBottlenecks.ps1'));Invoke-GetHyperVBottlenecks
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
+## iDRAC Connection Manager
+   
+   iDRACCMan provides simplified iDRAC access using PowerShell Windows Forms interface for managing Dell iDRAC
+    GUI and console sessions from a grouped server tree.
+   
+   ![alt text](readme/iDCMan.jpg)
+   
+   How To Use: 
+      From PowerShell as admin execute the following and follow the prompts:
+```Powershell
+Echo iDCMan;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;$wc=New-Object Net.WebClient;$wc.Encoding=[System.Text.Encoding]::UTF8;Invoke-Expression('$module="iDCMan";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/iDRAC-ConnectionManager.ps1'))
+```
+-------------------------------------------------------------------------------------------------------------------------------------------------
 ## KeyRelay
    
    This is a GUI tool to send text to applications that do not allow pasting.
