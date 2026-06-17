@@ -34,7 +34,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.8"
+$script:AppVersion   = "1.0.9"
 $script:DocumentsRoot = [Environment]::GetFolderPath("MyDocuments")
 $script:AppRoot      = Join-Path $script:DocumentsRoot "iDRACCMan"
 $script:LibRoot      = Join-Path $script:AppRoot "lib"
@@ -749,9 +749,9 @@ function Load-Servers {
     if (-not $script:Servers -or $script:Servers.Count -eq 0) {
         $script:Servers = @(
             [pscustomobject]@{
-                Name = "AzLNode1"
-                Address = "100.72.44.14"
-                Group = "17G"
+                Name = "Node1"
+                Address = "192.168.10.1"
+                Group = "iDRAC"
                 Username = "root"
                 Password = ""
                 Notes = ""
@@ -1983,7 +1983,7 @@ function Build-Gui {
     $top.Controls.Add($logo)
 
     $appTitle = New-Object System.Windows.Forms.Label
-    $appTitle.Text = "iDRAC Connection Manager | Enterprise"
+    $appTitle.Text = "iDRAC Connection Manager"
     $appTitle.Left = 50; $appTitle.Top = 13; $appTitle.Width = 520; $appTitle.Height = 26
     $appTitle.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
     $appTitle.ForeColor = [System.Drawing.Color]::White
