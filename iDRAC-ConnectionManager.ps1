@@ -34,7 +34,8 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.53"
+$script:AppVersion   = "1.0.54"
+$script:HelpUrl      = "https://github.com/DellProSupportGse/Tools/blob/main/iDRACCMan/help.md"
 $script:DocumentsRoot = [Environment]::GetFolderPath("MyDocuments")
 $script:AppRoot      = Join-Path $script:DocumentsRoot "iDRACCMan"
 $script:LibRoot      = Join-Path $script:AppRoot "lib"
@@ -195,6 +196,7 @@ function Set-iDRACCManSetting {
 $script:TelemetryReportID = [guid]::NewGuid().Guid
 $script:TelemetryGeoResolved = $false
 $script:TelemetryGeoData = @{}
+$script:TelemetrySent = @{}
 $script:uploadToAzure = $true
 
 function Write-Indent {
@@ -266,17 +268,17 @@ function Add-TableData {
         try {
             Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
             $success = $true
-            Write-Indent "Telemetry recorded successfully" 1 Green
+            # Telemetry success is intentionally quiet.
         }
         catch {
             $attempt++
 
             if ($attempt -lt $maxRetries) {
-                Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
+                # Retry quietly; telemetry should not distract from the tool UI.
                 Start-Sleep -Seconds 2
             }
             else {
-                Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
+                # Final telemetry failure is logged only.
                 try {
                     Write-iDRACCManLog ("Telemetry upload failed: {0}" -f $_.Exception.Message) "WARN"
                 }
@@ -290,7 +292,7 @@ function Resolve-iDRACCManTelemetryGeo {
     try {
         if ($script:TelemetryGeoResolved) { return }
 
-        Write-Indent "Resolving Geo Location..."
+        # Resolve geo once per session; keep console output quiet.
 
         if (-not $global:GeoCache) {
             $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
@@ -309,12 +311,11 @@ function Resolve-iDRACCManTelemetryGeo {
                 timezone    = [string]$response.timezone.id
             }
 
-            Write-Indent "Country: $($script:TelemetryGeoData.country)" 2
-            Write-Indent "Region : $($script:TelemetryGeoData.region)" 2
+            # Geo resolved.
         }
     }
     catch {
-        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+        # Geo lookup failed; telemetry continues without geo fields.
         $script:TelemetryGeoData = @{}
     }
     finally {
@@ -325,13 +326,23 @@ function Resolve-iDRACCManTelemetryGeo {
 function Send-iDRACCManTelemetry {
     param(
         [Parameter(Mandatory=$true)][string]$EventName,
-        [hashtable]$Properties = @{}
+        [hashtable]$Properties = @{},
+        [switch]$AllowDuplicate
     )
 
     try {
         if (-not [bool](Get-iDRACCManSetting -Name "TelemetryEnabled" -Default $true)) { return }
 
-        Write-Host "Logging Telemetry Information..."
+        if (-not $script:TelemetrySent) { $script:TelemetrySent = @{} }
+
+        # Prevent noisy duplicate uploads from repeated UI events/timers in the same app session.
+        # Use -AllowDuplicate only for events where every occurrence matters.
+        if (-not $AllowDuplicate) {
+            if ($script:TelemetrySent.ContainsKey($EventName)) { return }
+            $script:TelemetrySent[$EventName] = $true
+        }
+
+        Write-iDRACCManLog ("Telemetry event: {0}" -f $EventName) "INFO"
 
         Resolve-iDRACCManTelemetryGeo
 
@@ -1385,7 +1396,6 @@ function Refresh-iDRACHealthBatch {
 
     if ($script:Status) {
         $script:Status.Text = "Health refresh complete. Success: $okCount  Failed: $failCount  Time: $(Get-Date -Format 'h:mm:ss tt')"
-        Send-iDRACCManTelemetry -EventName "RefreshHealth" -Properties @{ Title = $Title; Success = $okCount; Failed = $failCount; Count = $servers.Count }
     }
 
     if ($failCount -gt 0) {
@@ -1678,6 +1688,38 @@ function Update-DashboardServerList {
     catch {}
 }
 
+
+function Split-iDRACAddressInput {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) { return @() }
+
+    return @(
+        $Text -split '[,;`\r`\n]+' |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique
+    )
+}
+
+function Test-iDRACAddressFast {
+    param(
+        [Parameter(Mandatory=$true)][string]$Address,
+        [int]$TimeoutMs = 1200
+    )
+
+    try {
+        $hostName = Get-iDRACHost $Address
+        $p = New-Object System.Net.NetworkInformation.Ping
+        $reply = $p.Send($hostName, $TimeoutMs)
+        return ($reply -and $reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success)
+    }
+    catch {
+        return $false
+    }
+}
+
+
 function Show-ServerDialog {
     param($Server)
 
@@ -1705,14 +1747,14 @@ function Show-ServerDialog {
         $discoveredInventory = $null
 
         $lblInfo = New-Object System.Windows.Forms.Label
-        $lblInfo.Text = "Enter the iDRAC connection info, then click Connect. After discovery completes, choose an existing group or type a new group, then click Add."
+        $lblInfo.Text = "Enter one iDRAC IP/hostname or multiple comma-separated iDRACs, then click Connect. Ping is checked first so offline iDRACs fail fast. After discovery completes, choose an existing group or type a new group, then click Add."
         $lblInfo.Left = 12
         $lblInfo.Top = 12
         $lblInfo.Width = 665
         $lblInfo.Height = 42
         $f.Controls.Add($lblInfo)
 
-        $labels = @("IP / Hostname","Username","Password")
+        $labels = @("IP / Hostname(s)","Username","Password")
         $boxes = @{}
 
         for ($i=0; $i -lt $labels.Count; $i++) {
@@ -1802,10 +1844,11 @@ function Show-ServerDialog {
         $cmbGroup.Add_SelectedIndexChanged({ & $enableAdd }.GetNewClosure())
 
         $connect.Add_Click({
-            if ([string]::IsNullOrWhiteSpace($boxes["IP / Hostname"].Text) -or
+            $addresses = @(Split-iDRACAddressInput -Text $boxes["IP / Hostname(s)"].Text)
+            if ($addresses.Count -eq 0 -or
                 [string]::IsNullOrWhiteSpace($boxes["Username"].Text) -or
                 [string]::IsNullOrWhiteSpace($boxes["Password"].Text)) {
-                [System.Windows.Forms.MessageBox]::Show("IP/Hostname, Username, and Password are required.","Add iDRAC") | Out-Null
+                [System.Windows.Forms.MessageBox]::Show("At least one IP/Hostname, Username, and Password are required.","Add iDRAC") | Out-Null
                 return
             }
 
@@ -1816,23 +1859,83 @@ function Show-ServerDialog {
                 $f.AcceptButton = $connect
                 & $enableAdd
                 $connect.Enabled = $false
-                $status.Text = "Connecting and reading Redfish inventory..."
-                $resultBox.Text = "Connecting..."
+                $add.Enabled = $false
+
+                $found = New-Object System.Collections.ArrayList
+                $log = New-Object System.Text.StringBuilder
+                [void]$log.AppendLine("Discovery started: $(Get-Date)")
+                [void]$log.AppendLine("Targets: $($addresses -join ', ')")
+                [void]$log.AppendLine("")
+
+                $status.Text = "Checking ping before Redfish discovery..."
+                $resultBox.Text = "Checking ping..."
                 if ($script:Status) { $script:Status.Text = $status.Text }
                 [System.Windows.Forms.Application]::DoEvents()
 
-                $inv = Get-iDRACInventory `
-                    -Address $boxes["IP / Hostname"].Text.Trim() `
-                    -Username $boxes["Username"].Text.Trim() `
-                    -Password $boxes["Password"].Text
+                foreach ($addr in $addresses) {
+                    try {
+                        $status.Text = "Pinging $addr..."
+                        $resultBox.Text = $log.ToString() + "Pinging $addr..."
+                        if ($script:Status) { $script:Status.Text = $status.Text }
+                        [System.Windows.Forms.Application]::DoEvents()
 
-                $script:PendingDiscoveredInventory = $inv
-                $discoveredInventory = $inv
-                $add.Tag = $inv
-                $f.Tag = $inv
-                $resultBox.Text = "Connected successfully.`r`n`r`nName: $($inv.Name)`r`nService Tag: $($inv.ServiceTag)`r`nModel: $($inv.Model)`r`nOS Hostname: $($inv.OSHostname)`r`nHealth: $($inv.Health)`r`nPower: $($inv.PowerState)"
-                $status.Text = "Discovery complete. Choose or type a group, then click Add."
-                if ($script:Status) { $script:Status.Text = "Discovery complete for $($inv.Name)" }
+                        if (-not (Test-iDRACAddressFast -Address $addr)) {
+                            [void]$log.AppendLine("FAILED PING: $addr")
+                            continue
+                        }
+
+                        [void]$log.AppendLine("PING OK: $addr")
+                        $status.Text = "Reading Redfish inventory from $addr..."
+                        $resultBox.Text = $log.ToString() + "Reading Redfish inventory from $addr..."
+                        if ($script:Status) { $script:Status.Text = $status.Text }
+                        [System.Windows.Forms.Application]::DoEvents()
+
+                        $inv = Get-iDRACInventory `
+                            -Address $addr `
+                            -Username $boxes["Username"].Text.Trim() `
+                            -Password $boxes["Password"].Text
+
+                        [void]$found.Add($inv)
+                        [void]$log.AppendLine("DISCOVERED: $($inv.Name) [$addr]")
+                        [void]$log.AppendLine("  Service Tag: $($inv.ServiceTag)")
+                        [void]$log.AppendLine("  Model      : $($inv.Model)")
+                        [void]$log.AppendLine("  OS Hostname: $($inv.OSHostname)")
+                        [void]$log.AppendLine("  Health     : $($inv.Health)")
+                        [void]$log.AppendLine("  Power      : $($inv.PowerState)")
+                        [void]$log.AppendLine("")
+                    }
+                    catch {
+                        [void]$log.AppendLine("FAILED REDFISH: $addr - $($_.Exception.Message)")
+                        [void]$log.AppendLine("")
+                    }
+                }
+
+                if ($found.Count -eq 0) {
+                    $script:PendingDiscoveredInventory = $null
+                    $discoveredInventory = $null
+                    $add.Tag = $null
+                    $f.Tag = $null
+                    $status.Text = "No iDRACs discovered."
+                    $resultBox.Text = $log.ToString()
+                    if ($script:Status) { $script:Status.Text = "Add iDRAC discovery found no reachable iDRACs" }
+
+                    [System.Windows.Forms.MessageBox]::Show(
+                        "No iDRACs were discovered.`r`n`r`nOffline systems failed fast at ping. Reachable systems failed Redfish discovery.",
+                        "Add iDRAC Failed",
+                        [System.Windows.Forms.MessageBoxButtons]::OK,
+                        [System.Windows.Forms.MessageBoxIcon]::Warning
+                    ) | Out-Null
+                    return
+                }
+
+                $script:PendingDiscoveredInventory = @($found)
+                $discoveredInventory = @($found)
+                $add.Tag = @($found)
+                $f.Tag = @($found)
+
+                $resultBox.Text = $log.ToString()
+                $status.Text = "Discovery complete. $($found.Count) iDRAC(s) ready. Choose or type a group, then click Add."
+                if ($script:Status) { $script:Status.Text = "Discovery complete for $($found.Count) iDRAC(s)" }
                 & $enableAdd
                 if (-not [string]::IsNullOrWhiteSpace(($cmbGroup.Text).Trim())) { $add.Enabled = $true }
                 $f.AcceptButton = $add
@@ -1859,14 +1962,14 @@ function Show-ServerDialog {
         }.GetNewClosure())
 
         $add.Add_Click({
-            # Use the inventory stored directly on this button. This avoids scope/closure issues
+            # Use the discovered inventory stored directly on this button. This avoids scope/closure issues
             # when the script is loaded through Invoke-Expression from GitHub.
-            $inv = $add.Tag
-            if ($null -eq $inv) { $inv = $f.Tag }
-            if ($null -eq $inv) { $inv = $script:PendingDiscoveredInventory }
+            $invItems = @($add.Tag)
+            if ($invItems.Count -eq 0 -or $null -eq $invItems[0]) { $invItems = @($f.Tag) }
+            if ($invItems.Count -eq 0 -or $null -eq $invItems[0]) { $invItems = @($script:PendingDiscoveredInventory) }
             $groupName = $cmbGroup.Text.Trim()
 
-            if ($null -eq $inv) {
+            if ($invItems.Count -eq 0 -or $null -eq $invItems[0]) {
                 [System.Windows.Forms.MessageBox]::Show("Click Connect first so the iDRAC can be discovered.","Add iDRAC") | Out-Null
                 return
             }
@@ -1876,24 +1979,39 @@ function Show-ServerDialog {
                 return
             }
 
-            $exists = @($script:Servers | Where-Object { $_.Address -eq $inv.Address -or ($_.ServiceTag -and $_.ServiceTag -eq $inv.ServiceTag -and $inv.ServiceTag -ne "Unknown") })
-            if ($exists.Count -gt 0) {
-                $answer = [System.Windows.Forms.MessageBox]::Show(
-                    "This iDRAC appears to already exist.`r`n`r`nAdd it anyway?",
-                    "Possible Duplicate",
-                    [System.Windows.Forms.MessageBoxButtons]::YesNo,
-                    [System.Windows.Forms.MessageBoxIcon]::Warning
-                )
-                if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+            $added = New-Object System.Collections.ArrayList
+            $skipped = New-Object System.Collections.ArrayList
+
+            foreach ($inv in $invItems) {
+                try {
+                    $exists = @($script:Servers | Where-Object { $_.Address -eq $inv.Address -or ($_.ServiceTag -and $_.ServiceTag -eq $inv.ServiceTag -and $inv.ServiceTag -ne "Unknown") })
+                    if ($exists.Count -gt 0) {
+                        $answer = [System.Windows.Forms.MessageBox]::Show(
+                            "This iDRAC appears to already exist:`r`n`r`n$($inv.Name) [$($inv.Address)]`r`n`r`nAdd it anyway?",
+                            "Possible Duplicate",
+                            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+                            [System.Windows.Forms.MessageBoxIcon]::Warning
+                        )
+                        if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) {
+                            [void]$skipped.Add($inv)
+                            continue
+                        }
+                    }
+
+                    $addedRecord = Add-iDRACServerRecord -Inventory $inv -GroupName $groupName
+                    [void]$added.Add($addedRecord)
+                    Send-iDRACCManTelemetry -EventName "AddiDRAC" -Properties @{ Group = $addedRecord.Group; Model = $addedRecord.Model; Health = $addedRecord.Health }
+                }
+                catch {
+                    [void]$skipped.Add($inv)
+                    try { Add-LogTab -Title "Add iDRAC Failed" -Text "Failed to add $($inv.Name) [$($inv.Address)]`r`n`r`n$($_.Exception.Message)" } catch {}
+                }
             }
 
-            $addedRecord = Add-iDRACServerRecord -Inventory $inv -GroupName $groupName
-
-            if ($script:Status) { $script:Status.Text = "Added $($addedRecord.Name) to group $($addedRecord.Group)" }
-            Send-iDRACCManTelemetry -EventName "AddiDRAC" -Properties @{ Group = $addedRecord.Group; Model = $addedRecord.Model; Health = $addedRecord.Health }
+            if ($script:Status) { $script:Status.Text = "Added $($added.Count) iDRAC(s) to group $groupName. Skipped: $($skipped.Count)" }
 
             [System.Windows.Forms.MessageBox]::Show(
-                "Added successfully.`r`n`r`nName: $($inv.Name)`r`nGroup: $groupName`r`nService Tag: $($inv.ServiceTag)`r`nModel: $($inv.Model)`r`nOS Hostname: $($inv.OSHostname)`r`nHealth: $($inv.Health)",
+                "Add complete.`r`n`r`nAdded: $($added.Count)`r`nSkipped: $($skipped.Count)`r`nGroup: $groupName",
                 "iDRAC Added",
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Information
@@ -3934,6 +4052,309 @@ function Show-ServerContextMenu {
     $cm.Show($script:Tree, $Location)
 }
 
+
+function Get-iDRACCManSearchText {
+    param([string]$Prompt = "Search iDRACs")
+
+    $f = New-Object System.Windows.Forms.Form
+    $f.Text = $Prompt
+    $f.Width = 430
+    $f.Height = 160
+    $f.StartPosition = "CenterParent"
+    $f.FormBorderStyle = "FixedDialog"
+    $f.Font = $script:AppFont
+    $f.MaximizeBox = $false
+    $f.MinimizeBox = $false
+
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = "Search name, IP/address, service tag, model, OS hostname, group, health, or notes:"
+    $lbl.Left = 12
+    $lbl.Top = 14
+    $lbl.Width = 390
+    $lbl.Height = 28
+    $f.Controls.Add($lbl)
+
+    $txt = New-Object System.Windows.Forms.TextBox
+    $txt.Left = 12
+    $txt.Top = 48
+    $txt.Width = 390
+    $f.Controls.Add($txt)
+
+    $ok = New-Object System.Windows.Forms.Button
+    $ok.Text = "Search"
+    $ok.Left = 240
+    $ok.Top = 82
+    $ok.Width = 75
+    $ok.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $f.Controls.Add($ok)
+
+    $cancel = New-Object System.Windows.Forms.Button
+    $cancel.Text = "Cancel"
+    $cancel.Left = 325
+    $cancel.Top = 82
+    $cancel.Width = 75
+    $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $f.Controls.Add($cancel)
+
+    $f.AcceptButton = $ok
+    $f.CancelButton = $cancel
+
+    if ($f.ShowDialog($script:MainForm) -eq [System.Windows.Forms.DialogResult]::OK) {
+        return $txt.Text.Trim()
+    }
+
+    return ""
+}
+
+function Test-iDRACServerMatchesSearch {
+    param(
+        [Parameter(Mandatory=$true)]$Server,
+        [Parameter(Mandatory=$true)][string]$SearchText
+    )
+
+    if ([string]::IsNullOrWhiteSpace($SearchText)) { return $false }
+    $q = $SearchText.Trim()
+
+    $fields = @(
+        $Server.Name,
+        $Server.Address,
+        $Server.ServiceTag,
+        $Server.Model,
+        $Server.OSHostname,
+        $Server.Group,
+        $Server.Health,
+        $Server.PowerState,
+        $Server.Notes,
+        $Server.Username
+    )
+
+    foreach ($field in $fields) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$field)) {
+            if ([string]$field -like "*$q*") { return $true }
+        }
+    }
+
+    return $false
+}
+
+function Show-iDRACCManSearch {
+    param([string]$InitialText = "")
+
+    $query = $InitialText
+    if ([string]::IsNullOrWhiteSpace($query)) {
+        $query = Get-iDRACCManSearchText
+    }
+
+    if ([string]::IsNullOrWhiteSpace($query)) { return }
+
+    try {
+        $matches = @($script:Servers | Where-Object { Test-iDRACServerMatchesSearch -Server $_ -SearchText $query } | Sort-Object Group,Name)
+
+        $tab = New-Object System.Windows.Forms.TabPage
+        $tab.Text = "Search: $query"
+
+        $outer = New-Object System.Windows.Forms.Panel
+        $outer.Dock = "Fill"
+        $outer.BackColor = [System.Drawing.Color]::FromArgb(245,247,250)
+
+        $bar = New-Object System.Windows.Forms.Panel
+        $bar.Dock = "Top"
+        $bar.Height = 46
+        $bar.BackColor = [System.Drawing.Color]::White
+
+        $lbl = New-Object System.Windows.Forms.Label
+        $lbl.Text = "Search results for '$query'  ($($matches.Count) found)"
+        $lbl.Left = 12
+        $lbl.Top = 13
+        $lbl.Width = 420
+        $lbl.Height = 22
+        $lbl.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+        $bar.Controls.Add($lbl)
+
+        $btnClose = New-Object System.Windows.Forms.Button
+        $btnClose.Text = "Close"
+        $btnClose.Left = 445
+        $btnClose.Top = 8
+        $btnClose.Width = 70
+        $btnClose.Height = 28
+        $btnClose.Add_Click({ Close-CurrentTab })
+        $bar.Controls.Add($btnClose)
+
+        $btnNewSearch = New-Object System.Windows.Forms.Button
+        $btnNewSearch.Text = "New Search"
+        $btnNewSearch.Left = 525
+        $btnNewSearch.Top = 8
+        $btnNewSearch.Width = 95
+        $btnNewSearch.Height = 28
+        $btnNewSearch.Add_Click({ Show-iDRACCManSearch })
+        $bar.Controls.Add($btnNewSearch)
+
+        $list = New-Object System.Windows.Forms.ListView
+        $list.Dock = "Fill"
+        $list.View = "Details"
+        $list.FullRowSelect = $true
+        $list.GridLines = $true
+        $list.HideSelection = $false
+        $list.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        [void]$list.Columns.Add("Name", 190)
+        [void]$list.Columns.Add("IP / Address", 145)
+        [void]$list.Columns.Add("Service Tag", 110)
+        [void]$list.Columns.Add("Model", 190)
+        [void]$list.Columns.Add("OS Hostname", 170)
+        [void]$list.Columns.Add("Health", 80)
+        [void]$list.Columns.Add("Power", 75)
+        [void]$list.Columns.Add("Group", 130)
+
+        foreach ($srv in $matches) {
+            $item = New-Object System.Windows.Forms.ListViewItem([string]$srv.Name)
+            [void]$item.SubItems.Add([string]$srv.Address)
+            [void]$item.SubItems.Add([string]$srv.ServiceTag)
+            [void]$item.SubItems.Add([string]$srv.Model)
+            [void]$item.SubItems.Add([string]$srv.OSHostname)
+            [void]$item.SubItems.Add([string]$srv.Health)
+            [void]$item.SubItems.Add([string]$srv.PowerState)
+            [void]$item.SubItems.Add([string]$srv.Group)
+            $item.Tag = $srv
+
+            try {
+                switch -Regex ($srv.Health) {
+                    "Critical" { $item.ForeColor = [System.Drawing.Color]::FromArgb(222,43,43); break }
+                    "Warning"  { $item.ForeColor = [System.Drawing.Color]::FromArgb(245,146,0); break }
+                    "OK"       { $item.ForeColor = [System.Drawing.Color]::FromArgb(36,152,50); break }
+                }
+            }
+            catch {}
+
+            [void]$list.Items.Add($item)
+        }
+
+        $list.Add_DoubleClick({
+            try {
+                if ($list.SelectedItems.Count -eq 0) { return }
+                $srv = $list.SelectedItems[0].Tag
+                if (-not $srv) { return }
+
+                foreach ($gNode in $script:Tree.Nodes) {
+                    foreach ($child in $gNode.Nodes) {
+                        if ($child.Tag -and $child.Tag.Address -eq $srv.Address) {
+                            $gNode.Expand()
+                            $script:Tree.SelectedNode = $child
+                            $child.EnsureVisible()
+                            break
+                        }
+                    }
+                }
+
+                Open-KvmEmbedded
+            }
+            catch {}
+        }.GetNewClosure())
+
+        $cm = New-Object System.Windows.Forms.ContextMenuStrip
+        $miConsole = New-Object System.Windows.Forms.ToolStripMenuItem("Open Console")
+        $miConsole.Add_Click({
+            if ($list.SelectedItems.Count -gt 0) {
+                $srv = $list.SelectedItems[0].Tag
+                if ($srv) {
+                    foreach ($gNode in $script:Tree.Nodes) {
+                        foreach ($child in $gNode.Nodes) {
+                            if ($child.Tag -and $child.Tag.Address -eq $srv.Address) {
+                                $script:Tree.SelectedNode = $child
+                                $child.EnsureVisible()
+                                break
+                            }
+                        }
+                    }
+                    Open-KvmEmbedded
+                }
+            }
+        }.GetNewClosure())
+        $miGui = New-Object System.Windows.Forms.ToolStripMenuItem("Open GUI")
+        $miGui.Add_Click({
+            if ($list.SelectedItems.Count -gt 0) {
+                $srv = $list.SelectedItems[0].Tag
+                if ($srv) {
+                    foreach ($gNode in $script:Tree.Nodes) {
+                        foreach ($child in $gNode.Nodes) {
+                            if ($child.Tag -and $child.Tag.Address -eq $srv.Address) {
+                                $script:Tree.SelectedNode = $child
+                                $child.EnsureVisible()
+                                break
+                            }
+                        }
+                    }
+                    Open-WebEmbedded
+                }
+            }
+        }.GetNewClosure())
+        $miEdit = New-Object System.Windows.Forms.ToolStripMenuItem("Edit")
+        $miEdit.Add_Click({
+            if ($list.SelectedItems.Count -gt 0) {
+                $srv = $list.SelectedItems[0].Tag
+                if ($srv) { Show-ServerDialog -Server $srv }
+            }
+        }.GetNewClosure())
+        [void]$cm.Items.Add($miConsole)
+        [void]$cm.Items.Add($miGui)
+        [void]$cm.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+        [void]$cm.Items.Add($miEdit)
+        $list.ContextMenuStrip = $cm
+
+        $outer.Controls.Add($list)
+        $outer.Controls.Add($bar)
+        $tab.Controls.Add($outer)
+
+        [void]$script:Tabs.TabPages.Add($tab)
+        $script:Tabs.SelectedTab = $tab
+
+        if ($script:Status) { $script:Status.Text = "Search found $($matches.Count) result(s) for '$query'." }
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Search failed.`r`n`r`n$($_.Exception.Message)",
+            "Search",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+    }
+}
+
+
+
+function Open-iDRACCManHelp {
+    param([string]$Source = "Unknown")
+
+    $helpUrl = "https://github.com/DellProSupportGse/Tools/blob/main/iDRACCMan/help.md"
+
+    try {
+        if ($script:HelpUrl -and -not [string]::IsNullOrWhiteSpace([string]$script:HelpUrl)) {
+            $helpUrl = [string]$script:HelpUrl
+        }
+    }
+    catch {}
+
+    try {
+        Start-Process -FilePath $helpUrl
+
+        if ($script:Status) {
+            $script:Status.Text = "Opened online documentation."
+        }
+
+        try {
+            Send-iDRACCManTelemetry -EventName "OpenHelp" -Properties @{ Target = "help.md"; Source = $Source }
+        }
+        catch {}
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            ("Unable to open online documentation.`r`n`r`n{0}`r`n`r`n{1}" -f $helpUrl, $_.Exception.Message),
+            "Documentation",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) | Out-Null
+    }
+}
+
 function Build-Gui {
     $script:MainForm = New-Object System.Windows.Forms.Form
     $script:MainForm.Text = "$script:AppName $script:AppVersion - Simplified iDRAC Access. By: Jim Gandy"
@@ -4128,13 +4549,99 @@ function Build-Gui {
     $appTitle.ForeColor = [System.Drawing.Color]::White
     $top.Controls.Add($appTitle)
 
-    $topRight = New-Object System.Windows.Forms.Label
-    $topRight.Text = "⌕   🔒   👤   ?"
+    $topRight = New-Object System.Windows.Forms.Panel
     $topRight.Dock = "Right"
-    $topRight.Width = 170
-    $topRight.TextAlign = "MiddleCenter"
-    $topRight.Font = New-Object System.Drawing.Font("Segoe UI Symbol", 13)
-    $topRight.ForeColor = [System.Drawing.Color]::White
+    $topRight.Width = 320
+    $topRight.BackColor = $colorBlue
+
+    $txtTopSearch = New-Object System.Windows.Forms.TextBox
+    $script:TopSearchBox = $txtTopSearch
+    $txtTopSearch.Left = 8
+    $txtTopSearch.Top = 12
+    $txtTopSearch.Width = 175
+    $txtTopSearch.Height = 24
+    $txtTopSearch.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $txtTopSearch.BorderStyle = "FixedSingle"
+    $txtTopSearch.Text = ""
+    try {
+        $txtTopSearch.ForeColor = [System.Drawing.Color]::FromArgb(80,80,80)
+        $txtTopSearch.BackColor = [System.Drawing.Color]::White
+    } catch {}
+    $txtTopSearch.Add_KeyDown({
+        try {
+            if ($_.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
+                $_.SuppressKeyPress = $true
+                Show-iDRACCManSearch -InitialText $txtTopSearch.Text.Trim()
+            }
+        } catch {}
+    }.GetNewClosure())
+    $topRight.Controls.Add($txtTopSearch)
+
+    $btnTopSearch = New-Object System.Windows.Forms.Label
+    $btnTopSearch.Text = "⌕"
+    $btnTopSearch.Left = 188
+    $btnTopSearch.Top = 8
+    $btnTopSearch.Width = 34
+    $btnTopSearch.Height = 34
+    $btnTopSearch.TextAlign = "MiddleCenter"
+    $btnTopSearch.Font = New-Object System.Drawing.Font("Segoe UI Symbol", 15)
+    $btnTopSearch.ForeColor = [System.Drawing.Color]::White
+    $btnTopSearch.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $btnTopSearch.Add_Click({
+        try {
+            Show-iDRACCManSearch -InitialText $txtTopSearch.Text.Trim()
+        } catch {
+            Show-iDRACCManSearch
+        }
+    }.GetNewClosure())
+    $btnTopSearch.Add_MouseEnter({ $btnTopSearch.BackColor = $colorBlueDark }.GetNewClosure())
+    $btnTopSearch.Add_MouseLeave({ $btnTopSearch.BackColor = $colorBlue }.GetNewClosure())
+    $topRight.Controls.Add($btnTopSearch)
+
+    $lblIssues = New-Object System.Windows.Forms.Label
+    $lblIssues.Text = "👤"
+    $lblIssues.Left = 232
+    $lblIssues.Top = 8
+    $lblIssues.Width = 34
+    $lblIssues.Height = 34
+    $lblIssues.TextAlign = "MiddleCenter"
+    $lblIssues.Font = New-Object System.Drawing.Font("Segoe UI Emoji", 13)
+    $lblIssues.ForeColor = [System.Drawing.Color]::White
+    $lblIssues.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $lblIssues.Add_MouseEnter({ $lblIssues.BackColor = $colorBlueDark }.GetNewClosure())
+    $lblIssues.Add_MouseLeave({ $lblIssues.BackColor = $colorBlue }.GetNewClosure())
+    $lblIssues.Add_Click({
+        try {
+            Start-Process "https://github.com/DellProSupportGse/Tools/issues"
+            if ($script:Status) { $script:Status.Text = "Opened GitHub Issues & Feedback." }
+            Send-iDRACCManTelemetry -EventName "OpenIssues" -Properties @{ Target = "GitHubIssues" }
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Could not open GitHub Issues & Feedback.`r`n`r`nhttps://github.com/DellProSupportGse/Tools/issues",
+                "Issues & Feedback",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            ) | Out-Null
+        }
+    }.GetNewClosure())
+    $topRight.Controls.Add($lblIssues)
+
+    $lblHelp = New-Object System.Windows.Forms.Label
+    $lblHelp.Text = "?"
+    $lblHelp.Left = 270
+    $lblHelp.Top = 8
+    $lblHelp.Width = 34
+    $lblHelp.Height = 34
+    $lblHelp.TextAlign = "MiddleCenter"
+    $lblHelp.Font = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold)
+    $lblHelp.ForeColor = [System.Drawing.Color]::White
+    $lblHelp.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $lblHelp.Add_MouseEnter({ $lblHelp.BackColor = $colorBlueDark }.GetNewClosure())
+    $lblHelp.Add_MouseLeave({ $lblHelp.BackColor = $colorBlue }.GetNewClosure())
+    $lblHelp.Add_Click({ Open-iDRACCManHelp -Source "TopRightIcon" }.GetNewClosure())
+    $topRight.Controls.Add($lblHelp)
+
     $top.Controls.Add($topRight)
 
     $menu = New-Object System.Windows.Forms.MenuStrip
@@ -4215,6 +4722,9 @@ function Build-Gui {
         ) | Out-Null
     })
 
+    $miDocumentation = New-Object System.Windows.Forms.ToolStripMenuItem("Documentation")
+    $miDocumentation.Add_Click({ Open-iDRACCManHelp -Source "HelpMenu" })
+
     [void]$mFile.DropDownItems.Add($miImport)
     [void]$mFile.DropDownItems.Add($miExport)
     [void]$mFile.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
@@ -4235,6 +4745,8 @@ function Build-Gui {
     [void]$mTools.DropDownItems.Add($miCloseTab)
     [void]$mTools.DropDownItems.Add($miTelemetryToggle)
     [void]$mTools.DropDownItems.Add($miDiagnostics)
+    [void]$mHelp.DropDownItems.Add($miDocumentation)
+    [void]$mHelp.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
     [void]$mHelp.DropDownItems.Add($miOpenDataFolder)
     [void]$mHelp.DropDownItems.Add($miViewLogs)
     [void]$mHelp.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
@@ -4490,7 +5002,6 @@ function Invoke-iDRACCMan {
                 $script:Tabs.SelectedTab = $script:Tabs.TabPages[0]
                 Close-CurrentTab
             }
-            Send-iDRACCManTelemetry -EventName "AppClose" -Properties @{ ServerCount = @($script:Servers).Count }
             Write-iDRACCManLog "iDRACCMan closed"
         })
 
