@@ -34,7 +34,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.52"
+$script:AppVersion   = "1.0.53"
 $script:DocumentsRoot = [Environment]::GetFolderPath("MyDocuments")
 $script:AppRoot      = Join-Path $script:DocumentsRoot "iDRACCMan"
 $script:LibRoot      = Join-Path $script:AppRoot "lib"
@@ -83,6 +83,7 @@ function Initialize-iDRACCManSettings {
             AutoContinueConsole = $true
             AutoContinueGui = $true
             AutoLoginGui = $true
+            TelemetryEnabled = $true
             ConnectionsCollapsed = $false
             ConnectionsWidth = 260
         } | ConvertTo-Json -Depth 5 | Set-Content -Path $script:SettingsFile -Encoding UTF8
@@ -104,6 +105,11 @@ function Initialize-iDRACCManSettings {
 
             if (-not ($settings.PSObject.Properties.Name -contains "AutoLoginGui")) {
                 $settings | Add-Member -NotePropertyName AutoLoginGui -NotePropertyValue $true -Force
+                $changed = $true
+            }
+
+            if (-not ($settings.PSObject.Properties.Name -contains "TelemetryEnabled")) {
+                $settings | Add-Member -NotePropertyName TelemetryEnabled -NotePropertyValue $true -Force
                 $changed = $true
             }
 
@@ -181,6 +187,213 @@ function Set-iDRACCManSetting {
         Write-iDRACCManLog "Failed to save setting $Name. $($_.Exception.Message)" "WARN"
     }
 }
+
+# =====================================================
+#region Telemetry Information
+# =====================================================
+
+$script:TelemetryReportID = [guid]::NewGuid().Guid
+$script:TelemetryGeoResolved = $false
+$script:TelemetryGeoData = @{}
+$script:uploadToAzure = $true
+
+function Write-Indent {
+    param(
+        [string]$Message,
+        [int]$Level = 1,
+        [string]$Color = "Gray"
+    )
+
+    try {
+        $prefix = "  " * $Level
+        Write-Host "$prefix$Message" -ForegroundColor $Color
+    }
+    catch {}
+}
+
+function Add-TableData {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$TableName,
+
+        [Parameter(Mandatory=$true)]
+        [string]$PartitionKey,
+
+        [Parameter(Mandatory=$false)]
+        [string]$RowKey,
+
+        [Parameter(Mandatory=$false)]
+        [string]$SasToken,
+
+        [Parameter(Mandatory=$true)]
+        $Data
+    )
+
+    if (-not $script:uploadToAzure) { return }
+
+    try {
+        $Data = [HashTable]$Data
+
+        $RowKey = [guid]::NewGuid().Guid
+
+        # Add your Azure Table SaS Token with at least add permissions here.
+        $TableSaSToken = '?SECRET REMOVED'
+        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/' + $TableSaSToken
+
+        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
+
+        $headers = @{
+            "Accept"       = "application/json;odata=nometadata"
+            "Content-Type" = "application/json"
+            "x-ms-version" = "2019-02-02"
+        }
+
+        $Data["PartitionKey"] = $PartitionKey
+        $Data["RowKey"]       = $RowKey
+
+        $body = $Data | ConvertTo-Json -Depth 5
+
+        $maxRetries = 3
+        $attempt = 0
+        $success = $false
+    }
+    catch {
+        return
+    }
+
+    while (-not $success -and $attempt -lt $maxRetries) {
+        try {
+            Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
+            $success = $true
+            Write-Indent "Telemetry recorded successfully" 1 Green
+        }
+        catch {
+            $attempt++
+
+            if ($attempt -lt $maxRetries) {
+                Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
+                Start-Sleep -Seconds 2
+            }
+            else {
+                Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
+                try {
+                    Write-iDRACCManLog ("Telemetry upload failed: {0}" -f $_.Exception.Message) "WARN"
+                }
+                catch {}
+            }
+        }
+    }
+}
+
+function Resolve-iDRACCManTelemetryGeo {
+    try {
+        if ($script:TelemetryGeoResolved) { return }
+
+        Write-Indent "Resolving Geo Location..."
+
+        if (-not $global:GeoCache) {
+            $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+        }
+
+        $response = $global:GeoCache
+
+        if ($response.success -eq $true) {
+            $script:TelemetryGeoData = @{
+                country     = [string]$response.country
+                countryCode = [string]$response.country_code
+                region      = [string]$response.region
+                city        = [string]$response.city
+                latitude    = [string]$response.latitude
+                longitude   = [string]$response.longitude
+                timezone    = [string]$response.timezone.id
+            }
+
+            Write-Indent "Country: $($script:TelemetryGeoData.country)" 2
+            Write-Indent "Region : $($script:TelemetryGeoData.region)" 2
+        }
+    }
+    catch {
+        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+        $script:TelemetryGeoData = @{}
+    }
+    finally {
+        $script:TelemetryGeoResolved = $true
+    }
+}
+
+function Send-iDRACCManTelemetry {
+    param(
+        [Parameter(Mandatory=$true)][string]$EventName,
+        [hashtable]$Properties = @{}
+    )
+
+    try {
+        if (-not [bool](Get-iDRACCManSetting -Name "TelemetryEnabled" -Default $true)) { return }
+
+        Write-Host "Logging Telemetry Information..."
+
+        Resolve-iDRACCManTelemetryGeo
+
+        $machineHash = ""
+        try {
+            $raw = "$env:USERDOMAIN\$env:USERNAME@$env:COMPUTERNAME"
+            $sha = [System.Security.Cryptography.SHA256]::Create()
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($raw)
+            $hash = $sha.ComputeHash($bytes)
+            $machineHash = ([BitConverter]::ToString($hash)).Replace("-","").Substring(0,24)
+        }
+        catch {}
+
+        $data = @{
+            EventName    = $EventName
+            Region       = $script:TelemetryGeoData.region
+            Version      = $script:AppVersion
+            ReportID     = $script:TelemetryReportID
+            country      = $script:TelemetryGeoData.country
+            countryCode  = $script:TelemetryGeoData.countryCode
+            geoRegion    = $script:TelemetryGeoData.region
+            city         = $script:TelemetryGeoData.city
+            lat          = $script:TelemetryGeoData.latitude
+            lon          = $script:TelemetryGeoData.longitude
+            timezone     = $script:TelemetryGeoData.timezone
+            Timestamp    = (Get-Date).ToUniversalTime().ToString("o")
+            HostOS       = [System.Environment]::OSVersion.VersionString
+            PSVersion    = $PSVersionTable.PSVersion.ToString()
+            MachineHash  = $machineHash
+            ComputerName = $env:COMPUTERNAME
+        }
+
+        foreach ($k in @($Properties.Keys)) {
+            try {
+                $safeName = ([string]$k) -replace '[^a-zA-Z0-9_]', '_'
+                if ([string]::IsNullOrWhiteSpace($safeName)) { continue }
+                $v = $Properties[$k]
+                if ($null -eq $v) { $v = "" }
+                $data[$safeName] = [string]$v
+            }
+            catch {}
+        }
+
+        # We use tool name for this value.
+        $PartitionKey = "iDRACCMan"
+
+        Add-TableData `
+            -TableName "iDRACCManTelemetryData" `
+            -PartitionKey $PartitionKey `
+            -Data $data
+    }
+    catch {
+        try {
+            Write-iDRACCManLog ("Telemetry failed for {0}: {1}" -f $EventName, $_.Exception.Message) "WARN"
+        }
+        catch {}
+    }
+}
+
+#endregion
+
+
 
 function Open-iDRACCManDataFolder {
     Start-Process $script:AppRoot
@@ -1172,6 +1385,7 @@ function Refresh-iDRACHealthBatch {
 
     if ($script:Status) {
         $script:Status.Text = "Health refresh complete. Success: $okCount  Failed: $failCount  Time: $(Get-Date -Format 'h:mm:ss tt')"
+        Send-iDRACCManTelemetry -EventName "RefreshHealth" -Properties @{ Title = $Title; Success = $okCount; Failed = $failCount; Count = $servers.Count }
     }
 
     if ($failCount -gt 0) {
@@ -1676,6 +1890,7 @@ function Show-ServerDialog {
             $addedRecord = Add-iDRACServerRecord -Inventory $inv -GroupName $groupName
 
             if ($script:Status) { $script:Status.Text = "Added $($addedRecord.Name) to group $($addedRecord.Group)" }
+            Send-iDRACCManTelemetry -EventName "AddiDRAC" -Properties @{ Group = $addedRecord.Group; Model = $addedRecord.Model; Health = $addedRecord.Health }
 
             [System.Windows.Forms.MessageBox]::Show(
                 "Added successfully.`r`n`r`nName: $($inv.Name)`r`nGroup: $groupName`r`nService Tag: $($inv.ServiceTag)`r`nModel: $($inv.Model)`r`nOS Hostname: $($inv.OSHostname)`r`nHealth: $($inv.Health)",
@@ -2946,6 +3161,7 @@ function Open-WebEmbedded {
     $s = Get-SelectedServer
     if (-not $s) { return }
     Add-WebViewTab -Server $s -Url (Get-iDRACBaseUrl $s.Address)
+    Send-iDRACCManTelemetry -EventName "OpenGUI" -Properties @{ Group = $s.Group; Model = $s.Model; Health = $s.Health }
 }
 
 function Open-KvmEmbedded {
@@ -2963,6 +3179,7 @@ function Open-KvmEmbedded {
         }
 
         $script:Status.Text = "Opened embedded KVM for $($s.Name)"
+        Send-iDRACCManTelemetry -EventName "OpenConsole" -Properties @{ Group = $s.Group; Model = $s.Model; Health = $s.Health }
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show(
@@ -3000,6 +3217,7 @@ function Invoke-PowerAction {
 
         Add-LogTab -Title "$($s.Name) Power" -Text "Power action sent to $($s.Name): $ResetType"
         $script:Status.Text = "Power action sent: $ResetType"
+        Send-iDRACCManTelemetry -EventName "PowerAction" -Properties @{ ResetType = $ResetType; Group = $s.Group; Model = $s.Model }
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show(
@@ -3506,6 +3724,7 @@ function Open-MultiViewForSelectedGroup {
     }
 
     $script:Status.Text = "Opened Multi View for group $groupName"
+    Send-iDRACCManTelemetry -EventName "OpenMultiView" -Properties @{ Group = $groupName; Count = $servers.Count }
 }
 
 
@@ -3970,6 +4189,16 @@ function Build-Gui {
 
     $miCloseTab = New-Object System.Windows.Forms.ToolStripMenuItem("Close Current")
     $miCloseTab.Add_Click({ Close-CurrentTab })
+
+    $miTelemetryToggle = New-Object System.Windows.Forms.ToolStripMenuItem("Toggle Telemetry")
+    $miTelemetryToggle.Add_Click({
+        $current = [bool](Get-iDRACCManSetting -Name "TelemetryEnabled" -Default $true)
+        Set-iDRACCManSetting -Name "TelemetryEnabled" -Value (-not $current)
+        $state = if (-not $current) { "enabled" } else { "disabled" }
+        if ($script:Status) { $script:Status.Text = "Telemetry $state." }
+        [System.Windows.Forms.MessageBox]::Show("Telemetry is now $state.","Telemetry") | Out-Null
+    })
+
     $miDiagnostics = New-Object System.Windows.Forms.ToolStripMenuItem("Diagnostics")
     $miDiagnostics.Add_Click({ Show-Diagnostics })
     $miOpenDataFolder = New-Object System.Windows.Forms.ToolStripMenuItem("Open Data Folder")
@@ -4004,6 +4233,7 @@ function Build-Gui {
     [void]$mActions.DropDownItems.Add($miRefreshSelectedHealth)
     [void]$mActions.DropDownItems.Add($miRefreshAllHealth)
     [void]$mTools.DropDownItems.Add($miCloseTab)
+    [void]$mTools.DropDownItems.Add($miTelemetryToggle)
     [void]$mTools.DropDownItems.Add($miDiagnostics)
     [void]$mHelp.DropDownItems.Add($miOpenDataFolder)
     [void]$mHelp.DropDownItems.Add($miViewLogs)
@@ -4253,12 +4483,14 @@ function Invoke-iDRACCMan {
 
         [void](Initialize-WebView2)
         Build-Gui
+        Send-iDRACCManTelemetry -EventName "AppReady" -Properties @{ ServerCount = @($script:Servers).Count; GroupCount = @($script:Servers | Group-Object Group).Count }
 
         $script:MainForm.Add_FormClosing({
             while ($script:Tabs.TabPages.Count -gt 0) {
                 $script:Tabs.SelectedTab = $script:Tabs.TabPages[0]
                 Close-CurrentTab
             }
+            Send-iDRACCManTelemetry -EventName "AppClose" -Properties @{ ServerCount = @($script:Servers).Count }
             Write-iDRACCManLog "iDRACCMan closed"
         })
 
