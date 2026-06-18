@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.597"
+    $ver="0.598"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -68,8 +68,8 @@ param(
         Write-Host "Checking Net Intents..."
         $failedNetIntent+=$GetNetIntentStatus | ? {$_.LastSuccess -lt (Get-Date).AddMinutes(-40)}
         $failedNetIntentGlobal+=$GetNetIntentGlobalStatus | ? {$_.LastSuccess -lt (Get-Date).AddMinutes(-40)}
-        $failedNetIntent=$failedNetIntent | ? {$_.Progress -gt ""}
-        $failedNetIntentGlobal=$failedNetIntentGlobal | ? {$_.Progress -gt ""}
+        $failedNetIntent=@($failedNetIntent | ? {$_.Progress -gt ""})
+        $failedNetIntentGlobal=@($failedNetIntentGlobal | ? {$_.Progress -gt ""})
         If ($failedNetIntent) {
            Foreach ($failedIntent in $failedNetIntent) {
                Write-ToHost "Net Intent $($failedIntent.IntentName) on Node $($failedIntent.Host) FAILED" -Checkmark 3 -Level 3
@@ -81,7 +81,10 @@ param(
         } else {
            Write-ToHost "Net Intent check successful" -Checkmark 1 -Level 1
         }
-        return ($failedNetIntent+$failedNetIntentGlobal)
+        $failedNetIntentAll=@()
+        $failedNetIntentAll+=$failedNetIntent
+        $failedNetIntentAll+=$failedNetIntentGlobal
+        return ($failedNetIntentAll)
     }
     Function Test-iDracHostNicDHCP {
         Write-Host "Checking iDrac host nics have DHCP enabled..."
@@ -362,7 +365,7 @@ param(
 
                     $copies = $_.NumberOfDataCopies
 
-                    $multiplier = if ($copies -in 1..3) {
+                    $multiplier = if ($copies -in 1..6) {
                         $copies
                     }
                     else {
@@ -384,16 +387,12 @@ param(
                     $maxPercent = $null
                 }
 
-                If ($ErrorOnlyCheck -eq $false) {
-                    if ($maxPercent -gt $threshold -and !($ErrorOnlyCheck)) {
-                        $testpass=2
-                         Write-ToHost (
-                             "MAX thin provisioning usage exceeds threshold: $maxPercent% (Threshold: $threshold%)"
-                         ) -Level 2 -Checkmark 2
-                    }
+                if ($maxPercent -gt $threshold -and !($ErrorOnlyCheck)) {
+                        Write-ToHost (
+                            "MAX thin provisioning usage exceeds threshold: $maxPercent% (Threshold: $threshold%)"
+                        ) -Level 2 -Checkmark 2
                 }
                 if ($currentPercent -gt $threshold) {
-                    $testpass=3
                     Write-ToHost (
                         "CURRENT thin provisioning usage exceeds threshold: $currentPercent% (Threshold: $threshold%)"
                     ) -Level 3 -Checkmark 3
