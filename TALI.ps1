@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.598"
+    $ver="0.6"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -115,18 +115,18 @@ param(
         return $Redfish
     }
     Function Test-OsBootTimeOver99Days {
-        $OSBootTimeOver99Days=@()
-        If ($ErrorOnlyCheck -eq $false) {
+        If (!($ErrorOnlyCheck)) {
+            $OSBootTimeOver99Days=@()
             Write-Host "Testing that all nodes have been rebooted within 99 days..."
             $OSBootTimeOver99Days+=Get-CimInstance -ComputerName $nodes Win32_OperatingSystem | %{[PSCustomObject]@{"CsName"=$_.CsName;"OSBootOver99Days"=(((Get-Date).AddDays(-99)-$_.LastBootUpTime) -gt 0)}}
             $failedOSBootTimeOver99Days=$OSBootTimeOver99Days | ? OSBootOver99Days -eq $true
             If ($failedOSBootTimeOver99Days) {
-               Write-ToHost "Node(s) $($failedOSBootTimeOver99Days.CsName -join ',') have not been rebooted for over 99 days" -Checkmark 2 -Level 2
+                Write-ToHost "Node(s) $($failedOSBootTimeOver99Days.CsName -join ',') have not been rebooted for over 99 days" -Checkmark 2 -Level 2
             } else {
-               Write-ToHost "All nodes have been rebooted within 99 days"
+                Write-ToHost "All nodes have been rebooted within 99 days"
             }
+            return $failedOSBootTimeOver99Days
         }
-        return $failedOSBootTimeOver99Days
     }
     Function Test-HWTimeout {
         Write-Host "Testing that all nodes have the HWTimeout registry key set to at least 10000..."
@@ -312,7 +312,7 @@ param(
             # Survivable capacity
             $usableCapacity = $pool.Size - $pool.Reserved - $failureReserve
             if ($totalAllocatedMax -gt $usableCapacity) {
-                If ($ErrorOnlyCheck -eq $false) { 
+                If (!($ErrorOnlyCheck)) { 
                     $userVdisks=$vDisks | ? FriendlyName -notlike "Infrastructure*" | ? FriendlyName -notlike "ClusterPerformanceHistory*"
                     $sysVdisks=$vDisks | ?{$_.FriendlyName -like "Infrastructure*" -or $_.FriendlyName -like "ClusterPerformanceHistory*"}
                     $sysVdiskSize=0
@@ -328,7 +328,7 @@ param(
             return ($totalAllocatedMax -gt $usableCapacity)
         }
         catch {
-            If ($ErrorOnlyCheck -eq $false) {Write-ToHost "Could not determine Over Provisioned Virtual Disks on Storage Pool" -Checkmark 2 -Level 2}
+            If (!($ErrorOnlyCheck)) {Write-ToHost "Could not determine Over Provisioned Virtual Disks on Storage Pool" -Checkmark 2 -Level 2}
             return $false
         }
     }
@@ -470,7 +470,7 @@ param(
     function Test-AzLocalCpuNMinusOneOvercommit {
         [CmdletBinding()]
         param()
-        If ($ErrorOnlyCheck -eq $false) {
+        If (!($ErrorOnlyCheck)) {
 
             Write-Host "Testing cluster CPU vCPU overcommit risk (N-1 model, 200% threshold)..."
 
@@ -517,7 +517,7 @@ param(
     function Test-AzLocalVmMigrationFailures {
         [CmdletBinding()]
         param()
-        If ($ErrorOnlyCheck -eq $false) {
+        If (!($ErrorOnlyCheck)) {
 
             Write-Host "Analyzing non-Windows VM live migration / failback failures (last 7 days across all nodes)..."
 
@@ -602,14 +602,15 @@ param(
     }
     Function Test-AzureLocalNodeServices {
         Write-Host "Checking per node services vital to Azure local..."
-        $FailedServices=Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock {
+        $FailedServices=@()
+        $FailedServices+=Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock {
             param($ServiceList)
-            $FailedServices=@()
+            $FailedServicesOnNode=@()
             # Run Get-Service once for the entire list
             $Status = Get-Service -Name $ServiceList -ErrorAction SilentlyContinue
             # Check any that aren't running
-            $FailedServices+=$Status | Where-Object { $_.Status -ne "Running" }
-            $FailedServices
+            $FailedServicesOnNode+=$Status | Where-Object { $_.Status -ne "Running" }
+            $FailedServicesOnNode
         } -ArgumentList ($AzureLocalServices)
         If ($FailedServices) {
             Write-ToHost "Azure local required all node services $(($FailedServices.Name | Sort -Unique) -join ',') are NOT running on ALL nodes" -Level 3 -Checkmark 3
@@ -619,7 +620,7 @@ param(
         return $FailedServices
     }
     Function Test-DiskLatencyOutlier {
-        If ($ErrorOnlyCheck -eq $false) {
+        If (!($ErrorOnlyCheck)) {
             Write-Host "Looking at physical disk latency in the past week..."
             try {
                 #Sample 2: Fire, fire, latency outlier
@@ -1463,7 +1464,7 @@ v$ver
         Write-Host "Recommendation: Restart node(s) $($badNodes.Node -join ',') to resolve service issue"
         $testPass=2
     } 
-    $testReport+= [PSCustomObject] @{TestName="Test-ClusterControlPlaneHealth";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-ClusterControlPlaneHealth";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     If ((Get-Job -Name "SUJob" -ErrorAction SilentlyContinue).count) {
         Write-Host "Waiting for prevoius Get Solution Update command to timeout..."
@@ -1478,13 +1479,13 @@ v$ver
             While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
             Write-Host "."
             Get-Job -Name "SUJob" -ErrorAction SilentlyContinue | Remove-Job -Force
-            If (Test-SolutionUpdateCommand) {Write-ToHost "Fix Get Solution Update command FAILED!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If (Test-SolutionUpdateCommand) {Write-ToHost "Fix Get Solution Update command FAILED!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             Write-Host "Recommendation: Restart the Azure Stack HCI cluster groups and make sure they are Online"
             $testPass=2
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-SolutionUpdateCommand";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-SolutionUpdateCommand";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $GetNetAdapterAll=Invoke-Command -ComputerName $nodes -ScriptBlock {Get-NetAdapter}
     $GetNetIntent=Get-NetIntent
@@ -1520,7 +1521,7 @@ v$ver
             $GetNetIntentStatus=Get-NetIntentStatus
             $GetNetIntentGlobalStatus=Get-NetIntentStatus -GlobalOverrides
             $failedNetIntent=Test-NetIntents
-            If ($failedNetIntent) {Write-ToHost "Fix Net Intents FAILED!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If ($failedNetIntent) {Write-ToHost "Fix Net Intents FAILED!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             $dnetAdapter=($GetNetAdapterAll | ? {($GetNetIntent.NetAdapterNamesAsList) -match $_.name -and !($_.status -eq "Up" -or $_.ifOperStatus -eq "Up")})
@@ -1531,7 +1532,7 @@ v$ver
             }
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-NetIntents";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-NetIntents";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     #$IdracIP=((ipconfig /all | Select-String "NDIS" -Context 0,15).tostring().split('`n') | select-string -SimpleMatch "DHCP Server" | %{[regex]::Match($_,"(\b169\.254\.\d{1,3}\.\d{1,3}\b)")}).groups[1].value
     #$iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*").DHCPServer
@@ -1549,13 +1550,13 @@ v$ver
             Write-Host ""
             Sleep 10
             $failediDracDHCP=Test-iDracHostNicDHCP
-            If ($failediDracDHCP) {Write-ToHost "Fix iDrac Host Nic DHCP FAILED!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If ($failediDracDHCP) {Write-ToHost "Fix iDrac Host Nic DHCP FAILED!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Enable DHCP on the iDrac host network adapter for all nodes"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-iDracHostNicDHCP";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-iDracHostNicDHCP";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     <# New-NetFirewallRule -DisplayName "Block-Idrac-Https-a897gt98gydf" -Direction Outbound -Action Block -RemoteAddress 169.254.0.0/16 -Protocol TCP -RemotePort 443 -Enabled True #>
     $failediDracRedfish=@()
@@ -1606,19 +1607,19 @@ v$ver
                Write-Host "."
             }}
             $failediDracRedfish=Test-iDracRedfish
-            If ($failediDracRedfish) {Write-ToHost "Fix iDrac redfish FAILED! May need to drain flea power on host" -Level 4 -Checkmark 4;$testPass=2}
+            If ($failediDracRedfish) {Write-ToHost "Fix iDrac redfish FAILED! May need to drain flea power on host" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Reboot iDrac on failing nodes and/or enable redfish on those iDracs"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-iDracRedfish";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-iDracRedfish";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     If ((Test-OsBootTimeOver99Days)){
         $testPass=1
         Write-host "Recommendation: Manually Pause/Drain, Reboot and Resume with failback these node(s) to avoid update issues"
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-OsBootTimeOver99Days";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-OsBootTimeOver99Days";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $nonCompliant=Test-HWTimeout
     If ($nonCompliant)  {
@@ -1631,13 +1632,13 @@ v$ver
             }
             Write-Host "Reboot nodes to apply settings"
             $nonCompliant=Test-HWTimeout
-            If ($nonCompliant) {Write-ToHost "Fix HWTimeout registry key failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If ($nonCompliant) {Write-ToHost "Fix HWTimeout registry key failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
              $testPass=2
              Write-Host "Recommendation: Set HWTimeout registry key to at least 10000 on all nodes"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-HWTimeoutKey";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-HWTimeoutKey";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $disksInMaint= Test-NodesUpDisksinMaintMode
     If ($disksInMaint)  {
@@ -1677,14 +1678,14 @@ v$ver
                 $testPass=2
             } else {
                 $disksInMaint = Test-NodesUpDisksinMaintMode
-                If ($disksInMaint) {Write-ToHost "Fix take disks out of maintenance mode failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+                If ($disksInMaint) {Write-ToHost "Fix take disks out of maintenance mode failed!!!" -Level 4 -Checkmark 4;$testPass=3}
             }
         } else {
             $testPass=2
             Write-Host "Recommendation: Take disks out of maintenance mode if all nodes are up"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-NodesUpDisksinMaintMode";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-NodesUpDisksinMaintMode";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $nonCompliant=Test-TimeZone
     If ($nonCompliant)  {
@@ -1693,37 +1694,37 @@ v$ver
             $tz=$global:dTimeZone
             Invoke-Command -ComputerName $nonCompliant.Node -ScriptBlock {Set-TimeZone -Id $using:tz}
             $nonCompliant=Test-TimeZone
-            If ($nonCompliant) {Write-ToHost "Fix time zone failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If ($nonCompliant) {Write-ToHost "Fix time zone failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Set all nodes to the same time zone"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-TimeZone";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-TimeZone";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     If (Test-ClusterShutdownTime) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Fixing cluster shutdown timeout. Est Time is less than one minute" -ForegroundColor Cyan
             (Get-Cluster).ShutdownTimeoutInMinutes=1440
-            If (Test-ClusterShutdownTime) {Write-ToHost "Fix setting cluster shutdown timeout to 1440 minutes failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If (Test-ClusterShutdownTime) {Write-ToHost "Fix setting cluster shutdown timeout to 1440 minutes failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Set cluster shutdown timeout to 1440"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-ClusterShutdownTime";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-ClusterShutdownTime";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     If (Test-InvalidCAUReports) {
         if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "Removing invalid CAU reports. Est Time is less than one minute" -ForegroundColor Cyan
             Invoke-Command -ComputerName $nodes -ScriptBlock {Remove-Item C:\Windows\Cluster\Reports\CauReport-00000101000000.xml -ErrorAction SilentlyContinue -Force}
-            If (Test-InvalidCAUReports) {Write-ToHost "Fix removing invalid CAU reports failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If (Test-InvalidCAUReports) {Write-ToHost "Fix removing invalid CAU reports failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Remove invalid CAU Reports named CauReport-00000101000000.xml"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-InvalidCAUReports";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-InvalidCAUReports";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $FailedComputeIntents=Test-NetworkDirectOnComputeIntents
     If ($FailedComputeIntents) {
@@ -1735,13 +1736,13 @@ v$ver
                 Set-NetIntent -Name "$($FailedComIntent.IntentName)" -AdapterPropertyOverrides $AdapOver
             }
             $FailedComputeIntents=Test-NetworkDirectOnComputeIntents
-            If ($FailedComputeIntents) {Write-ToHost "Fix invalid Net Intent Network Direct configuration failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If ($FailedComputeIntents) {Write-ToHost "Fix invalid Net Intent Network Direct configuration failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Remove Network Direct setting on compute intents"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-NetworkDirectOnComputeIntents";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-NetworkDirectOnComputeIntents";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $FailedStorageIntents=Test-NetworkDirectOnStorageIntents
     If ($FailedStorageIntents) {
@@ -1757,13 +1758,13 @@ v$ver
                 Set-NetIntent -Name "$($FailedStrIntent.IntentName)" -AdapterPropertyOverrides $AdapOver
             }
             $FailedStorageIntents=Test-NetworkDirectOnStorageIntents
-            If ($FailedStorageIntents) {Write-ToHost "Fix invalid Net Intent Network Direct Technology configuration failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If ($FailedStorageIntents) {Write-ToHost "Fix invalid Net Intent Network Direct Technology configuration failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Define Network Direct Technology setting on storage intents"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-NetworkDirectOnStorageIntents";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-NetworkDirectOnStorageIntents";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $nonWindowsGroups = Test-AzLocalVmMigrationFailures
     if ($nonWindowsGroups) {
@@ -1792,17 +1793,14 @@ v$ver
         $testPass=1
         Write-Host "Recommendation: Some non-Windows VMs such as $($nonWindowsGroups.Name -join ',') may need to have their priority set to 1000 (Low) to avoid migration issues. This will have those VMs use Quick Migrate instead"        
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalVmMigrationFailures";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalVmMigrationFailures";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $AzureLocalServices = @(
         "himds", 
-        "WssdService", 
+        "wssdagent",
         "MocHostAgent", 
         "GCArcService", 
-        "ExtensionService", 
-        "KeyVaultLocalAgent", 
-        "NetworkControllerHostAgent", 
-        "SymptomManager"
+        "ExtensionService"
     )
     $FailedServices=Test-AzureLocalNodeServices
     If ($FailedServices) {
@@ -1814,19 +1812,19 @@ v$ver
                 }
             }
             $FailedServices=Test-AzureLocalNodeServices
-            If ($FailedServices) {Write-ToHost "Fix starting stopped required services for Azure Local that run on all nodes failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If ($FailedServices) {Write-ToHost "Fix starting stopped required services for Azure Local that run on all nodes failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Start $(($FailedServices.Name | Sort -Unique) -join ',') on ALL nodes"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-AzureLocalNodeServices";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-AzureLocalNodeServices";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     If (Test-AzLocalOverProvisionedVirtualDisks) {
         $testPass=1
         Write-Host "Recommendation: Make sure Storage Pool space does not run below best practice levels"
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalOverProvisionedVirtualDisks";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalOverProvisionedVirtualDisks";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $failed=Test-AzLocalThinProvisioningUtilization
     if ($failed.CurrentPercent -lt 99) {$failed.CurrentPercent=$failed.CurrentPercent+1}
@@ -1846,7 +1844,8 @@ v$ver
             $changed=$true
         }
         if ($changed) {
-            If (Test-AzLocalThinProvisioningUtilization) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4;$testPass=2}
+            $failed=Test-AzLocalThinProvisioningUtilization
+            If (($failed.MaxPercent -gt $failed.Threshold -and $FixWarningsAlso) -or ($failed.CurrentPercent -gt $failed.Threshold)) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             If ($failed.CurrentPercent -gt $failed.Threshold) {
                 $testPass=2
@@ -1861,26 +1860,26 @@ v$ver
             }
         }        
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalThinProvisioningUtilization";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalThinProvisioningUtilization";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};;$testPass=0
     Write-Host ""
     If (Test-AzLocalMemoryNMinusOne) {
         $testPass=2
         Write-Host "Recommendation: Lower total VM assigned memory to avoid node pause/drain issues"
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalMemoryNMinusOne";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalMemoryNMinusOne";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     If (Test-AzLocalCpuNMinusOneOvercommit) {
         $testPass=1
         Write-Host "Recommendation: Lower total vCPU assignment to avoid node pause/drain issues"
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalCpuNumMinusOne";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-AzLocalCpuNumMinusOne";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $ProblemDrives=Test-DiskLatencyOutlier
     If ($ProblemDrives) {
         $testPass=1
         Write-Host "Recommendation: Reboot nodes with the disks. Reseat disks. Re-test after 48 hours"
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-DiskLatencyOutlier";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-DiskLatencyOutlier";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     If ((Test-GetHealthFault) -eq $true) {
         if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
@@ -1889,13 +1888,13 @@ v$ver
                 Restart-Service Winmgmt -Force
             }
             Sleep 5
-            If ((Test-GetHealthFault) -eq $true) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4;$testPass=2}
+            If ((Test-GetHealthFault) -eq $true) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Restart Winmgmt service on ALL nodes"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-GetHealthFault";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-GetHealthFault";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $badModules=Test-MismatchedPSModules
     If ($badModules.count) {
@@ -1947,7 +1946,7 @@ v$ver
             }
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-MismatchedPSModules";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-MismatchedPSModules";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $ErrorReport=Test-CauErrorAudit
     If ($ErrorReport) {
@@ -1955,7 +1954,7 @@ v$ver
         Write-Host "Recommendation: Repair issue causing the CAU failure"
         Write-Host ""
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-CauReportError";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0 
+    $testReport+= [PSCustomObject] @{TestName="Test-CauReportError";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0 
     If ($ErrorReport -ne $null) {Write-Host ""}
     $controlPlaneVMDown=Test-ControlPlaneVMNetwork
     If ($controlPlaneVMDown -eq $true) {
@@ -1979,7 +1978,7 @@ v$ver
             } 
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-ControlPlaneVMNetwork";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-ControlPlaneVMNetwork";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $FailedArcIssues=Test-AksArcIssues
     If ($FailedArcIssues) {
@@ -1995,7 +1994,7 @@ v$ver
             Write-Host "Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem"
         #}
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-AksArcIssues";TestResult=@("Passed","Warning","Error")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-AksArcIssues";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
     #Write-Host "."
