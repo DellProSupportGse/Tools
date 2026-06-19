@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.598"
+    $ver="0.599"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -115,18 +115,18 @@ param(
         return $Redfish
     }
     Function Test-OsBootTimeOver99Days {
-        $OSBootTimeOver99Days=@()
-        If ($ErrorOnlyCheck -eq $false) {
+        If (!($ErrorOnlyCheck)) {
+            $OSBootTimeOver99Days=@()
             Write-Host "Testing that all nodes have been rebooted within 99 days..."
             $OSBootTimeOver99Days+=Get-CimInstance -ComputerName $nodes Win32_OperatingSystem | %{[PSCustomObject]@{"CsName"=$_.CsName;"OSBootOver99Days"=(((Get-Date).AddDays(-99)-$_.LastBootUpTime) -gt 0)}}
             $failedOSBootTimeOver99Days=$OSBootTimeOver99Days | ? OSBootOver99Days -eq $true
             If ($failedOSBootTimeOver99Days) {
-               Write-ToHost "Node(s) $($failedOSBootTimeOver99Days.CsName -join ',') have not been rebooted for over 99 days" -Checkmark 2 -Level 2
+                Write-ToHost "Node(s) $($failedOSBootTimeOver99Days.CsName -join ',') have not been rebooted for over 99 days" -Checkmark 2 -Level 2
             } else {
-               Write-ToHost "All nodes have been rebooted within 99 days"
+                Write-ToHost "All nodes have been rebooted within 99 days"
             }
+            return $failedOSBootTimeOver99Days
         }
-        return $failedOSBootTimeOver99Days
     }
     Function Test-HWTimeout {
         Write-Host "Testing that all nodes have the HWTimeout registry key set to at least 10000..."
@@ -312,7 +312,7 @@ param(
             # Survivable capacity
             $usableCapacity = $pool.Size - $pool.Reserved - $failureReserve
             if ($totalAllocatedMax -gt $usableCapacity) {
-                If ($ErrorOnlyCheck -eq $false) { 
+                If (!($ErrorOnlyCheck)) { 
                     $userVdisks=$vDisks | ? FriendlyName -notlike "Infrastructure*" | ? FriendlyName -notlike "ClusterPerformanceHistory*"
                     $sysVdisks=$vDisks | ?{$_.FriendlyName -like "Infrastructure*" -or $_.FriendlyName -like "ClusterPerformanceHistory*"}
                     $sysVdiskSize=0
@@ -328,7 +328,7 @@ param(
             return ($totalAllocatedMax -gt $usableCapacity)
         }
         catch {
-            If ($ErrorOnlyCheck -eq $false) {Write-ToHost "Could not determine Over Provisioned Virtual Disks on Storage Pool" -Checkmark 2 -Level 2}
+            If (!($ErrorOnlyCheck)) {Write-ToHost "Could not determine Over Provisioned Virtual Disks on Storage Pool" -Checkmark 2 -Level 2}
             return $false
         }
     }
@@ -470,7 +470,7 @@ param(
     function Test-AzLocalCpuNMinusOneOvercommit {
         [CmdletBinding()]
         param()
-        If ($ErrorOnlyCheck -eq $false) {
+        If (!($ErrorOnlyCheck)) {
 
             Write-Host "Testing cluster CPU vCPU overcommit risk (N-1 model, 200% threshold)..."
 
@@ -517,7 +517,7 @@ param(
     function Test-AzLocalVmMigrationFailures {
         [CmdletBinding()]
         param()
-        If ($ErrorOnlyCheck -eq $false) {
+        If (!($ErrorOnlyCheck)) {
 
             Write-Host "Analyzing non-Windows VM live migration / failback failures (last 7 days across all nodes)..."
 
@@ -619,7 +619,7 @@ param(
         return $FailedServices
     }
     Function Test-DiskLatencyOutlier {
-        If ($ErrorOnlyCheck -eq $false) {
+        If (!($ErrorOnlyCheck)) {
             Write-Host "Looking at physical disk latency in the past week..."
             try {
                 #Sample 2: Fire, fire, latency outlier
