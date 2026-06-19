@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.599"
+    $ver="0.6"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -602,14 +602,15 @@ param(
     }
     Function Test-AzureLocalNodeServices {
         Write-Host "Checking per node services vital to Azure local..."
-        $FailedServices=Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock {
+        $FailedServices=@()
+        $FailedServices+=Invoke-Command -ComputerName (Get-ClusterNode).Name -ScriptBlock {
             param($ServiceList)
-            $FailedServices=@()
+            $FailedServicesOnNode=@()
             # Run Get-Service once for the entire list
             $Status = Get-Service -Name $ServiceList -ErrorAction SilentlyContinue
             # Check any that aren't running
-            $FailedServices+=$Status | Where-Object { $_.Status -ne "Running" }
-            $FailedServices
+            $FailedServicesOnNode+=$Status | Where-Object { $_.Status -ne "Running" }
+            $FailedServicesOnNode
         } -ArgumentList ($AzureLocalServices)
         If ($FailedServices) {
             Write-ToHost "Azure local required all node services $(($FailedServices.Name | Sort -Unique) -join ',') are NOT running on ALL nodes" -Level 3 -Checkmark 3
@@ -1796,13 +1797,10 @@ v$ver
     Write-Host ""
     $AzureLocalServices = @(
         "himds", 
-        "WssdService", 
+        "wssdagent",
         "MocHostAgent", 
         "GCArcService", 
-        "ExtensionService", 
-        "KeyVaultLocalAgent", 
-        "NetworkControllerHostAgent", 
-        "SymptomManager"
+        "ExtensionService"
     )
     $FailedServices=Test-AzureLocalNodeServices
     If ($FailedServices) {
