@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.6"
+    $ver="0.61"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1998,7 +1998,9 @@ v$ver
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
     #Write-Host "."
-    return $testReport
+    $testReport
     Stop-Transcript -ErrorAction SilentlyContinue
+    return $testReport
+    
 }
 
