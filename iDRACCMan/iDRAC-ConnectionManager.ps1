@@ -29,12 +29,32 @@
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+
+# WinForms DPI/font clipping fix
+try {
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+    [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
+    if ([System.Windows.Forms.Application].GetMethod("SetHighDpiMode")) {
+        [void][System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::SystemAware)
+    }
+}
+catch {}
+
+$script:UiFont        = New-Object System.Drawing.Font("Segoe UI", 9)
+$script:UiFontSmall   = New-Object System.Drawing.Font("Segoe UI", 8)
+$script:UiFontBold    = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$script:UiFontTitle   = New-Object System.Drawing.Font("Segoe UI", 18, [System.Drawing.FontStyle]::Regular)
+$script:UiFontMetric  = New-Object System.Drawing.Font("Segoe UI", 20, [System.Drawing.FontStyle]::Bold)
 Add-Type -AssemblyName System.Security
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.54"
+$script:AppVersion   = "1.0.56"
+
+# Telemetry run-once guard
+$script:TelemetryStartupSent = $false
+$script:TelemetryGeoResolved = $false
 $script:HelpUrl      = "https://github.com/DellProSupportGse/Tools/blob/main/iDRACCMan/help.md"
 $script:DocumentsRoot = [Environment]::GetFolderPath("MyDocuments")
 $script:AppRoot      = Join-Path $script:DocumentsRoot "iDRACCMan"
@@ -196,7 +216,6 @@ function Set-iDRACCManSetting {
 $script:TelemetryReportID = [guid]::NewGuid().Guid
 $script:TelemetryGeoResolved = $false
 $script:TelemetryGeoData = @{}
-$script:TelemetrySent = @{}
 $script:uploadToAzure = $true
 
 function Write-Indent {
@@ -268,17 +287,17 @@ function Add-TableData {
         try {
             Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
             $success = $true
-            # Telemetry success is intentionally quiet.
+            Write-Indent "Telemetry recorded successfully" 1 Green
         }
         catch {
             $attempt++
 
             if ($attempt -lt $maxRetries) {
-                # Retry quietly; telemetry should not distract from the tool UI.
+                Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
                 Start-Sleep -Seconds 2
             }
             else {
-                # Final telemetry failure is logged only.
+                Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
                 try {
                     Write-iDRACCManLog ("Telemetry upload failed: {0}" -f $_.Exception.Message) "WARN"
                 }
@@ -292,7 +311,7 @@ function Resolve-iDRACCManTelemetryGeo {
     try {
         if ($script:TelemetryGeoResolved) { return }
 
-        # Resolve geo once per session; keep console output quiet.
+        Write-Indent "Resolving Geo Location..."
 
         if (-not $global:GeoCache) {
             $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
@@ -311,11 +330,12 @@ function Resolve-iDRACCManTelemetryGeo {
                 timezone    = [string]$response.timezone.id
             }
 
-            # Geo resolved.
+            Write-Indent "Country: $($script:TelemetryGeoData.country)" 2
+            Write-Indent "Region : $($script:TelemetryGeoData.region)" 2
         }
     }
     catch {
-        # Geo lookup failed; telemetry continues without geo fields.
+        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
         $script:TelemetryGeoData = @{}
     }
     finally {
@@ -326,23 +346,22 @@ function Resolve-iDRACCManTelemetryGeo {
 function Send-iDRACCManTelemetry {
     param(
         [Parameter(Mandatory=$true)][string]$EventName,
-        [hashtable]$Properties = @{},
-        [switch]$AllowDuplicate
+        [hashtable]$Properties = @{}
     )
+
+    # Prevent duplicate startup telemetry when UI initialization refreshes dashboard/health multiple times.
+    if ($EventName -match '^(Startup|Launch|AppStart|ToolStart|TelemetryStartup)$') {
+        if ($script:TelemetryStartupSent) { return }
+        $script:TelemetryStartupSent = $true
+    }
 
     try {
         if (-not [bool](Get-iDRACCManSetting -Name "TelemetryEnabled" -Default $true)) { return }
 
-        if (-not $script:TelemetrySent) { $script:TelemetrySent = @{} }
+        if ($script:TelemetryStartupSent) { return }
+    $script:TelemetryStartupSent = $true
 
-        # Prevent noisy duplicate uploads from repeated UI events/timers in the same app session.
-        # Use -AllowDuplicate only for events where every occurrence matters.
-        if (-not $AllowDuplicate) {
-            if ($script:TelemetrySent.ContainsKey($EventName)) { return }
-            $script:TelemetrySent[$EventName] = $true
-        }
-
-        Write-iDRACCManLog ("Telemetry event: {0}" -f $EventName) "INFO"
+    Write-Host "Logging Telemetry Information..."
 
         Resolve-iDRACCManTelemetryGeo
 
@@ -1154,6 +1173,101 @@ function Invoke-iDRACRestMethod {
 }
 
 
+
+function Join-iDRACRedfishUri {
+    param(
+        [Parameter(Mandatory=$true)][string]$BaseUrl,
+        [Parameter(Mandatory=$true)][string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $BaseUrl }
+    if ($Path -match '^https?://') { return $Path }
+
+    $b = $BaseUrl.TrimEnd("/")
+    $p = $Path.TrimStart("/")
+    return "$b/$p"
+}
+
+function Invoke-iDRACRedfishJson {
+    param(
+        [Parameter(Mandatory=$true)][string]$BaseUrl,
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$false)]$Credential,
+        [Parameter(Mandatory=$false)]$Headers,
+        [string]$Method = "GET",
+        $Body = $null
+    )
+
+    $uri = Join-iDRACRedfishUri -BaseUrl $BaseUrl -Path $Path
+
+    $resp = Invoke-iDRACWebRequest `
+        -Uri $uri `
+        -Method $Method `
+        -Credential $Credential `
+        -Headers $Headers `
+        -Body $Body
+
+    if ([string]::IsNullOrWhiteSpace($resp.Content)) { return $null }
+    return ($resp.Content | ConvertFrom-Json)
+}
+
+function Get-iDRACFirstMemberUri {
+    param($Collection)
+
+    try {
+        if ($Collection.Members -and $Collection.Members.Count -gt 0) {
+            $first = @($Collection.Members)[0]
+            $uri = $first.'@odata.id'
+            if (-not [string]::IsNullOrWhiteSpace([string]$uri)) { return [string]$uri }
+        }
+    }
+    catch {}
+
+    return ""
+}
+
+function Test-iDRAC8LegacyKvmUnsupportedError {
+    param([string]$Message)
+
+    if ([string]::IsNullOrWhiteSpace($Message)) { return $false }
+
+    return ($Message -match "405|Method Not Allowed|GetKVMSession|DelliDRACCardService")
+}
+
+function Open-iDRAC8GuiFallback {
+    param(
+        [Parameter(Mandatory=$true)]$Server,
+        [string]$Reason = ""
+    )
+
+    $title = "$($Server.Name) - iDRAC8: GUI only"
+    $msg = "iDRAC8 / 13G direct console launch is not supported. GUI opened instead. Use Launch Virtual Console from the iDRAC GUI."
+
+    try {
+        $tab = Add-WebViewTab `
+            -Server $Server `
+            -Url (Get-iDRACBaseUrl $Server.Address) `
+            -TabTitle $title `
+            -HeaderMessage $msg
+
+        if ($script:Status) {
+            $script:Status.Text = "iDRAC8 direct console not supported. Opened GUI for $($Server.Name)."
+        }
+
+        try {
+            Add-LogTab -Title "iDRAC8 Console Notice" -Text ("{0}`r`n`r`nServer: {1}`r`nAddress: {2}`r`nReason: {3}" -f $msg,$Server.Name,$Server.Address,$Reason)
+        }
+        catch {}
+
+        Send-iDRACCManTelemetry -EventName "OpenConsoleIDRAC8GuiFallback" -Properties @{ Group = $Server.Group; Model = $Server.Model; Health = $Server.Health }
+        return $tab
+    }
+    catch {
+        throw "Unable to open iDRAC8 GUI fallback.`r`n$($_.Exception.Message)"
+    }
+}
+
+
 function Get-RedfishValue {
     param(
         $Object,
@@ -1192,80 +1306,214 @@ function Get-iDRACInventory {
         [Parameter(Mandatory=$true)][string]$Password
     )
 
-    # Newer iDRAC/Redfish versions can reject Basic authentication on inventory GETs.
-    # Create a Redfish session first, then use X-Auth-Token for all discovery calls.
     $base = Get-iDRACBaseUrl $Address
     $sessionLocation = $null
     $headers = $null
+    $lastErrors = New-Object System.Collections.ArrayList
+
+    $serviceTag = ""
+    $model = ""
+    $osHost = ""
+    $health = ""
+    $powerState = ""
+    $managerName = ""
 
     try {
-        $sessionBody = @{
-            UserName = $Username
-            Password = $Password
-        }
-
-        $sessionResp = Invoke-iDRACWebRequest `
-            -Uri "$base/redfish/v1/SessionService/Sessions" `
-            -Method "POST" `
-            -Body $sessionBody `
-            -Headers @{ "Accept" = "application/json" }
-
-        $xAuthToken = $null
-        try { $xAuthToken = $sessionResp.Headers["X-Auth-Token"] } catch {}
-        if ([string]::IsNullOrWhiteSpace([string]$xAuthToken)) {
-            try { $xAuthToken = $sessionResp.Headers.'X-Auth-Token' } catch {}
-        }
-
-        $sessionLocation = $null
-        try { $sessionLocation = $sessionResp.Headers["Location"] } catch {}
-        if ([string]::IsNullOrWhiteSpace([string]$sessionLocation)) {
-            try { $sessionLocation = $sessionResp.Headers.Location } catch {}
-        }
-
-        if ($xAuthToken -is [array]) { $xAuthToken = $xAuthToken[0] }
-        if ($sessionLocation -is [array]) { $sessionLocation = $sessionLocation[0] }
-
-        if ([string]::IsNullOrWhiteSpace([string]$xAuthToken)) {
-            throw "The iDRAC login succeeded but did not return an X-Auth-Token."
-        }
-
-        $headers = @{
-            "Accept" = "application/json"
-            "X-Auth-Token" = [string]$xAuthToken
-        }
-
-        $systemResp = Invoke-iDRACWebRequest `
-            -Uri "$base/redfish/v1/Systems/System.Embedded.1" `
-            -Method "GET" `
-            -Headers $headers
-
-        if ([string]::IsNullOrWhiteSpace($systemResp.Content)) {
-            throw "The iDRAC responded, but no Redfish system inventory was returned."
-        }
-
-        $system = $systemResp.Content | ConvertFrom-Json
-
-        $idrac = $null
         try {
-            $idracResp = Invoke-iDRACWebRequest `
-                -Uri "$base/redfish/v1/Managers/iDRAC.Embedded.1" `
-                -Method "GET" `
-                -Headers $headers
+            $sessionBody = @{
+                UserName = $Username
+                Password = $Password
+            }
 
-            if (-not [string]::IsNullOrWhiteSpace($idracResp.Content)) {
-                $idrac = $idracResp.Content | ConvertFrom-Json
+            $sessionResp = Invoke-iDRACWebRequest `
+                -Uri "$base/redfish/v1/SessionService/Sessions" `
+                -Method "POST" `
+                -Body $sessionBody `
+                -Headers @{ "Accept" = "application/json" }
+
+            $xAuthToken = $null
+            try { $xAuthToken = $sessionResp.Headers["X-Auth-Token"] } catch {}
+            if ([string]::IsNullOrWhiteSpace([string]$xAuthToken)) {
+                try { $xAuthToken = $sessionResp.Headers.'X-Auth-Token' } catch {}
+            }
+
+            try { $sessionLocation = $sessionResp.Headers["Location"] } catch {}
+            if ([string]::IsNullOrWhiteSpace([string]$sessionLocation)) {
+                try { $sessionLocation = $sessionResp.Headers.Location } catch {}
+            }
+
+            if ($xAuthToken -is [array]) { $xAuthToken = $xAuthToken[0] }
+            if ($sessionLocation -is [array]) { $sessionLocation = $sessionLocation[0] }
+
+            if (-not [string]::IsNullOrWhiteSpace([string]$xAuthToken)) {
+                $headers = @{
+                    "Accept" = "application/json"
+                    "X-Auth-Token" = [string]$xAuthToken
+                }
+            }
+            else {
+                [void]$lastErrors.Add("Session login did not return X-Auth-Token.")
+            }
+        }
+        catch {
+            # iDRAC8 / 13G frequently returns 405 on Redfish session POST.
+            # That does not mean Redfish is unusable; Basic Auth GET discovery often still works.
+            [void]$lastErrors.Add("Session login failed: $($_.Exception.Message)")
+            $headers = $null
+        }
+
+        $basicCredential = $null
+        if (-not $headers) {
+            $sec = ConvertTo-SecureString $Password -AsPlainText -Force
+            $basicCredential = New-Object Management.Automation.PSCredential($Username, $sec)
+        }
+
+        $root = $null
+        try {
+            $root = Invoke-iDRACRedfishJson -BaseUrl $base -Path "/redfish/v1" -Headers $headers -Credential $basicCredential
+        }
+        catch {
+            [void]$lastErrors.Add("GET /redfish/v1 failed: $($_.Exception.Message)")
+        }
+
+        $system = $null
+        $systemsUri = ""
+        $systemUri = ""
+
+        try {
+            if ($root -and $root.Systems) {
+                $systemsUri = [string]$root.Systems.'@odata.id'
             }
         }
         catch {}
 
-        $serviceTag = Get-RedfishValue -Object $system -Paths @("SKU","SerialNumber","Oem.Dell.DellSystem.ChassisServiceTag")
-        $model      = Get-RedfishValue -Object $system -Paths @("Model","Oem.Dell.DellSystem.SystemModelName")
-        $osHost     = Get-RedfishValue -Object $system -Paths @("HostName","Oem.Dell.DellSystem.HostName","Oem.Dell.HostName")
-        $health     = Get-RedfishValue -Object $system -Paths @("Status.HealthRollup","Status.Health")
-        $powerState = Get-RedfishValue -Object $system -Paths @("PowerState")
+        $systemCandidateUris = New-Object System.Collections.ArrayList
 
-        if ([string]::IsNullOrWhiteSpace($health) -and $idrac) {
-            $health = Get-RedfishValue -Object $idrac -Paths @("Status.HealthRollup","Status.Health")
+        if (-not [string]::IsNullOrWhiteSpace($systemsUri)) {
+            try {
+                $systemsCollection = Invoke-iDRACRedfishJson -BaseUrl $base -Path $systemsUri -Headers $headers -Credential $basicCredential
+                $systemUri = Get-iDRACFirstMemberUri -Collection $systemsCollection
+                if (-not [string]::IsNullOrWhiteSpace($systemUri)) {
+                    [void]$systemCandidateUris.Add($systemUri)
+                }
+            }
+            catch {
+                [void]$lastErrors.Add("GET Systems collection failed: $($_.Exception.Message)")
+            }
+        }
+
+        foreach ($candidate in @(
+            "/redfish/v1/Systems/System.Embedded.1",
+            "/redfish/v1/Systems/1",
+            "/redfish/v1/Systems/System.Embedded.1/"
+        )) {
+            if (-not ($systemCandidateUris -contains $candidate)) {
+                [void]$systemCandidateUris.Add($candidate)
+            }
+        }
+
+        foreach ($candidate in @($systemCandidateUris)) {
+            try {
+                $system = Invoke-iDRACRedfishJson -BaseUrl $base -Path $candidate -Headers $headers -Credential $basicCredential
+                if ($system) {
+                    $systemUri = [string]$candidate
+                    break
+                }
+            }
+            catch {
+                [void]$lastErrors.Add("GET $candidate failed: $($_.Exception.Message)")
+            }
+        }
+
+        $idrac = $null
+        $managersUri = ""
+        $managerUri = ""
+
+        try {
+            if ($root -and $root.Managers) {
+                $managersUri = [string]$root.Managers.'@odata.id'
+            }
+        }
+        catch {}
+
+        $managerCandidateUris = New-Object System.Collections.ArrayList
+
+        if (-not [string]::IsNullOrWhiteSpace($managersUri)) {
+            try {
+                $mgrCollection = Invoke-iDRACRedfishJson -BaseUrl $base -Path $managersUri -Headers $headers -Credential $basicCredential
+                $managerUri = Get-iDRACFirstMemberUri -Collection $mgrCollection
+                if (-not [string]::IsNullOrWhiteSpace($managerUri)) {
+                    [void]$managerCandidateUris.Add($managerUri)
+                }
+            }
+            catch {
+                [void]$lastErrors.Add("GET Managers collection failed: $($_.Exception.Message)")
+            }
+        }
+
+        foreach ($candidate in @(
+            "/redfish/v1/Managers/iDRAC.Embedded.1",
+            "/redfish/v1/Managers/iDRAC.Embedded.1/",
+            "/redfish/v1/Managers/1"
+        )) {
+            if (-not ($managerCandidateUris -contains $candidate)) {
+                [void]$managerCandidateUris.Add($candidate)
+            }
+        }
+
+        foreach ($candidate in @($managerCandidateUris)) {
+            try {
+                $idrac = Invoke-iDRACRedfishJson -BaseUrl $base -Path $candidate -Headers $headers -Credential $basicCredential
+                if ($idrac) {
+                    $managerUri = [string]$candidate
+                    break
+                }
+            }
+            catch {
+                [void]$lastErrors.Add("GET $candidate failed: $($_.Exception.Message)")
+            }
+        }
+
+        if ($system) {
+            $serviceTag = Get-RedfishValue -Object $system -Paths @(
+                "SKU",
+                "SerialNumber",
+                "Oem.Dell.DellSystem.ChassisServiceTag",
+                "Oem.Dell.ChassisServiceTag"
+            )
+            $model = Get-RedfishValue -Object $system -Paths @(
+                "Model",
+                "Oem.Dell.DellSystem.SystemModelName",
+                "Oem.Dell.SystemModelName"
+            )
+            $osHost = Get-RedfishValue -Object $system -Paths @(
+                "HostName",
+                "Oem.Dell.DellSystem.HostName",
+                "Oem.Dell.HostName"
+            )
+            $health = Get-RedfishValue -Object $system -Paths @(
+                "Status.HealthRollup",
+                "Status.Health"
+            )
+            $powerState = Get-RedfishValue -Object $system -Paths @("PowerState")
+        }
+
+        if ($idrac) {
+            $managerName = Get-RedfishValue -Object $idrac -Paths @("Name","Id","HostName")
+            if ([string]::IsNullOrWhiteSpace($health)) {
+                $health = Get-RedfishValue -Object $idrac -Paths @("Status.HealthRollup","Status.Health")
+            }
+            if ([string]::IsNullOrWhiteSpace($model)) {
+                $model = Get-RedfishValue -Object $idrac -Paths @("Model","Oem.Dell.DelliDRACCard.Model")
+            }
+            if ([string]::IsNullOrWhiteSpace($serviceTag)) {
+                $serviceTag = Get-RedfishValue -Object $idrac -Paths @("ServiceTag","SerialNumber")
+            }
+        }
+
+        $redfishResponded = ($null -ne $root) -or ($null -ne $system) -or ($null -ne $idrac)
+        if (-not $redfishResponded) {
+            throw "Redfish did not return usable root, system, or manager data.`r`n$($lastErrors -join "`r`n")"
         }
 
         if ([string]::IsNullOrWhiteSpace($serviceTag)) { $serviceTag = "Unknown" }
@@ -1279,6 +1527,9 @@ function Get-iDRACInventory {
         }
         elseif ($serviceTag -ne "Unknown") {
             $serviceTag
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($managerName)) {
+            $managerName
         }
         else {
             $Address
@@ -1300,7 +1551,6 @@ function Get-iDRACInventory {
         throw $_
     }
     finally {
-        # Close the temporary Redfish discovery session.
         try {
             if ($headers -and -not [string]::IsNullOrWhiteSpace([string]$sessionLocation)) {
                 $deleteUri = if ($sessionLocation -match '^https?://') { $sessionLocation } else { "$base$sessionLocation" }
@@ -1396,6 +1646,7 @@ function Refresh-iDRACHealthBatch {
 
     if ($script:Status) {
         $script:Status.Text = "Health refresh complete. Success: $okCount  Failed: $failCount  Time: $(Get-Date -Format 'h:mm:ss tt')"
+        Send-iDRACCManTelemetry -EventName "RefreshHealth" -Properties @{ Title = $Title; Success = $okCount; Failed = $failCount; Count = $servers.Count }
     }
 
     if ($failCount -gt 0) {
@@ -2923,7 +3174,9 @@ function Add-WebViewTab {
     param(
         [Parameter(Mandatory=$true)]$Server,
         [Parameter(Mandatory=$true)][string]$Url,
-        [switch]$IsKvm
+        [switch]$IsKvm,
+        [Parameter(Mandatory=$false)][string]$TabTitle,
+        [Parameter(Mandatory=$false)][string]$HeaderMessage
     )
 
     if (-not $script:WebViewReady) {
@@ -2935,7 +3188,7 @@ function Add-WebViewTab {
     }
 
     $tab = New-Object System.Windows.Forms.TabPage
-    $tab.Text = $Server.Name
+    $tab.Text = if ([string]::IsNullOrWhiteSpace($TabTitle)) { $Server.Name } else { $TabTitle }
 
     $outer = New-Object System.Windows.Forms.Panel
     $outer.Dock = "Fill"
@@ -3042,7 +3295,10 @@ $info = New-Object System.Windows.Forms.Label
     $info.Top = 10
     $info.Width = 1200
     $info.Height = 22
-    $info.Text = if ($IsKvm) {
+    $info.Text = if (-not [string]::IsNullOrWhiteSpace($HeaderMessage)) {
+        $HeaderMessage
+    }
+    elseif ($IsKvm) {
         ""
     }
     else {
@@ -3300,8 +3556,20 @@ function Open-KvmEmbedded {
         Send-iDRACCManTelemetry -EventName "OpenConsole" -Properties @{ Group = $s.Group; Model = $s.Model; Health = $s.Health }
     }
     catch {
+        $err = $_.Exception.Message
+
+        if (Test-iDRAC8LegacyKvmUnsupportedError -Message $err) {
+            try {
+                Open-iDRAC8GuiFallback -Server $s -Reason $err | Out-Null
+                return
+            }
+            catch {
+                $err = $_.Exception.Message
+            }
+        }
+
         [System.Windows.Forms.MessageBox]::Show(
-            "Failed to create KVM session.`r`n`r`n$($_.Exception.Message)",
+            "Failed to create KVM session.`r`n`r`n$err",
             "KVM Error",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error
@@ -3469,17 +3737,28 @@ function Connect-AllInSelectedGroup {
 
     foreach ($srv in $servers) {
         try {
-            $kvm = New-iDRACKvmUrlDellMethod -Server $srv
-            $tab = Add-WebViewTab -Server $srv -Url $kvm.Url -IsKvm
+            try {
+                $kvm = New-iDRACKvmUrlDellMethod -Server $srv
+                $tab = Add-WebViewTab -Server $srv -Url $kvm.Url -IsKvm
 
-            if ($tab) {
-                $key = [string]$tab.GetHashCode()
-                $script:KvmSessions[$key] = $kvm
-                try {
-                    $tab.Tag.KvmSessionKey = $key
+                if ($tab) {
+                    $key = [string]$tab.GetHashCode()
+                    $script:KvmSessions[$key] = $kvm
+                    try {
+                        $tab.Tag.KvmSessionKey = $key
+                    }
+                    catch {
+                        $tab.Tag | Add-Member -NotePropertyName KvmSessionKey -NotePropertyValue $key -Force
+                    }
                 }
-                catch {
-                    $tab.Tag | Add-Member -NotePropertyName KvmSessionKey -NotePropertyValue $key -Force
+            }
+            catch {
+                $err = $_.Exception.Message
+                if (Test-iDRAC8LegacyKvmUnsupportedError -Message $err) {
+                    Open-iDRAC8GuiFallback -Server $srv -Reason $err | Out-Null
+                }
+                else {
+                    throw
                 }
             }
         }
@@ -4308,6 +4587,7 @@ function Show-iDRACCManSearch {
         $script:Tabs.SelectedTab = $tab
 
         if ($script:Status) { $script:Status.Text = "Search found $($matches.Count) result(s) for '$query'." }
+        Send-iDRACCManTelemetry -EventName "Search" -Properties @{ QueryLength = $query.Length; ResultCount = $matches.Count }
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show(
@@ -4408,7 +4688,7 @@ function Build-Gui {
         $icon = New-Object System.Windows.Forms.Label
         $icon.Text = "●"
         $icon.Left = 18; $icon.Top = 22; $icon.Width = 40; $icon.Height = 38
-        $icon.Font = New-Object System.Drawing.Font("Segoe UI", 22, [System.Drawing.FontStyle]::Bold)
+        $icon.Font = New-Object System.Drawing.Font("Segoe UI", 18, [System.Drawing.FontStyle]::Regular)
         $icon.ForeColor = $Accent
         $p.Controls.Add($icon)
 
@@ -4478,7 +4758,7 @@ function Build-Gui {
 
         $recentTitle = New-Object System.Windows.Forms.Label
         $recentTitle.Text = "Configured iDRAC Connections"
-        $recentTitle.Left = 14; $recentTitle.Top = 12; $recentTitle.Width = 400; $recentTitle.Height = 25
+        $recentTitle.Left = 14; $recentTitle.Top = 12; $recentTitle.Width = 400; $recentTitle.Height = 32
         $recentTitle.Font = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
         $recentTitle.ForeColor = $colorText
         $recentPanel.Controls.Add($recentTitle)
@@ -5002,6 +5282,7 @@ function Invoke-iDRACCMan {
                 $script:Tabs.SelectedTab = $script:Tabs.TabPages[0]
                 Close-CurrentTab
             }
+            Send-iDRACCManTelemetry -EventName "AppClose" -Properties @{ ServerCount = @($script:Servers).Count }
             Write-iDRACCManLog "iDRACCMan closed"
         })
 
