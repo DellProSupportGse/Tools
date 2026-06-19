@@ -607,11 +607,11 @@ param(
             param($ServiceList)
             $FailedServicesOnNode=@()
             # Run Get-Service once for the entire list
-            $Status = Get-Service -Name $ServiceList -ErrorAction SilentlyContinue
+            $Status = $ServiceList | Get-Service -ErrorAction SilentlyContinue
             # Check any that aren't running
             $FailedServicesOnNode+=$Status | Where-Object { $_.Status -ne "Running" }
             $FailedServicesOnNode
-        } -ArgumentList ($AzureLocalServices)
+        } -ArgumentList (,$AzureLocalServices)
         If ($FailedServices) {
             Write-ToHost "Azure local required all node services $(($FailedServices.Name | Sort -Unique) -join ',') are NOT running on ALL nodes" -Level 3 -Checkmark 3
         } else {
