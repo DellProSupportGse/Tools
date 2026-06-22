@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.51"
+    $ver="0.52"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -249,62 +249,65 @@ param(
     $envVarName = "AZURE_EXTENSION_DIR"
 
     # 1. Verify if the directory exists on D:
-    Write-Host "`n Checking for AzCliExtensions on the D drive..." -ForegroundColor Yellow
+    Foreach ($node in $clusterNodes) {
+        Write-Host "`n Checking for AzCliExtensions on the D drive on node $node..." -ForegroundColor Yellow
+        $nodeSourcePath="\\$(node)\$($sourcePath.replace(':','$'))"
+        if (Test-Path -Path $nodeSourcePath) {
+            Write-Host "  -> Directory found at $sourcePath on node $node. Should be relocated to C." -ForegroundColor Cyan
 
-    if (Test-Path -Path $sourcePath) {
-        Write-Host "  -> Directory found at $sourcePath. Should be relocated to C." -ForegroundColor Cyan
+            # 2. Move the directory to C:
+            if ($DoConversion) {
+                try {
+                    Write-Host "`n Moving directory to C: drive..." -ForegroundColor Yellow
+                    $nodeDestPath="\\$(node)\$($destPath.replace(':','$'))"
+                    Move-Item -Path $nodeSourcePath -Destination $nodeDestPath -Force -ErrorAction Stop
+                    Remove-Item $nodeSourcePath -Confirm:$false -Recurse -Force -ErrorAction SilentlyContinue
+                    Write-Host "Directory successfully moved to $destPath on node $node" -ForegroundColor Green
+                    #$conversionDone=$true
+                }
+                catch {
+                    Write-Error "CRITICAL: Failed to move directory. Ensure no files are actively open. Error: $_" -ErrorAction Stop
+                    $conversionDone=$false
+                }
+            }
 
-        # 2. Move the directory to C:
-        if ($DoConversion) {
-            try {
-                Write-Host "`n Moving directory to C: drive..." -ForegroundColor Yellow
-                Move-Item -Path $sourcePath -Destination $destPath -Force -ErrorAction Stop
-                Remove-Item $sourcePath -Confirm:$false -Recurse -Force -ErrorAction SilentlyContinue
-                Write-Host "Directory successfully moved to $destPath" -ForegroundColor Green
-                #$conversionDone=$true
+            # 3. Update the Machine-level Environment Variable
+            if ($DoConversion) {
+                try {
+                    Write-Host "`n Updating '$envVarName' Machine environment variable..." -ForegroundColor Yellow
+                    Invoke-Command -ComputerName $node -Scriptblock { [System.Environment]::SetEnvironmentVariable($using:envVarName, $using:destPath, 'Machine')}
+                    Write-Host "Environment variable updated in Machine registry on node $node." -ForegroundColor Green
+                }
+                catch {
+                    Write-Error "CRITICAL: Failed to set environment variable. Ensure PowerShell is running as Administrator. Error: $_" -ErrorAction Stop
+                    $conversionDone=$false
+                }
             }
-            catch {
-                Write-Error "CRITICAL: Failed to move directory. Ensure no files are actively open. Error: $_" -ErrorAction Stop
-                $conversionDone=$false
-            }
-        }
-
-        # 3. Update the Machine-level Environment Variable
-        if ($DoConversion) {
-            try {
-                Write-Host "`n Updating '$envVarName' Machine environment variable..." -ForegroundColor Yellow
-                [System.Environment]::SetEnvironmentVariable($envVarName, $destPath, 'Machine')
-                Write-Host "Environment variable updated in Machine registry." -ForegroundColor Green
-            }
-            catch {
-                Write-Error "CRITICAL: Failed to set environment variable. Ensure PowerShell is running as Administrator. Error: $_" -ErrorAction Stop
-                $conversionDone=$false
-            }
-        }
-    } else {
-        if ($conversionDone){ 
-            Write-Host "  -> Directory not found at $sourcePath. Either it was already moved or this is a standard AX deployment." -ForegroundColor DarkGray
         } else {
-            Write-Host "Directory not found at $sourcePath."
+            if ($conversionDone){ 
+                Write-Host "  -> Directory not found at $sourcePath on node $node. Either it was already moved or this is a standard AX deployment." -ForegroundColor DarkGray
+            } else {
+                Write-Host "Directory not found at $sourcePath on node $node."
+            }
+            #$conversionDone=$true
         }
-        #$conversionDone=$true
     }
-
     # 4 & 5. Verify the Machine environment variable explicitly
-    Write-Host "`n Verifying Machine-scoped environment variable resolution..." -ForegroundColor Yellow
+    Foreach ($node in $clusterNodes) {
+        Write-Host "`n Verifying Machine-scoped environment variable resolution on node $node..." -ForegroundColor Yellow
+        # Query the Machine scope directly instead of the Process scope ($env:)
+        $currentEnv = Invoke-Command -ComputerName $node -ScriptBlock {[System.Environment]::GetEnvironmentVariable($envVarName, 'Machine')}
+        $nodeDestPath="\\$(node)\$($destPath.replace(':','$'))"
+        $filesMoved=(gci $nodeDestPath -ErrorAction SilentlyContinue).count
 
-    # Query the Machine scope directly instead of the Process scope ($env:)
-    $currentEnv = [System.Environment]::GetEnvironmentVariable($envVarName, 'Machine')
-    $filesMoved=(gci $destPath -ErrorAction SilentlyContinue).count
-
-    if ($currentEnv -eq $destPath -and $filesMoved -gt 0) {
-        Write-Host "Machine scope '$envVarName' evaluates to: $currentEnv and files exist in the correct path" -ForegroundColor Green
-        #$conversionDone=$true
-    } else {
-        Write-Warning "Mismatch detected. Machine scope '$envVarName' currently evaluates to: '$currentEnv'. Expected: '$destPath'. or files do not exist in expected path"
-        $conversionDone=$false
+        if ($currentEnv -eq $nodeDestPath -and $filesMoved -gt 0) {
+            Write-Host "Machine scope '$envVarName' evaluates to: $currentEnv and files exist in the correct path" -ForegroundColor Green
+            #$conversionDone=$true
+        } else {
+            Write-Warning "Mismatch detected. Machine scope '$envVarName' currently evaluates to: '$currentEnv'. Expected: '$destPath'. or files do not exist in expected path"
+            $conversionDone=$false
+        }
     }
-
     # ══════════════════════════════════════════════════════════════════════════════
     # SECTION 5 — Dell AX SBE Hardware Mapping & RequiredSolution Update Check
     # ══════════════════════════════════════════════════════════════════════════════
