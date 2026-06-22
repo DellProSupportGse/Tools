@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.52"
+    $ver="0.53"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -251,7 +251,7 @@ param(
     # 1. Verify if the directory exists on D:
     Foreach ($node in $clusterNodes) {
         Write-Host "`n Checking for AzCliExtensions on the D drive on node $node..." -ForegroundColor Yellow
-        $nodeSourcePath="\\$(node)\$($sourcePath.replace(':','$'))"
+        $nodeSourcePath="\\$($node)\$($sourcePath.replace(':','$'))"
         if (Test-Path -Path $nodeSourcePath) {
             Write-Host "  -> Directory found at $sourcePath on node $node. Should be relocated to C." -ForegroundColor Cyan
 
@@ -259,7 +259,7 @@ param(
             if ($DoConversion) {
                 try {
                     Write-Host "`n Moving directory to C: drive..." -ForegroundColor Yellow
-                    $nodeDestPath="\\$(node)\$($destPath.replace(':','$'))"
+                    $nodeDestPath="\\$($node)\$($destPath.replace(':','$'))"
                     Move-Item -Path $nodeSourcePath -Destination $nodeDestPath -Force -ErrorAction Stop
                     Remove-Item $nodeSourcePath -Confirm:$false -Recurse -Force -ErrorAction SilentlyContinue
                     Write-Host "Directory successfully moved to $destPath on node $node" -ForegroundColor Green
@@ -297,7 +297,7 @@ param(
         Write-Host "`n Verifying Machine-scoped environment variable resolution on node $node..." -ForegroundColor Yellow
         # Query the Machine scope directly instead of the Process scope ($env:)
         $currentEnv = Invoke-Command -ComputerName $node -ScriptBlock {[System.Environment]::GetEnvironmentVariable($envVarName, 'Machine')}
-        $nodeDestPath="\\$(node)\$($destPath.replace(':','$'))"
+        $nodeDestPath="\\$($node)\$($destPath.replace(':','$'))"
         $filesMoved=(gci $nodeDestPath -ErrorAction SilentlyContinue).count
 
         if ($currentEnv -eq $nodeDestPath -and $filesMoved -gt 0) {
