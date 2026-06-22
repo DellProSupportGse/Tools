@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.56"
+    $ver="0.57"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -306,7 +306,7 @@ param(
         $nodeDestPath="\\$($node)\$($destPath.replace(':','$'))"
         $filesMoved=(gci $nodeDestPath -ErrorAction SilentlyContinue).count
 
-        if ($currentEnv -eq $nodeDestPath -and $filesMoved -gt 0) {
+        if ($currentEnv -eq $destPath -and $filesMoved -gt 0) {
             Write-Host "Machine scope '$envVarName' evaluates to: $currentEnv and files exist in the correct path" -ForegroundColor Green
             #$conversionDone=$true
         } else {
