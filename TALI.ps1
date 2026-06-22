@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.61"
+    $ver="0.62"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -144,6 +144,24 @@ param(
             Write-ToHost "Node(s) $($nonCompliant.Node -join ',') do(es) not have HWTimeout set to at least 10000" -Checkmark 3 -Level 3
         } else {
             Write-ToHost "All nodes have HWtimeout set to at least 10000"
+        }
+        return $nonCompliant
+    }
+    Function Test-VMMIgrationPerformanceOption {
+        Write-Host "Testing that all nodes have the VM migration performance option set to SMB..."
+        $results = Invoke-Command -ComputerName $nodes -ScriptBlock {
+            $value = (Get-VMHost).VirtualMachineMigrationPerformanceOption.ToString()
+            [PSCustomObject]@{
+                Node      = $env:COMPUTERNAME
+                VMMigrationPerfOption = $value.trim()
+            }
+        }
+        $nonCompliant = $null
+        $nonCompliant = $results | Where-Object { $_.VMMigrationPerfOption -ne "SMB" }
+        If ($nonCompliant) {
+            Write-ToHost "Node(s) $($nonCompliant.Node -join ',') do(es) not have SMB for the VM migration performance option" -Checkmark 3 -Level 3
+        } else {
+            Write-ToHost "All nodes have SMB for the VM migration performance option"
         }
         return $nonCompliant
     }
@@ -1639,6 +1657,20 @@ v$ver
         }
     }
     $testReport+= [PSCustomObject] @{TestName="Test-HWTimeoutKey";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
+    Write-Host ""
+    $nonCompliant=Test-VMMIgrationPerformanceOption
+    If ($nonCompliant)  {
+        If ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Fixing VM migration performance option. Est Time is less than one minute" -ForegroundColor Cyan
+            Set-VMHost -ComputerName $nonCompliant.node -VirtualMachineMigrationPerformanceOption SMB
+            $nonCompliant=Test-VMMIgrationPerformanceOption
+            If ($nonCompliant) {Write-ToHost "Fix VM migration performance option failed!!!" -Level 4 -Checkmark 4;$testPass=3}
+        } else {
+             $testPass=2
+             Write-Host "Recommendation: Set VM migration perfomance option to SMB to all nodes"
+        }
+    }
+    $testReport+= [PSCustomObject] @{TestName="Test-VMMIgrationPerformanceOption";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $disksInMaint= Test-NodesUpDisksinMaintMode
     If ($disksInMaint)  {
