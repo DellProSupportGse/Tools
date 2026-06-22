@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.53"
+    $ver="0.54"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -254,7 +254,6 @@ param(
         $nodeSourcePath="\\$($node)\$($sourcePath.replace(':','$'))"
         if (Test-Path -Path $nodeSourcePath) {
             Write-Host "  -> Directory found at $sourcePath on node $node. Should be relocated to C." -ForegroundColor Cyan
-
             # 2. Move the directory to C:
             if ($DoConversion) {
                 try {
@@ -269,6 +268,8 @@ param(
                     Write-Error "CRITICAL: Failed to move directory. Ensure no files are actively open. Error: $_" -ErrorAction Stop
                     $conversionDone=$false
                 }
+            } else {
+                $conversionDone=$false
             }
 
             # 3. Update the Machine-level Environment Variable
