@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.55"
+    $ver="0.56"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -249,7 +249,7 @@ param(
     $envVarName = "AZURE_EXTENSION_DIR"
 
     # 1. Verify if the directory exists on D:
-    Foreach ($node in $clusterNodes) {
+    Foreach ($node in $clusterNodes.Name) {
         Write-Host "`n Checking for AzCliExtensions on the D drive on node $node..." -ForegroundColor Yellow
         $nodeDDrive=$null
         $nodeDDrive=Get-Volume -CimSession $node -DriveLetter D -ErrorAction SilentlyContinue
@@ -299,7 +299,7 @@ param(
         }
     }
     # 4 & 5. Verify the Machine environment variable explicitly
-    Foreach ($node in $clusterNodes) {
+    Foreach ($node in $clusterNodes.Name) {
         Write-Host "`n Verifying Machine-scoped environment variable resolution on node $node..." -ForegroundColor Yellow
         # Query the Machine scope directly instead of the Process scope ($env:)
         $currentEnv = Invoke-Command -ComputerName $node -ScriptBlock {[System.Environment]::GetEnvironmentVariable($using:envVarName, 'Machine')}
