@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.54"
+    $ver="0.55"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -251,14 +251,19 @@ param(
     # 1. Verify if the directory exists on D:
     Foreach ($node in $clusterNodes) {
         Write-Host "`n Checking for AzCliExtensions on the D drive on node $node..." -ForegroundColor Yellow
+        $nodeDDrive=$null
+        $nodeDDrive=Get-Volume -CimSession $node -DriveLetter D -ErrorAction SilentlyContinue
         $nodeSourcePath="\\$($node)\$($sourcePath.replace(':','$'))"
-        if (Test-Path -Path $nodeSourcePath) {
+        $nodeDestPath="\\$($node)\$($destPath.replace(':','$'))"
+        if ($nodeDDrive) {$nodeDFiles=Test-Path -Path $nodeSourcePath} else {$nodeDFiles=$null}
+        $nodeCFiles=$null
+        $nodeCFiles=Test-Path -Path $nodeDestPath
+        if ($nodeDFiles -and !($nodeCFiles)) {
             Write-Host "  -> Directory found at $sourcePath on node $node. Should be relocated to C." -ForegroundColor Cyan
             # 2. Move the directory to C:
             if ($DoConversion) {
                 try {
                     Write-Host "`n Moving directory to C: drive..." -ForegroundColor Yellow
-                    $nodeDestPath="\\$($node)\$($destPath.replace(':','$'))"
                     Move-Item -Path $nodeSourcePath -Destination $nodeDestPath -Force -ErrorAction Stop
                     Remove-Item $nodeSourcePath -Confirm:$false -Recurse -Force -ErrorAction SilentlyContinue
                     Write-Host "Directory successfully moved to $destPath on node $node" -ForegroundColor Green
@@ -297,7 +302,7 @@ param(
     Foreach ($node in $clusterNodes) {
         Write-Host "`n Verifying Machine-scoped environment variable resolution on node $node..." -ForegroundColor Yellow
         # Query the Machine scope directly instead of the Process scope ($env:)
-        $currentEnv = Invoke-Command -ComputerName $node -ScriptBlock {[System.Environment]::GetEnvironmentVariable($envVarName, 'Machine')}
+        $currentEnv = Invoke-Command -ComputerName $node -ScriptBlock {[System.Environment]::GetEnvironmentVariable($using:envVarName, 'Machine')}
         $nodeDestPath="\\$($node)\$($destPath.replace(':','$'))"
         $filesMoved=(gci $nodeDestPath -ErrorAction SilentlyContinue).count
 
