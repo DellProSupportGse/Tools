@@ -5,7 +5,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.4'
+    $Ver = '1.5'
 
     $text = @"
 v$Ver
@@ -38,6 +38,16 @@ v$Ver
             Command     = 'Invoke-KeyRelay'
             Encoding    = 'Default'
         }
+        [pscustomobject]@{
+            Name        = 'AzHCIUrlChecker'
+            Description = 'GUI tool to send text to applications that do not allow pasting.'
+            Internal    = $false
+            SortOrder   = 10
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/AzHCIUrlChecker.ps1'
+            Module      = 'AzHCIUrlChecker'
+            Command     = 'Invoke-AzHCIUrlChecker'
+            Encoding    = 'UTF8'
+        }            
         [pscustomobject]@{
             Name        = 'iDRACMan'
             Description = 'simplified iDRAC access'
