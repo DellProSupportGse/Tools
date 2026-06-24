@@ -50,7 +50,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.56"
+$script:AppVersion   = "1.0.57"
 
 # Telemetry run-once guard
 $script:TelemetryStartupSent = $false
@@ -213,10 +213,11 @@ function Set-iDRACCManSetting {
 #region Telemetry Information
 # =====================================================
 
-$script:TelemetryReportID = [guid]::NewGuid().Guid
+$script:TelemetryReportID    = [guid]::NewGuid().Guid
 $script:TelemetryGeoResolved = $false
-$script:TelemetryGeoData = @{}
-$script:uploadToAzure = $true
+$script:TelemetryGeoData     = @{}
+$script:TelemetryStartupSent = $false
+$script:uploadToAzure        = $true
 
 function Write-Indent {
     param(
@@ -232,82 +233,20 @@ function Write-Indent {
     catch {}
 }
 
-function Add-TableData {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$TableName,
-
-        [Parameter(Mandatory=$true)]
-        [string]$PartitionKey,
-
-        [Parameter(Mandatory=$false)]
-        [string]$RowKey,
-
-        [Parameter(Mandatory=$false)]
-        [string]$SasToken,
-
-        [Parameter(Mandatory=$true)]
-        $Data
-    )
-
-    if (-not $script:uploadToAzure) { return }
-
+function Get-TelemetryMachineHash {
     try {
-        $Data = [HashTable]$Data
-
-        $RowKey = [guid]::NewGuid().Guid
-
-        # Add your Azure Table SaS Token with at least add permissions here.
-        $TableSaSToken = '?sv=2019-02-02&spr=https&st=2026-06-18T11%3A31%3A36Z&se=2028-06-19T11%3A31%3A00Z&sp=a&sig=Etv0vAlXPw3NtYe1YVFlKrTK80inQk5zMX9GMUyKwPo%3D&tn=iDRACCManTelemetryData'
-        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/' + $TableSaSToken
-
-        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
-
-        $headers = @{
-            "Accept"       = "application/json;odata=nometadata"
-            "Content-Type" = "application/json"
-            "x-ms-version" = "2019-02-02"
-        }
-
-        $Data["PartitionKey"] = $PartitionKey
-        $Data["RowKey"]       = $RowKey
-
-        $body = $Data | ConvertTo-Json -Depth 5
-
-        $maxRetries = 3
-        $attempt = 0
-        $success = $false
+        $raw = "$env:USERDOMAIN\$env:USERNAME@$env:COMPUTERNAME"
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($raw)
+        $hash = $sha.ComputeHash($bytes)
+        return ([BitConverter]::ToString($hash)).Replace("-","").Substring(0,24)
     }
     catch {
-        return
-    }
-
-    while (-not $success -and $attempt -lt $maxRetries) {
-        try {
-            Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
-            $success = $true
-            Write-Indent "Telemetry recorded successfully" 1 Green
-        }
-        catch {
-            $attempt++
-
-            if ($attempt -lt $maxRetries) {
-                Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
-                Start-Sleep -Seconds 2
-            }
-            else {
-                Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
-                try {
-                    Write-iDRACCManLog ("Telemetry upload failed: {0}" -f $_.Exception.Message) "WARN"
-                }
-                catch {}
-            }
-        }
+        return ""
     }
 }
 
-function Resolve-iDRACCManTelemetryGeo {
+function Resolve-TelemetryGeo {
     try {
         if ($script:TelemetryGeoResolved) { return }
 
@@ -343,87 +282,116 @@ function Resolve-iDRACCManTelemetryGeo {
     }
 }
 
-function Send-iDRACCManTelemetry {
+function Send-ToolTelemetry {
+    [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true)][string]$EventName,
-        [hashtable]$Properties = @{}
+        [Parameter(Mandatory=$true)]
+        [string]$TelemetryName,
+
+        [Parameter(Mandatory=$true)]
+        [string]$EventName,
+
+        [Parameter(Mandatory=$true)]
+        [string]$Version,
+
+        [Parameter(Mandatory=$true)]
+        [string]$Endpoint,
+
+        [int]$ServerCount = 0,
+
+        [int]$GroupCount = 0,
+
+        [switch]$NoGeo,
+
+        [switch]$DebugTelemetry
     )
 
-    # Prevent duplicate startup telemetry when UI initialization refreshes dashboard/health multiple times.
+    if (-not $script:uploadToAzure) { return }
+
     if ($EventName -match '^(Startup|Launch|AppStart|ToolStart|TelemetryStartup)$') {
         if ($script:TelemetryStartupSent) { return }
         $script:TelemetryStartupSent = $true
     }
 
     try {
-        if (-not [bool](Get-iDRACCManSetting -Name "TelemetryEnabled" -Default $true)) { return }
-
-        if ($script:TelemetryStartupSent) { return }
-    $script:TelemetryStartupSent = $true
-
-    Write-Host "Logging Telemetry Information..."
-
-        Resolve-iDRACCManTelemetryGeo
-
-        $machineHash = ""
-        try {
-            $raw = "$env:USERDOMAIN\$env:USERNAME@$env:COMPUTERNAME"
-            $sha = [System.Security.Cryptography.SHA256]::Create()
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($raw)
-            $hash = $sha.ComputeHash($bytes)
-            $machineHash = ([BitConverter]::ToString($hash)).Replace("-","").Substring(0,24)
+        if (-not $NoGeo) {
+            Resolve-TelemetryGeo
         }
-        catch {}
 
-        $data = @{
-            EventName    = $EventName
-            Region       = $script:TelemetryGeoData.region
-            Version      = $script:AppVersion
-            ReportID     = $script:TelemetryReportID
-            country      = $script:TelemetryGeoData.country
-            countryCode  = $script:TelemetryGeoData.countryCode
-            geoRegion    = $script:TelemetryGeoData.region
-            city         = $script:TelemetryGeoData.city
-            lat          = $script:TelemetryGeoData.latitude
-            lon          = $script:TelemetryGeoData.longitude
-            timezone     = $script:TelemetryGeoData.timezone
-            Timestamp    = (Get-Date).ToUniversalTime().ToString("o")
-            HostOS       = [System.Environment]::OSVersion.VersionString
+        $rowKey = [guid]::NewGuid().Guid
+        $partitionKey = $TelemetryName -replace 'TelemetryData$',''
+
+        # ONLY requested table columns are placed in Data.
+        $data = [ordered]@{
+            PartitionKey = $partitionKey
+            RowKey       = $rowKey
             PSVersion    = $PSVersionTable.PSVersion.ToString()
-            MachineHash  = $machineHash
-            ComputerName = $env:COMPUTERNAME
+            Region       = $script:TelemetryGeoData.region
+            countryCode  = $script:TelemetryGeoData.countryCode
+            lon          = $script:TelemetryGeoData.longitude
+            MachineHash  = Get-TelemetryMachineHash
+            geoRegion    = $script:TelemetryGeoData.region
+            lat          = $script:TelemetryGeoData.latitude
+            Version      = $Version
+            timezone     = $script:TelemetryGeoData.timezone
+            ReportID     = $script:TelemetryReportID
+            city         = $script:TelemetryGeoData.city
+            country      = $script:TelemetryGeoData.country
         }
 
-        foreach ($k in @($Properties.Keys)) {
-            try {
-                $safeName = ([string]$k) -replace '[^a-zA-Z0-9_]', '_'
-                if ([string]::IsNullOrWhiteSpace($safeName)) { continue }
-                $v = $Properties[$k]
-                if ($null -eq $v) { $v = "" }
-                $data[$safeName] = [string]$v
-            }
-            catch {}
+        # Envelope for the Function only. The Function should write Data only.
+        $payload = @{
+            TelemetryName = $TelemetryName
+            TableName     = $TelemetryName
+            Data          = $data
         }
 
-        # We use tool name for this value.
-        $PartitionKey = "iDRACCMan"
+        $body = $payload | ConvertTo-Json -Depth 10
 
-        Add-TableData `
-            -TableName "iDRACCManTelemetryData" `
-            -PartitionKey $PartitionKey `
-            -Data $data
+        if ($DebugTelemetry) {
+            Write-Host "Telemetry Request:" -ForegroundColor Cyan
+            Write-Host $body
+        }
+
+        $response = Invoke-RestMethod `
+            -Method Post `
+            -Uri $Endpoint `
+            -ContentType "application/json" `
+            -Body $body `
+            -TimeoutSec 15
+
+        if ($DebugTelemetry) {
+            Write-Host "Telemetry Response:" -ForegroundColor Green
+            $response | ConvertTo-Json -Depth 10
+        }
+        else {
+            Write-Indent "Telemetry recorded successfully" 1 Green
+        }
+
     }
     catch {
-        try {
-            Write-iDRACCManLog ("Telemetry failed for {0}: {1}" -f $EventName, $_.Exception.Message) "WARN"
+        if ($DebugTelemetry) {
+            Write-Warning "Telemetry failed: $($_.Exception.Message)"
+            if ($_.ErrorDetails.Message) {
+                Write-Warning $_.ErrorDetails.Message
+            }
         }
-        catch {}
+        return
     }
 }
 
 #endregion
 
+# Example:
+ $telemetryParams = @{
+     TelemetryName  = "iDRACCManTelemetryData"
+     EventName      = "Startup"
+     Version        = $script:AppVersion
+     Endpoint       = "https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData"
+     DebugTelemetry = $false
+ }
 
+ Send-ToolTelemetry @telemetryParams
 
 function Open-iDRACCManDataFolder {
     Start-Process $script:AppRoot
