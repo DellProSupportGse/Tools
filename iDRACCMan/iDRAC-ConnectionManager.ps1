@@ -50,7 +50,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.65"
+$script:AppVersion   = "1.0.67"
 
 # Telemetry run-once guard
 $script:TelemetryStartupSent = $false
@@ -211,6 +211,11 @@ function Set-iDRACCManSetting {
 
 # =====================================================
 #region Telemetry Information
+
+# GDPR note:
+# Do not collect iDRAC names, addresses, service tags, models, health, group names,
+# usernames, server counts, or user action telemetry. Send-ToolTelemetry is reserved
+# for the minimal approved startup signal only.
 # =====================================================
 
 $script:TelemetryReportID    = [guid]::NewGuid().Guid
@@ -1227,7 +1232,7 @@ function Open-iDRAC8GuiFallback {
         }
         catch {}
 
-        Send-iDRACCManTelemetry -EventName "OpenConsoleIDRAC8GuiFallback" -Properties @{ Group = $Server.Group; Model = $Server.Model; Health = $Server.Health }
+            # GDPR: legacy system/action telemetry removed.
         return $tab
     }
     catch {
@@ -1614,7 +1619,7 @@ function Refresh-iDRACHealthBatch {
 
     if ($script:Status) {
         $script:Status.Text = "Health refresh complete. Success: $okCount  Failed: $failCount  Time: $(Get-Date -Format 'h:mm:ss tt')"
-        Send-iDRACCManTelemetry -EventName "RefreshHealth" -Properties @{ Title = $Title; Success = $okCount; Failed = $failCount; Count = $servers.Count }
+            # GDPR: legacy system/action telemetry removed.
     }
 
     if ($failCount -gt 0) {
@@ -2219,7 +2224,7 @@ function Show-ServerDialog {
 
                     $addedRecord = Add-iDRACServerRecord -Inventory $inv -GroupName $groupName
                     [void]$added.Add($addedRecord)
-                    Send-iDRACCManTelemetry -EventName "AddiDRAC" -Properties @{ Group = $addedRecord.Group; Model = $addedRecord.Model; Health = $addedRecord.Health }
+            # GDPR: legacy system/action telemetry removed.
                 }
                 catch {
                     [void]$skipped.Add($inv)
@@ -3503,7 +3508,7 @@ function Open-WebEmbedded {
     $s = Get-SelectedServer
     if (-not $s) { return }
     Add-WebViewTab -Server $s -Url (Get-iDRACBaseUrl $s.Address)
-    Send-iDRACCManTelemetry -EventName "OpenGUI" -Properties @{ Group = $s.Group; Model = $s.Model; Health = $s.Health }
+            # GDPR: legacy system/action telemetry removed.
 }
 
 function Open-KvmEmbedded {
@@ -3521,7 +3526,7 @@ function Open-KvmEmbedded {
         }
 
         $script:Status.Text = "Opened embedded KVM for $($s.Name)"
-        Send-iDRACCManTelemetry -EventName "OpenConsole" -Properties @{ Group = $s.Group; Model = $s.Model; Health = $s.Health }
+            # GDPR: legacy system/action telemetry removed.
     }
     catch {
         $err = $_.Exception.Message
@@ -3571,7 +3576,7 @@ function Invoke-PowerAction {
 
         Add-LogTab -Title "$($s.Name) Power" -Text "Power action sent to $($s.Name): $ResetType"
         $script:Status.Text = "Power action sent: $ResetType"
-        Send-iDRACCManTelemetry -EventName "PowerAction" -Properties @{ ResetType = $ResetType; Group = $s.Group; Model = $s.Model }
+            # GDPR: legacy system/action telemetry removed.
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show(
@@ -4089,7 +4094,7 @@ function Open-MultiViewForSelectedGroup {
     }
 
     $script:Status.Text = "Opened Multi View for group $groupName"
-    Send-iDRACCManTelemetry -EventName "OpenMultiView" -Properties @{ Group = $groupName; Count = $servers.Count }
+            # GDPR: legacy system/action telemetry removed.
 }
 
 
@@ -4555,7 +4560,7 @@ function Show-iDRACCManSearch {
         $script:Tabs.SelectedTab = $tab
 
         if ($script:Status) { $script:Status.Text = "Search found $($matches.Count) result(s) for '$query'." }
-        Send-iDRACCManTelemetry -EventName "Search" -Properties @{ QueryLength = $query.Length; ResultCount = $matches.Count }
+            # GDPR: legacy system/action telemetry removed.
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show(
@@ -4587,11 +4592,7 @@ function Open-iDRACCManHelp {
         if ($script:Status) {
             $script:Status.Text = "Opened online documentation."
         }
-
-        try {
-            Send-iDRACCManTelemetry -EventName "OpenHelp" -Properties @{ Target = "help.md"; Source = $Source }
-        }
-        catch {}
+            # GDPR: legacy system/action telemetry removed.
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show(
@@ -4862,7 +4863,7 @@ function Build-Gui {
         try {
             Start-Process "https://github.com/DellProSupportGse/Tools/issues"
             if ($script:Status) { $script:Status.Text = "Opened GitHub Issues & Feedback." }
-            Send-iDRACCManTelemetry -EventName "OpenIssues" -Properties @{ Target = "GitHubIssues" }
+            # GDPR: legacy system/action telemetry removed.
         }
         catch {
             [System.Windows.Forms.MessageBox]::Show(
@@ -4945,13 +4946,13 @@ function Build-Gui {
     $miCloseTab = New-Object System.Windows.Forms.ToolStripMenuItem("Close Current")
     $miCloseTab.Add_Click({ Close-CurrentTab })
 
-    $miTelemetryToggle = New-Object System.Windows.Forms.ToolStripMenuItem("Toggle Telemetry")
+    $miTelemetryToggle = New-Object System.Windows.Forms.ToolStripMenuItem("Toggle Minimal Startup Telemetry")
     $miTelemetryToggle.Add_Click({
         $current = [bool](Get-iDRACCManSetting -Name "TelemetryEnabled" -Default $true)
         Set-iDRACCManSetting -Name "TelemetryEnabled" -Value (-not $current)
         $state = if (-not $current) { "enabled" } else { "disabled" }
-        if ($script:Status) { $script:Status.Text = "Telemetry $state." }
-        [System.Windows.Forms.MessageBox]::Show("Telemetry is now $state.","Telemetry") | Out-Null
+        if ($script:Status) { $script:Status.Text = "Minimal startup telemetry $state." }
+        [System.Windows.Forms.MessageBox]::Show("Minimal startup telemetry is now $state.","Telemetry") | Out-Null
     })
 
     $miDiagnostics = New-Object System.Windows.Forms.ToolStripMenuItem("Diagnostics")
@@ -5243,14 +5244,13 @@ function Invoke-iDRACCMan {
 
         [void](Initialize-WebView2)
         Build-Gui
-        Send-iDRACCManTelemetry -EventName "AppReady" -Properties @{ ServerCount = @($script:Servers).Count; GroupCount = @($script:Servers | Group-Object Group).Count }
+            # GDPR: legacy system/action telemetry removed.
 
         $script:MainForm.Add_FormClosing({
             while ($script:Tabs.TabPages.Count -gt 0) {
                 $script:Tabs.SelectedTab = $script:Tabs.TabPages[0]
                 Close-CurrentTab
             }
-            Send-iDRACCManTelemetry -EventName "AppClose" -Properties @{ ServerCount = @($script:Servers).Count }
             Write-iDRACCManLog "iDRACCMan closed"
         })
 
