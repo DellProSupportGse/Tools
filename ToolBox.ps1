@@ -15,7 +15,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.7'
+    $Ver = '1.8'
 
     $text = @"
 v$Ver
@@ -150,36 +150,69 @@ v$Ver
         }
     )
 
-    function Invoke-ToolBoxDownload {
-        param(
-            [Parameter(Mandatory)]
-            [pscustomobject]$Tool
-        )
+function Invoke-ToolBoxDownload {
+    param(
+        [Parameter(Mandatory)]
+        [pscustomobject]$Tool
+    )
 
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $powershell5 = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
 
-        if ($Tool.Encoding -eq 'UTF8') {
-            $webClient = New-Object Net.WebClient
-            $webClient.Encoding = [System.Text.Encoding]::UTF8
-        }
-        else {
-            $webClient = New-Object Net.WebClient
-        }
-
-        $code = '$module="{0}";$repo="PowershellScripts"' -f $Tool.Module
-        $code += $webClient.DownloadString($Tool.Url)
-
-        Invoke-Expression $code
-
-        if (Get-Command $Tool.Command -ErrorAction SilentlyContinue) {
-            & $Tool.Command
-        }
-        else {
-            Write-Host ""
-            Write-Host "ERROR: Command not found after loading tool: $($Tool.Command)" -ForegroundColor Red
-            Pause
-        }
+    if (-not (Test-Path $powershell5)) {
+        Write-Host "ERROR: Windows PowerShell 5.1 was not found." -ForegroundColor Red
+        Pause
+        return
     }
+
+    $tempScript = Join-Path $env:TEMP ("ToolBox_{0}_{1}.ps1" -f $Tool.Name, ([guid]::NewGuid().Guid))
+
+    $encodingCode = if ($Tool.Encoding -eq 'UTF8') {
+        '$wc = New-Object Net.WebClient; $wc.Encoding = [System.Text.Encoding]::UTF8'
+    }
+    else {
+        '$wc = New-Object Net.WebClient'
+    }
+
+    $runCommand = if ([string]::IsNullOrWhiteSpace($Tool.Command)) {
+        ''
+    }
+    else {
+        "& $($Tool.Command)"
+    }
+
+@"
+`$ErrorActionPreference = 'Stop'
+
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+    `$module = '$($Tool.Module)'
+    `$repo   = 'PowershellScripts'
+
+    $encodingCode
+
+    `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts"' + `$wc.DownloadString('$($Tool.Url)')
+
+    Invoke-Expression `$code
+
+    $runCommand
+}
+catch {
+    Write-Host ''
+    Write-Host 'ERROR running $($Tool.Name):' -ForegroundColor Red
+    Write-Host `$_.Exception.Message -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host `$_.ScriptStackTrace -ForegroundColor DarkGray
+}
+
+"@ | Set-Content -Path $tempScript -Encoding UTF8 -Force
+
+    Start-Process -FilePath $powershell5 -ArgumentList @(
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', "`"$tempScript`""
+    )
+}
 
     function ShowMenu {
         do {
