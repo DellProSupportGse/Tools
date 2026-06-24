@@ -309,8 +309,8 @@ function Send-ToolTelemetry {
     if (-not $script:uploadToAzure) { return }
 
     if ($EventName -match '^(Startup|Launch|AppStart|ToolStart|TelemetryStartup)$') {
-        if ($script:TelemetryStartupSent) { return }
-        $script:TelemetryStartupSent = $true
+        if ($global:TelemetryStartupSentGlobal) { return }
+        $global:TelemetryStartupSentGlobal = $true
     }
 
     try {
