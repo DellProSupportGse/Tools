@@ -5,7 +5,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.5'
+    $Ver = '1.6'
 
     $text = @"
 v$Ver
@@ -39,12 +39,12 @@ v$Ver
             Encoding    = 'Default'
         }
         [pscustomobject]@{
-            Name        = 'AzHCIUrlChecker'
-            Description = 'GUI tool to send text to applications that do not allow pasting.'
+            Name        = 'AzHCIUrlChkr'
+            Description = 'Checks Access to AzL URL Endpoints'
             Internal    = $false
             SortOrder   = 10
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/AzHCIUrlChecker.ps1'
-            Module      = 'AzHCIUrlChecker'
+            Module      = 'AzHCIUrlChkr'
             Command     = 'Invoke-AzHCIUrlChecker'
             Encoding    = 'UTF8'
         }            
