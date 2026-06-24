@@ -8,7 +8,7 @@ param(
     # ══════════════════════════════════════════════════════════════════════════════
 
     Import-Module FailoverClusters
-    $ver="0.57"
+    $ver="0.6"
     Write-Host "TMC2AX version $ver"
 
     # 1. Verify the cluster service is running
@@ -540,6 +540,7 @@ param(
     If ($conversionDone) {
         If ($latestSbeVer -gt $currentSbeVer) {
             if (!(Test-Path $extractionFolder)) { New-Item -ItemType Directory -path (Split-Path $extractionFolder -Parent) -Name (Split-Path $extractionFolder -Leaf) -ErrorAction SilentlyContinue -Force}
+            Write-Host "Base conversion has been Completed!!!" -ForegroundColor Green
             Write-Host "Downloading the SBE package requires logging into the Dell site which cannot be done in this script at this time"
             Write-host "Please download and extract the SBE package to $extractionFolder"
             If ((gci $extractionFolder).count -lt 3 -and $PrepareSBE) {Write-Host "SBE folder is not correct. Please extract the files from the zip directly into the expected folder";$PrepareSBE=$false;break}
@@ -547,7 +548,7 @@ param(
             Write-Host "Conversion has been completed and no SBE updates are avaiable" -ForegroundColor Yellow
         }
     } else {
-        Write-Host "Conversion has not been completed" -ForegroundColor Yellow
+        Write-Host "Base conversion has not been completed" -ForegroundColor Yellow
         break
     }
 
