@@ -49,7 +49,7 @@ v$Ver
             Encoding    = 'Default'
         }
         [pscustomobject]@{
-            Name        = 'iDRAC Connection Manager'
+            Name        = 'iDRACMan'
             Description = 'Finds Windows Update Errors'
             Internal    = $false
             SortOrder   = 10
