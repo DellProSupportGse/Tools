@@ -50,7 +50,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.57"
+$script:AppVersion   = "1.0.64"
 
 # Telemetry run-once guard
 $script:TelemetryStartupSent = $false
@@ -380,19 +380,36 @@ function Send-ToolTelemetry {
     }
 }
 
+
+function Send-iDRACCManTelemetry {
+    param(
+        [Parameter(Mandatory=$true)][string]$EventName,
+        [Parameter(Mandatory=$false)]$Properties = @{}
+    )
+
+    try {
+        $enabled = [bool](Get-iDRACCManSetting -Name "TelemetryEnabled" -Default $true)
+        if (-not $enabled) { return }
+
+        Send-ToolTelemetry `
+            -TelemetryName "iDRACCManTelemetryData" `
+            -EventName $EventName `
+            -Version $script:AppVersion `
+            -Endpoint "https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData" `
+            -ServerCount @($script:Servers).Count `
+            -GroupCount @($script:Servers | Group-Object Group).Count `
+            -NoGeo `
+            -DebugTelemetry:$false
+    }
+    catch {
+        try { Write-iDRACCManLog ("Telemetry failed for {0}: {1}" -f $EventName, $_.Exception.Message) "WARN" } catch {}
+    }
+}
+
+
 #endregion
 
-# Example:
- $telemetryParams = @{
-     TelemetryName  = "iDRACCManTelemetryData"
-     EventName      = "Startup"
-     Version        = $script:AppVersion
-     Endpoint       = "https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData"
-     DebugTelemetry = $false
- }
-
- Send-ToolTelemetry @telemetryParams
-
+# Startup telemetry is sent through Send-iDRACCManTelemetry after the GUI is ready.
 function Open-iDRACCManDataFolder {
     Start-Process $script:AppRoot
 }
