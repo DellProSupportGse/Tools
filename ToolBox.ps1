@@ -1,3 +1,13 @@
+<#
+    .Synopsis
+       ToolBox.ps1
+    .DESCRIPTION
+       This script is a menu to the other tools 
+    .EXAMPLES
+       Invoke-ToolBox
+    .Created 
+        By: Jim Gandy
+#>
 function EndScript {
     return
 }
@@ -5,7 +15,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.6'
+    $Ver = '1.7'
 
     $text = @"
 v$Ver
@@ -40,7 +50,7 @@ v$Ver
         }
         [pscustomobject]@{
             Name        = 'AzHCIUrlChkr'
-            Description = 'Checks Access to AzL URL Endpoints'
+            Description = 'AzL Url Enpoint Checker'
             Internal    = $false
             SortOrder   = 10
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/AzHCIUrlChecker.ps1'
