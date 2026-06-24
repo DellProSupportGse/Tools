@@ -1,13 +1,3 @@
-<#
-    .Synopsis
-       ToolBox.ps1
-    .DESCRIPTION
-       This script is a menu to the other tools 
-    .EXAMPLES
-       Invoke-ToolBox
-    .Created 
-        By: Jim Gandy
-#>
 function EndScript {
     return
 }
@@ -40,7 +30,7 @@ v$Ver
     $script:ToolBoxTools = @(
         [pscustomobject]@{
             Name        = 'KeyRelay'
-            Description = 'Finds Windows Update Errors'
+            Description = 'GUI tool to send text to applications that do not allow pasting.'
             Internal    = $false
             SortOrder   = 10
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.ps1'
@@ -50,7 +40,7 @@ v$Ver
         }
         [pscustomobject]@{
             Name        = 'iDRACMan'
-            Description = 'Finds Windows Update Errors'
+            Description = 'simplified iDRAC access'
             Internal    = $false
             SortOrder   = 10
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/iDRACCMan/iDRAC-ConnectionManager.ps1'
