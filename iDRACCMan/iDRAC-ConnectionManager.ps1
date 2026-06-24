@@ -50,7 +50,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.67"
+$script:AppVersion   = "1.0.68"
 
 # Telemetry run-once guard
 $script:TelemetryStartupSent = $false
@@ -2698,11 +2698,26 @@ function Invoke-WebView2iDRACAutoLogin {
 
 function Invoke-WebView2AdvancedContinue {
     param(
-        [Parameter(Mandatory=$true)]$Web
+        [Parameter(Mandatory=$true)]$Web,
+        [switch]$Force
     )
 
     try {
         if (-not $Web -or -not $Web.CoreWebView2) { return }
+
+        if (-not $script:AdvancedContinueAttemptedUrls) { $script:AdvancedContinueAttemptedUrls = @{} }
+
+        $currentUri = ""
+        try { $currentUri = [string]$Web.Source.AbsoluteUri } catch {}
+        if ([string]::IsNullOrWhiteSpace($currentUri)) { $currentUri = "unknown" }
+
+        # Prevent endless Advanced/Continue flicker loop.
+        # Allow one attempt per URL; NavigationCompleted calls can use -Force.
+        if (-not $Force) {
+            if ($script:AdvancedContinueAttemptedUrls.ContainsKey($currentUri)) { return }
+            $script:AdvancedContinueAttemptedUrls[$currentUri] = $true
+        }
+
 
         # Edge/Chromium SSL interstitial uses details-button and proceed-link.
         # Run this a few times because the privacy page can finish rendering after NavigationCompleted.
@@ -2761,11 +2776,11 @@ function Start-WebView2GuiAutomationTimer {
                 # on the Chromium SSL privacy interstitial or while an iDRAC page does slow rendering.
                 if ($script:Status -and $tickCount -ge 3) {
                     if ($script:Status.Text -like 'Loading*') {
-                        $script:Status.Text = "Waiting for $($Server.Name)... Auto Continue active."
+                        $script:Status.Text = "Waiting for $($Server.Name)... Auto Continue attempted."
                     }
                 }
 
-                if ($AutoContinueCheckBox -and $AutoContinueCheckBox.Checked) {
+                if ($AutoContinueCheckBox -and $AutoContinueCheckBox.Checked -and $tickCount -le 10 -and (($tickCount % 2) -eq 1)) {
                     Invoke-WebView2AdvancedContinue -Web $Web
                 }
 
@@ -3361,13 +3376,13 @@ $info = New-Object System.Windows.Forms.Label
             try {
                 if ($IsKvm) {
                     if ($chkAutoContinue -and $chkAutoContinue.Checked) {
-                        Invoke-WebView2AdvancedContinue -Web $web
+                        Invoke-WebView2AdvancedContinue -Web $web -Force
                         $script:Status.Text = "Opened console. Auto Continue attempted."
                     }
                 }
                 else {
                     if ($chkAutoContinue -and $chkAutoContinue.Checked) {
-                        Invoke-WebView2AdvancedContinue -Web $web
+                        Invoke-WebView2AdvancedContinue -Web $web -Force
                     }
                     # GUI Auto Login is handled by the non-blocking timer so NavigationCompleted
                     # never blocks WebView2 during slow iDRAC page loads.
