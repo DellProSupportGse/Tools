@@ -5,18 +5,19 @@
        This script is a menu to the other tools 
     .EXAMPLES
        Invoke-ToolBox
-    .UPDATES
-        2025/11/03:v1.2 - 1. JG - Added SLIC
+    .Created 
+        By: Jim Gandy
 #>
-
-Function EndScript{ 
-    break
+function EndScript {
+    return
 }
 
-Function Invoke-ToolBox{
-Clear-Host
-$Ver=1.2
-$text = @"
+function Invoke-ToolBox {
+    Clear-Host
+
+    $Ver = '1.3'
+
+    $text = @"
 v$Ver
   _____         _   ___          
  |_   _|__  ___| | | _ ) _____ __
@@ -26,80 +27,215 @@ v$Ver
                       by: Jim Gandy 
 "@
 
-#IE Fix
-Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Internet Explorer\Main" -Name "DisableFirstRunCustomize" -Value 2
+    # IE Fix
+    try {
+        Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Internet Explorer\Main" `
+            -Name "DisableFirstRunCustomize" -Value 2 -ErrorAction SilentlyContinue
+    } catch {}
 
-Function ShowMenu{
-    do
-     {
+    # =====================================================
+    # Tool Registry
+    # Add new tools here only
+    # =====================================================
+    $script:ToolBoxTools = @(
+        [pscustomobject]@{
+            Name        = 'KeyRelay'
+            Description = 'Finds Windows Update Errors'
+            Internal    = $false
+            SortOrder   = 10
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.ps1'
+            Module      = 'KeyRelay'
+            Command     = 'Invoke-KeyRelay'
+            Encoding    = 'Default'
+        }
+        [pscustomobject]@{
+            Name        = 'iDRAC Connection Manager'
+            Description = 'Finds Windows Update Errors'
+            Internal    = $false
+            SortOrder   = 10
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/iDRACCMan/iDRAC-ConnectionManager.ps1'
+            Module      = 'iDRACMan'
+            Command     = ''
+            Encoding    = 'UTF8'
+        }
+        [pscustomobject]@{
+            Name        = 'BOILER'
+            Description = 'Finds Windows Update Errors'
+            Internal    = $false
+            SortOrder   = 10
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1'
+            Module      = 'BOILER'
+            Command     = 'Invoke-BOILER'
+            Encoding    = 'Default'
+        }
+        [pscustomobject]@{
+            Name        = 'DART'
+            Description = 'Installs Dell/MS Updates'
+            Internal    = $false
+            SortOrder   = 20
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'
+            Module      = 'DART'
+            Command     = 'Invoke-DART'
+            Encoding    = 'Default'
+        }
+        [pscustomobject]@{
+            Name        = 'FLEP'
+            Description = 'Filters Event Logs'
+            Internal    = $false
+            SortOrder   = 30
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLEP.ps1'
+            Module      = 'FLEP'
+            Command     = 'Invoke-FLEP'
+            Encoding    = 'Default'
+        }
+        [pscustomobject]@{
+            Name        = 'FLCkr'
+            Description = 'Looks up Mini Filter Drivers'
+            Internal    = $false
+            SortOrder   = 40
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'
+            Module      = 'FLCkr'
+            Command     = 'Invoke-FLCkr'
+            Encoding    = 'Default'
+        }
+        [pscustomobject]@{
+            Name        = 'LogCollector'
+            Description = 'Make log collection easier'
+            Internal    = $false
+            SortOrder   = 50
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/LogCollector.ps1'
+            Module      = 'LogCollector'
+            Command     = 'Invoke-LogCollector'
+            Encoding    = 'Default'
+        }
+        [pscustomobject]@{
+            Name        = 'CluChk'
+            Description = 'Cluster Checker'
+            Internal    = $true
+            SortOrder   = 60
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchk.ps1'
+            Module      = 'RunCluChk'
+            Command     = 'Invoke-RunCluChk'
+            Encoding    = 'Default'
+        }
+        [pscustomobject]@{
+            Name        = 'DriFT'
+            Description = 'Driver and Firmware Tool'
+            Internal    = $true
+            SortOrder   = 70
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/drift.ps1'
+            Module      = 'RunDriFT'
+            Command     = 'Invoke-RunDriFT'
+            Encoding    = 'Default'
+        }
+        [pscustomobject]@{
+            Name        = 'SLIC'
+            Description = 'Switch Log InspeCtor'
+            Internal    = $true
+            SortOrder   = 80
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/slic.ps1'
+            Module      = 'RunSLIC'
+            Command     = 'Invoke-SLIC'
+            Encoding    = 'UTF8'
+        }
+    )
 
-         $selection=""
-         Clear-Host
-         Write-Host $text
-         Write-Host ""
-         Write-Host "This code is under the MIT License. See Repository for Licensing/Support details."
-         Write-Host ""
-         Write-Host "==================== Please make a selection ====================="
-         Write-Host ""
-         Write-Host "1)  BOILER       - Finds Windows Update Errors"
-         Write-Host "2)  DART         - Installs Dell/MS Updates"
-         Write-Host "3)  FLEP         - Filters Event Logs"
-         Write-Host "4)  FLCkr        - Looks up Mini Filter Drivers"
-         Write-Host "5)  LogCollector - Make log collection easier"
-         Write-Host "6)  DriFT        - Driver and Firmware Tool ***INTERNAL ONLY***"
-         Write-Host "7)  CluChk       - Cluster Checker ***INTERNAL ONLY***"
-         Write-Host "8)  SLIC         - Switch Log InspeCtor ***INTERNAL ONLY***"
-         Write-Host "Q to Quit"
-         Write-Host ""
-         $selection = Read-Host "Type a number and press [Enter]"
-     }
-    until ($selection -match '[1-8,qQ,hH]')
-    $Global:WindowsUpdates=$False
-    $Global:DriverandFirmware=$False
-    $Global:Confirm=$False
-    IF($selection -imatch 'h'){
-        Clear-Host
-        Write-Host ""
-        Write-Host "What's New in"$Ver":"
-        Write-Host $WhatsNew 
-        Write-Host ""
-        Write-Host "Useage:"
-        Write-Host "    Make a select by entering a number from the menu."
-        Write-Host ""
-        Write-Host "        Example: 1 will run BOILER."
-        Write-Host ""
-        Pause
-        ShowMenu
-    }
-    IF($selection -match 1){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="BOILER";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1'));Invoke-BOILER
-    }
-    IF($selection -match 2){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART
-    }
-    IF($selection -match 3){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLEP";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLEP.ps1'));Invoke-FLEP
-    }
-    IF($selection -match 4){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
-    }
-    IF($selection -match 5){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="LogCollector";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/LogCollector.ps1'));Invoke-LogCollector
-    }
-    IF($selection -match 6){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunDriFT";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/drift.ps1'));Invoke-RunDriFT
-    }
-    IF($selection -match 7){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunCluChk";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchk.ps1'));Invoke-RunCluChk
-    }
-    IF($selection -match 8){
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunSLIC";$repo="PowershellScripts"'+(new-object net.webclient -Property @{ Encoding = [System.Text.Encoding]::UTF8 }).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/main/slic.ps1'));Invoke-SLIC
-    }    
+    function Invoke-ToolBoxDownload {
+        param(
+            [Parameter(Mandatory)]
+            [pscustomobject]$Tool
+        )
 
-    IF($selection -imatch 'q'){
-        Write-Host "Bye Bye..."
-        EndScript
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+        if ($Tool.Encoding -eq 'UTF8') {
+            $webClient = New-Object Net.WebClient
+            $webClient.Encoding = [System.Text.Encoding]::UTF8
+        }
+        else {
+            $webClient = New-Object Net.WebClient
+        }
+
+        $code = '$module="{0}";$repo="PowershellScripts"' -f $Tool.Module
+        $code += $webClient.DownloadString($Tool.Url)
+
+        Invoke-Expression $code
+
+        if (Get-Command $Tool.Command -ErrorAction SilentlyContinue) {
+            & $Tool.Command
+        }
+        else {
+            Write-Host ""
+            Write-Host "ERROR: Command not found after loading tool: $($Tool.Command)" -ForegroundColor Red
+            Pause
+        }
     }
-}#End of ShowMenu
-ShowMenu
+
+    function ShowMenu {
+        do {
+            Clear-Host
+
+            $tools = $script:ToolBoxTools | Sort-Object SortOrder, Name
+
+            Write-Host $text
+            Write-Host ""
+            Write-Host "This code is under the MIT License. See Repository for Licensing/Support details."
+            Write-Host ""
+            Write-Host "==================== Please make a selection ====================="
+            Write-Host ""
+
+            for ($i = 0; $i -lt $tools.Count; $i++) {
+                $tool = $tools[$i]
+                $internalText = if ($tool.Internal) { ' ***INTERNAL ONLY***' } else { '' }
+
+                Write-Host ("{0})  {1,-12} - {2}{3}" -f ($i + 1), $tool.Name, $tool.Description, $internalText)
+            }
+
+            Write-Host ""
+            Write-Host "H)  Help"
+            Write-Host "Q)  Quit"
+            Write-Host ""
+
+            $selection = Read-Host "Type a number and press [Enter]"
+
+            if ($selection -imatch '^q$') {
+                Write-Host "Bye Bye..."
+                return
+            }
+
+            if ($selection -imatch '^h$') {
+                Clear-Host
+                Write-Host ""
+                Write-Host "What's New in v$Ver"
+                Write-Host "  - Menu is now auto-generated from a tool registry."
+                Write-Host "  - Tools can be sorted with SortOrder."
+                Write-Host "  - Adding tools no longer requires adding new IF blocks."
+                Write-Host ""
+                Write-Host "Usage:"
+                Write-Host "  Make a selection by entering a number from the menu."
+                Write-Host ""
+                Write-Host "Example:"
+                Write-Host "  1 will run the first sorted tool."
+                Write-Host ""
+                Pause
+                continue
+            }
+
+            if ($selection -match '^\d+$') {
+                $index = [int]$selection - 1
+
+                if ($index -ge 0 -and $index -lt $tools.Count) {
+                    $Global:WindowsUpdates     = $false
+                    $Global:DriverandFirmware  = $false
+                    $Global:Confirm            = $false
+
+                    Invoke-ToolBoxDownload -Tool $tools[$index]
+                    Pause
+                }
+            }
+
+        } while ($true)
+    }
+
+    ShowMenu
 }
