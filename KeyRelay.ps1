@@ -14,7 +14,7 @@ Function Invoke-KeyRelay {
 # =====================================================
 # App Version
 # =====================================================
-$APP_VERSION = "1.17.3"
+$APP_VERSION = "1.17.4"
 
 # =====================================================
 # APP DATA FOLDER
@@ -198,7 +198,7 @@ function Send-ToolTelemetry {
 }
 
  $telemetryParams = @{
-     TelemetryName  = "TestTelemetryData"
+     TelemetryName  = "KeyRelayTelemetryData"
      EventName      = "Startup"
      Version        = $APP_VERSION
      Endpoint       = "https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData"
