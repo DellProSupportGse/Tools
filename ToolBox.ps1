@@ -5,7 +5,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.3'
+    $Ver = '1.4'
 
     $text = @"
 v$Ver
