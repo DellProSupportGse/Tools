@@ -50,7 +50,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.68d-SingleAddFix"
+$script:AppVersion   = "1.0.69DEV"
 
 # Telemetry run-once guard
 $script:TelemetryStartupSent = $false
