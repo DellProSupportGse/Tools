@@ -21,7 +21,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.32
+v1.33
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -110,29 +110,108 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
     IF(Test-Path "$env:USERPROFILE\HealthTest-*.zip"){Remove-Item $env:USERPROFILE\HealthTest-*.zip -Force}    
     IF(Test-Path "$Logs\HealthTest-*.zip"){Remove-Item $Logs\HealthTest-*.zip -Force}
 # Run SDDC
+
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+
+public class Win32 {
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern int GetWindowTextLength(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    public const int SW_MINIMIZE = 6;
+}
+"@
+
 if (-not (gcm Get-SddcDiagnosticInfo)) {
+
+    $minBlankWindows = [Win32+EnumWindowsProc]{
+        param($hWnd, $lParam)
+        if ([Win32]::IsWindowVisible($hWnd))
+        {
+            $len = [Win32]::GetWindowTextLength($hWnd)
+            $sb = New-Object System.Text.StringBuilder ($len + 1)
+            [Win32]::GetWindowText($hWnd, $sb, $sb.Capacity) | Out-Null
+            $title = $sb.ToString()
+            if ($title -like "*\WindowsPowershell\v1.0\powershell.exe*")
+            {
+                #Write-Host "Minimizing: $title"
+                [Win32]::ShowWindow($hWnd, [Win32]::SW_MINIMIZE) | Out-Null
+            }
+        }
+        $true
+    }
     mkdir "$($env:USERPROFILE)\HealthTest" -ErrorAction SilentlyContinue
     $sharepath="\\$($env:COMPUTERNAME)\$(($env:USERPROFILE).replace('C:\','c$\'))\HealthTest"
+    Write-Host "Getting Solution Update information..."
+    Start-Job -Name "SolutionUpdateInfo" -ScriptBlock {
+        Get-StampInformation | Export-CliXml "$($env:USERPROFILE)\HealthTest\GetStampInformation.xml"
+        Get-SolutionUpdateEnvironment | Export-CliXml "$($env:USERPROFILE)\HealthTest\GetSolutionUpdateEnvironment.xml"
+    }
+    Start-Job -Name "GetSolutionUpdate" -ScriptBlock {
+        Get-SolutionUpdate | Tee-Object -Variable GSUpd >$Null;$GSUpd | ForEach-Object{$_;$_.HealthCheckResult}
+    }
     if ((gcm Get-ClusterNode)) {
         (Get-ClusterNode).Name | %{Invoke-Command -AsJob -JobName "SendDiags-$($_)" -ComputerName $_ -ScriptBlock {
 		            $Rpath="C:\SendDiags"
                     Remove-Item $RPath -Recurse -Force -ErrorAction SilentlyContinue
                     New-Item -Path $RPath -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
                     Send-DiagnosticData -SaveToPath $Rpath
-                    Copy-Item $Rpath $using:sharepath -Recurse
-        }}
+        } | Out-Null}
     
     } else { 
         Send-DiagnosticData -SaveToPath "$($env:USERPROFILE)\Healthtest"
     }
-    while ((Get-Job).State -match "Running") {Get-Job | Receive-Job -ErrorAction SilentlyContinue;Write-Host "." -NoNewLine;sleep 30}
-    Get-Job | Remove-Job
+    $startTime=(Get-Date)
+    Sleep 30
+    While (Get-Job -Name "GetSolutionUpdate" | ? State -eq Running) {Sleep 5}
+    $job=Get-Job -Name "GetSolutionUpdate"
+    $LocalFile = $job.Name
+    $output = Receive-Job $job
+    $output | Format-Table -AutoSize | Out-File -Width 9999 -Encoding ascii -FilePath "$($env:USERPROFILE)\HealthTest\$LocalFile.txt"
+    $output | Export-Clixml -Path "$($env:USERPROFILE)\HealthTest\$LocalFile.xml"
+    #Find and minimize Send-DiagnosticData windows
+    [Win32]::EnumWindows($minBlankWindows, [IntPtr]::Zero) | Out-Null
+    $xx=0
+    while ((Get-Job).State -match "Running" -and $xx -lt 120) {
+        Get-Job -Name "SendDiags-*" | Receive-Job -ErrorAction SilentlyContinue
+        $jobs=Get-Job | ? State -match "Running"
+        $ddate=(Get-Date).ToString()
+        Write-Host "--------------------------------------------------------------------------------------------------------------"
+        Write-Host "[$ddate] Waiting on $($jobs.name -replace 'SendDiags-','' -join ',') to complete. Started $([int]((Get-Date) - $startTime).TotalMinutes) minutes ago"
+        sleep 30
+        $xx++
+    }
+  
+    $jobs=Get-Job | ? State -match "Running"
+    if ($jobs) {
+        Write-Host "Jobs $($jobs.name -join ',') exceeded timeout"
+    } else {
+        Get-Job | Remove-Job
+    }
+    Write-Host ""
     Write-Host "Copying Diag logs...."
     Start-Job -Name "CopyJob" -ScriptBlock {foreach ($node in (Get-ClusterNode).Name) {
        	Move-Item "\\$node\c$\SendDiags\*" "$($env:USERPROFILE)\HealthTest"
-    }}
-    while ((Get-Job).State -match "Running") {Get-Job | Receive-Job -ErrorAction SilentlyContinue;Write-Host "." -NoNewLine;sleep 5}
-
+    }} | Out-Null
+    while ((Get-Job).State -match "Running") {Get-Job | ? State -eq Running | Receive-Job -ErrorAction SilentlyContinue;Write-Host "." -NoNewLine;sleep 5}
+    Write-Host ""
+    Write-Host "Zipping up files..."
     $ZipSuffix = '-' + ((Get-Date).ToString('yyyyMMdd-HHmm')) + '.ZIP'
     $ZipSuffix = '-' + ($CNames.Split('.',2)[0]) + $ZipSuffix
     $ZipPath = "$($env:USERPROFILE)\Healthtest" + $ZipSuffix

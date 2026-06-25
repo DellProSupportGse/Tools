@@ -2030,7 +2030,7 @@ v$ver
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
     #Write-Host "."
-    $testReport
+    $testReport | ft
     Stop-Transcript -ErrorAction SilentlyContinue
     return $testReport
     
