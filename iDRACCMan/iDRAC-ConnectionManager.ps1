@@ -50,7 +50,7 @@ Add-Type -AssemblyName System.Security
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $script:AppName      = "iDRAC Connection Manager"
-$script:AppVersion   = "1.0.68"
+$script:AppVersion   = "1.0.69"
 
 # Telemetry run-once guard
 $script:TelemetryStartupSent = $false
@@ -1913,17 +1913,47 @@ function Update-DashboardServerList {
 }
 
 
-function Split-iDRACAddressInput {
+
+$script:SplitIDRACAddressInputBlock = {
     param([string]$Text)
 
     if ([string]::IsNullOrWhiteSpace($Text)) { return @() }
 
-    return @(
-        $Text -split '[,;`\r`\n]+' |
-            ForEach-Object { $_.Trim() } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-            Select-Object -Unique
-    )
+    $items = $Text -split '[,\;\|\r\n\t ]+' |
+        ForEach-Object { ([string]$_).Trim() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+    $clean = New-Object System.Collections.Generic.List[string]
+
+    foreach ($item in $items) {
+        $value = $item.Trim()
+
+        try {
+            if ($value -match '^https?://') {
+                $uri = [Uri]$value
+                if (-not [string]::IsNullOrWhiteSpace($uri.Host)) {
+                    $value = $uri.Host
+                }
+            }
+        }
+        catch {}
+
+        $value = $value.Trim().TrimEnd("/")
+        if ($value -match '/') {
+            $value = ($value -split '/')[0]
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($value) -and -not $clean.Contains($value)) {
+            [void]$clean.Add($value)
+        }
+    }
+
+    return @($clean)
+}
+
+function Split-iDRACAddressInput {
+    param([string]$Text)
+    return @(& $script:SplitIDRACAddressInputBlock $Text)
 }
 
 function Test-iDRACAddressFast {
@@ -2068,7 +2098,23 @@ function Show-ServerDialog {
         $cmbGroup.Add_SelectedIndexChanged({ & $enableAdd }.GetNewClosure())
 
         $connect.Add_Click({
-            $addresses = @(Split-iDRACAddressInput -Text $boxes["IP / Hostname(s)"].Text)
+            $addresses = @()
+            try {
+                $addresses = @(& $script:SplitIDRACAddressInputBlock $boxes["IP / Hostname(s)"].Text)
+            }
+            catch {
+                $rawAddressText = [string]$boxes["IP / Hostname(s)"].Text
+                if (-not [string]::IsNullOrWhiteSpace($rawAddressText)) {
+                    $addresses = @(
+                        $rawAddressText -split '[,\;\|
+	 ]+' |
+                            ForEach-Object { ([string]$_).Trim() } |
+                            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                            Select-Object -Unique
+                    )
+                }
+            }
+
             if ($addresses.Count -eq 0 -or
                 [string]::IsNullOrWhiteSpace($boxes["Username"].Text) -or
                 [string]::IsNullOrWhiteSpace($boxes["Password"].Text)) {
