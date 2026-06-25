@@ -15,7 +15,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.7'
+    $Ver = '1.8'
 
     $text = @"
 v$Ver
@@ -150,36 +150,65 @@ v$Ver
         }
     )
 
-    function Invoke-ToolBoxDownload {
-        param(
-            [Parameter(Mandatory)]
-            [pscustomobject]$Tool
-        )
+function Invoke-ToolBoxDownload {
+    param(
+        [Parameter(Mandatory)]
+        [pscustomobject]$Tool
+    )
 
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $ps5 = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
 
-        if ($Tool.Encoding -eq 'UTF8') {
-            $webClient = New-Object Net.WebClient
-            $webClient.Encoding = [System.Text.Encoding]::UTF8
-        }
-        else {
-            $webClient = New-Object Net.WebClient
-        }
+    $tempScript = Join-Path $env:TEMP ("ToolBox_{0}_{1}.ps1" -f $Tool.Name, ([guid]::NewGuid().Guid))
 
-        $code = '$module="{0}";$repo="PowershellScripts"' -f $Tool.Module
-        $code += $webClient.DownloadString($Tool.Url)
+    $childCode = @"
+`$ErrorActionPreference = 'Continue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-        Invoke-Expression $code
+try {
+    if ('$($Tool.Encoding)' -eq 'UTF8') {
+        `$webClient = New-Object Net.WebClient
+        `$webClient.Encoding = [System.Text.Encoding]::UTF8
+    }
+    else {
+        `$webClient = New-Object Net.WebClient
+    }
 
-        if (Get-Command $Tool.Command -ErrorAction SilentlyContinue) {
-            & $Tool.Command
+    `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts"'
+    `$code += `$webClient.DownloadString('$($Tool.Url)')
+
+    Invoke-Expression `$code
+
+    `$cmd = '$($Tool.Command)'
+
+    if (-not [string]::IsNullOrWhiteSpace(`$cmd)) {
+        if (Get-Command `$cmd -ErrorAction SilentlyContinue) {
+            & `$cmd
         }
         else {
             Write-Host ""
-            Write-Host "ERROR: Command not found after loading tool: $($Tool.Command)" -ForegroundColor Red
-            Pause
+            Write-Host "ERROR: Command not found after loading tool: `$cmd" -ForegroundColor Red
         }
     }
+}
+catch {
+    Write-Host ""
+    Write-Host "ERROR running $($Tool.Name):" -ForegroundColor Red
+    Write-Host `$_.Exception.Message -ForegroundColor Red
+}
+finally {
+    try { Remove-Item '$tempScript' -Force -ErrorAction SilentlyContinue } catch {}
+}
+"@
+
+    Set-Content -Path $tempScript -Value $childCode -Encoding UTF8
+
+    Start-Process -FilePath $ps5 -ArgumentList @(
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-NoExit',
+        '-File', "`"$tempScript`""
+    )
+}
 
     function ShowMenu {
         do {
