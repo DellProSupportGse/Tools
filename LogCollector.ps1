@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.89"
+$Ver="1.9"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -411,7 +411,7 @@ Function ShowMenu{
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
         Write-Host "Collecting Windows Server (TSS)..."
         $Global:CollectTSS = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSSCollect"; $repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/fginacio/MS/main/TSSCollect.ps1'))
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSSCollect"; $repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/TommyPaulkDell/TSS/main/TSSCollect.ps1'))
         Invoke-TSSCollect -confirm:$False -CaseNumber $CaseNumber
     }
     IF($Global:CollectTSR -eq "Y") {
