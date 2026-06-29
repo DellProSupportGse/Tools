@@ -15,7 +15,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.8'
+    $Ver = '1.9'
 
     $text = @"
 v$Ver
@@ -39,10 +39,36 @@ v$Ver
     # =====================================================
     $script:ToolBoxTools = @(
         [pscustomobject]@{
+            Name        = 'Convert-Etl2Pcap'
+            Description = 'Convert ETL network traces to PCap.'
+            Internal    = $false
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Convert-Etl2Pcap.ps1'
+            Module      = 'ETL2PCAP'
+            Command     = 'Invoke-ETL2PCAP'
+            Encoding    = 'UTF8'
+        }
+        [pscustomobject]@{
+            Name        = 'Make ISO'
+            Description = 'Convert a folder to ISO.'
+            Internal    = $false
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/isomaker.ps1'
+            Module      = 'MakeISO'
+            Command     = 'Invoke-MakeISO'
+            Encoding    = 'UTF8'
+        } 
+        [pscustomobject]@{
+            Name        = 'GetHyperVBottlenecks'
+            Description = 'This is a tool to detect bottlenecks in a Hyper-V environment.'
+            Internal    = $false
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/GetHyperVBottlenecks.ps1'
+            Module      = 'GetHyperVBottlenecks'
+            Command     = 'Invoke-GetHyperVBottlenecks'
+            Encoding    = 'UTF8'
+        }                        
+        [pscustomobject]@{
             Name        = 'KeyRelay'
             Description = 'GUI tool to send text to applications that do not allow pasting.'
             Internal    = $false
-            SortOrder   = 10
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.ps1'
             Module      = 'KeyRelay'
             Command     = 'Invoke-KeyRelay'
@@ -52,7 +78,6 @@ v$Ver
             Name        = 'AzHCIUrlChkr'
             Description = 'AzL Url Enpoint Checker'
             Internal    = $false
-            SortOrder   = 10
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/AzHCIUrlChecker.ps1'
             Module      = 'AzHCIUrlChkr'
             Command     = 'Invoke-AzHCIUrlChecker'
@@ -62,7 +87,6 @@ v$Ver
             Name        = 'iDRACMan'
             Description = 'simplified iDRAC access'
             Internal    = $false
-            SortOrder   = 10
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/iDRACCMan/iDRAC-ConnectionManager.ps1'
             Module      = 'iDRACMan'
             Command     = ''
@@ -72,7 +96,6 @@ v$Ver
             Name        = 'BOILER'
             Description = 'Finds Windows Update Errors'
             Internal    = $false
-            SortOrder   = 10
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1'
             Module      = 'BOILER'
             Command     = 'Invoke-BOILER'
@@ -82,7 +105,6 @@ v$Ver
             Name        = 'DART'
             Description = 'Installs Dell/MS Updates'
             Internal    = $false
-            SortOrder   = 20
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'
             Module      = 'DART'
             Command     = 'Invoke-DART'
@@ -92,7 +114,6 @@ v$Ver
             Name        = 'FLEP'
             Description = 'Filters Event Logs'
             Internal    = $false
-            SortOrder   = 30
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLEP.ps1'
             Module      = 'FLEP'
             Command     = 'Invoke-FLEP'
@@ -102,7 +123,6 @@ v$Ver
             Name        = 'FLCkr'
             Description = 'Looks up Mini Filter Drivers'
             Internal    = $false
-            SortOrder   = 40
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'
             Module      = 'FLCkr'
             Command     = 'Invoke-FLCkr'
@@ -112,7 +132,6 @@ v$Ver
             Name        = 'LogCollector'
             Description = 'Make log collection easier'
             Internal    = $false
-            SortOrder   = 50
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/LogCollector.ps1'
             Module      = 'LogCollector'
             Command     = 'Invoke-LogCollector'
@@ -122,7 +141,6 @@ v$Ver
             Name        = 'CluChk'
             Description = 'Cluster Checker'
             Internal    = $true
-            SortOrder   = 60
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchk.ps1'
             Module      = 'RunCluChk'
             Command     = 'Invoke-RunCluChk'
@@ -132,7 +150,6 @@ v$Ver
             Name        = 'DriFT'
             Description = 'Driver and Firmware Tool'
             Internal    = $true
-            SortOrder   = 70
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/drift.ps1'
             Module      = 'RunDriFT'
             Command     = 'Invoke-RunDriFT'
@@ -142,7 +159,6 @@ v$Ver
             Name        = 'SLIC'
             Description = 'Switch Log InspeCtor'
             Internal    = $true
-            SortOrder   = 80
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/slic.ps1'
             Module      = 'RunSLIC'
             Command     = 'Invoke-SLIC'
@@ -173,7 +189,7 @@ try {
         `$webClient = New-Object Net.WebClient
     }
 
-    `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts"'
+    `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts";'
     `$code += `$webClient.DownloadString('$($Tool.Url)')
 
     Invoke-Expression `$code
@@ -194,9 +210,11 @@ catch {
     Write-Host ""
     Write-Host "ERROR running $($Tool.Name):" -ForegroundColor Red
     Write-Host `$_.Exception.Message -ForegroundColor Red
+    Start-Sleep -Seconds 4
 }
 finally {
     try { Remove-Item '$tempScript' -Force -ErrorAction SilentlyContinue } catch {}
+    exit
 }
 "@
 
@@ -205,7 +223,6 @@ finally {
     Start-Process -FilePath $ps5 -ArgumentList @(
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
-        '-NoExit',
         '-File', "`"$tempScript`""
     )
 }
@@ -214,7 +231,7 @@ finally {
         do {
             Clear-Host
 
-            $tools = $script:ToolBoxTools | Sort-Object SortOrder, Name
+            $tools = $script:ToolBoxTools | Sort-Object @{Expression={$_.Name.ToUpper()}}
 
             Write-Host $text
             Write-Host ""
@@ -223,11 +240,19 @@ finally {
             Write-Host "==================== Please make a selection ====================="
             Write-Host ""
 
+            $numberWidth = ($tools.Count.ToString()).Length
+            $nameWidth   = (($tools | ForEach-Object { $_.Name.Length }) | Measure-Object -Maximum).Maximum
+
             for ($i = 0; $i -lt $tools.Count; $i++) {
                 $tool = $tools[$i]
                 $internalText = if ($tool.Internal) { ' ***INTERNAL ONLY***' } else { '' }
 
-                Write-Host ("{0})  {1,-12} - {2}{3}" -f ($i + 1), $tool.Name, $tool.Description, $internalText)
+                Write-Host ("{0,$numberWidth})  {1,-$nameWidth} - {2}{3}" -f `
+                    ($i + 1),
+                    $tool.Name,
+                    $tool.Description,
+                    $internalText
+                )
             }
 
             Write-Host ""
@@ -247,7 +272,6 @@ finally {
                 Write-Host ""
                 Write-Host "What's New in v$Ver"
                 Write-Host "  - Menu is now auto-generated from a tool registry."
-                Write-Host "  - Tools can be sorted with SortOrder."
                 Write-Host "  - Adding tools no longer requires adding new IF blocks."
                 Write-Host ""
                 Write-Host "Usage:"
@@ -260,17 +284,36 @@ finally {
                 continue
             }
 
+# Number selection
+$selectedTool = $null
+
             if ($selection -match '^\d+$') {
                 $index = [int]$selection - 1
 
                 if ($index -ge 0 -and $index -lt $tools.Count) {
-                    $Global:WindowsUpdates     = $false
-                    $Global:DriverandFirmware  = $false
-                    $Global:Confirm            = $false
-
-                    Invoke-ToolBoxDownload -Tool $tools[$index]
-                    Pause
+                    $selectedTool = $tools[$index]
                 }
+            }
+            else {
+                # Name selection
+                $selectedTool = $tools | Where-Object {
+                    $_.Name -ieq $selection
+                } | Select-Object -First 1
+            }
+
+            if ($selectedTool) {
+                $Global:WindowsUpdates     = $false
+                $Global:DriverandFirmware  = $false
+                $Global:Confirm            = $false
+
+                Invoke-ToolBoxDownload -Tool $selectedTool
+                continue
+            }
+            else {
+                Write-Host ""
+                Write-Host "Invalid selection: $selection" -ForegroundColor Red
+                Start-Sleep -Seconds 2
+                continue
             }
 
         } while ($true)
