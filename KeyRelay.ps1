@@ -14,7 +14,7 @@ Function Invoke-KeyRelay {
 # =====================================================
 # App Version
 # =====================================================
-$APP_VERSION = "1.17.4"
+$APP_VERSION = "1.17.5"
 
 # =====================================================
 # APP DATA FOLDER
@@ -1049,7 +1049,10 @@ function Start-Typing {
         if (-not $continueTyping) { return }
     }
 
-    Add-TableData -TableName "KeyRelayTelemetryData" -PartitionKey $PartitionKey -Data $data -ShowSuccessOnce $true
+    # v1.17.5 fix:
+    # Removed old Add-TableData call. That helper is not defined in this script,
+    # and $PartitionKey / $data are not valid in Start-Typing. Startup telemetry
+    # is already sent through Send-ToolTelemetry near the top of Invoke-KeyRelay.
     Maybe-AddToHistory $text
 
     $startDelay = [int]$inpStartDelay.Text
