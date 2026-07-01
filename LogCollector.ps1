@@ -545,17 +545,6 @@ Function UploadLogs {
         $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*$CaseNumber* | sort lastwritetime | select -last 1 
         $s=Upload-FileToCase -FilePath $HealthZip.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
         
-        #Get the File-Name without path
-        #$name = (Get-Item $HealthZip).Name
-
-        #The target URL wit SAS Token
-        #$uri = "https://gsetools.blob.core.windows.net/sddcdata/$($name)?sp=acw&st=2022-06-28T17:26:35Z&se=2032-06-29T01:26:35Z&spr=https&SECRET REMOVED"
-
-        #Define required Headers
-        #$headers = @{
-        #    'x-ms-blob-type' = 'BlockBlob'
-        #        }
-
         #Upload File...
         #$resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
         if ($s -eq 0) {Write-Host "SDDC uploaded to case $CaseNumber" -ForegroundColor Green}
@@ -570,17 +559,6 @@ Function UploadLogs {
         $parsed=($content | Select-String -context 0,2 -SimpleMatch "Svc Tag").ToString()
         $servicetag=(($parsed.split("`r")[2]) -split "  ")[-2]
         $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
-
-        #Get the File-Name without path
-        #$name = (Get-Item $ZipPath).Name
-
-        #The target URL wit SAS Token
-        #$uri = "https://gsetools.blob.core.windows.net/showtech/$($name)?sp=acw&st=2022-08-14T20:19:23Z&se=2032-08-15T04:19:23Z&spr=https&SECRET REMOVED"
-
-        #Define required Headers
-        #$headers = @{
-        #    'x-ms-blob-type' = 'BlockBlob'
-        #    }
 
         #Upload File...
         #$resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
