@@ -144,7 +144,7 @@ v$Ver
             Url         = 'https://raw.githubusercontent.com/DellProSupportGse/source/main/cluchk.ps1'
             Module      = 'RunCluChk'
             Command     = 'Invoke-RunCluChk'
-            Encoding    = 'Default'
+            Encoding    = 'UTF8'
         }
         [pscustomobject]@{
             Name        = 'DriFT'
