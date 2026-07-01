@@ -11,91 +11,51 @@
 #>
 Function Invoke-BOILER{
 #region Opening Banner and menu
-$Ver="1.36"
+$Ver="1.37"
 
 # =====================================================
 #region Telemetry Information
 # =====================================================
-$uploadToAzure=$True
-IF($uploadToAzure){
 
-    Write-Host "Logging Telemetry Information..."
+$script:TelemetryReportID    = [guid]::NewGuid().Guid
+$script:TelemetryGeoResolved = $false
+$script:TelemetryGeoData     = @{}
+$script:TelemetryStartupSent = $false
+$script:uploadToAzure        = $true
 
-    function Add-TableData {
-        [CmdletBinding()]
-        param(
-            [Parameter(Mandatory=$true)]
-            [string]$TableName,
+function Write-Indent {
+    param(
+        [string]$Message,
+        [int]$Level = 1,
+        [string]$Color = "Gray"
+    )
 
-            [Parameter(Mandatory=$true)]
-            [string]$PartitionKey,
-
-            [Parameter(Mandatory=$true)]
-            [hashtable]$Data
-        )
-
-        if (-not $uploadToAzure) { return }
-
-        $RowKey = [guid]::NewGuid().Guid
-        
-        $TableSvcSasUrl = 'https://gsetools.table.core.windows.net/?SECRET REMOVED'
-
-        $uri = "https://gsetools.table.core.windows.net/$TableName$($TableSvcSasUrl.Substring($TableSvcSasUrl.IndexOf('?')))"
-
-        $headers = @{
-            "Accept"       = "application/json;odata=nometadata"
-            "Content-Type" = "application/json"
-            "x-ms-version" = "2019-02-02"
-        }
-
-        $Data["PartitionKey"] = $PartitionKey
-        $Data["RowKey"]       = $RowKey
-
-        $body = $Data | ConvertTo-Json -Depth 5
-
-        $maxRetries = 3
-        $attempt = 0
-        $success = $false
-
-        while (-not $success -and $attempt -lt $maxRetries) {
-
-            try {
-                Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body | Out-Null
-                $success = $true
-                Write-Indent "Telemetry recorded successfully" 1 Green
-            }
-            catch {
-                $attempt++
-
-                if ($attempt -lt $maxRetries) {
-                    Write-Indent "Retrying telemetry upload ($attempt/$maxRetries)..." 1 Yellow
-                    Start-Sleep -Seconds 2
-                }
-                else {
-                    Write-Indent "Telemetry upload failed after $maxRetries attempts" 1 Yellow
-                }
-            }
-        }
-    }
-
-    function Write-Indent {
-        param(
-            [string]$Message,
-            [int]$Level = 1,
-            [string]$Color = "Gray"
-        )
-
+    try {
         $prefix = "  " * $Level
         Write-Host "$prefix$Message" -ForegroundColor $Color
     }
+    catch {}
+}
 
-    # Unique report id
-    $CReportID = [guid]::NewGuid().Guid
-
-
-    Write-Indent "Resolving Geo Location..."
-
+function Get-TelemetryMachineHash {
     try {
+        $raw = "$env:USERDOMAIN\$env:USERNAME@$env:COMPUTERNAME"
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($raw)
+        $hash = $sha.ComputeHash($bytes)
+        return ([BitConverter]::ToString($hash)).Replace("-","").Substring(0,24)
+    }
+    catch {
+        return ""
+    }
+}
+
+function Resolve-TelemetryGeo {
+    try {
+        if ($script:TelemetryGeoResolved) { return }
+
+        Write-Indent "Resolving Geo Location..."
+
         if (-not $global:GeoCache) {
             $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
         }
@@ -103,48 +63,137 @@ IF($uploadToAzure){
         $response = $global:GeoCache
 
         if ($response.success -eq $true) {
+            $script:TelemetryGeoData = @{
+                country     = [string]$response.country
+                countryCode = [string]$response.country_code
+                region      = [string]$response.region
+                city        = [string]$response.city
+                latitude    = [string]$response.latitude
+                longitude   = [string]$response.longitude
+                timezone    = [string]$response.timezone.id
+            }
 
-            $country     = $response.country
-            $countryCode = $response.country_code
-            $region      = $response.region
-            $city        = $response.city
-            $latitude    = $response.latitude
-            $longitude   = $response.longitude
-            $timezone    = $response.timezone.id
-
-            Write-Indent "Country: $country" 2
-            Write-Indent "Region : $region" 2
+            Write-Indent "Country: $($script:TelemetryGeoData.country)" 2
+            Write-Indent "Region : $($script:TelemetryGeoData.region)" 2
         }
     }
     catch {
         Write-Indent "WARN: ipwho lookup failed" 2 Yellow
+        $script:TelemetryGeoData = @{}
     }
-
-    $data = @{
-        Region       = $region
-        Version      = $Ver
-        ReportID     = $CReportID
-        country      = $country
-        countryCode  = $countryCode
-        geoRegion    = $region
-        city         = $city
-        lat          = $latitude
-        lon          = $longitude
-        timezone     = $timezone
-        Timestamp = (Get-Date).ToUniversalTime().ToString("o")
-        HostOS = [System.Environment]::OSVersion.VersionString
-        PSVersion = $PSVersionTable.PSVersion.ToString()
+    finally {
+        $script:TelemetryGeoResolved = $true
     }
-
-    # We use tool name for this value
-    $PartitionKey = "Boiler"
-
-    Add-TableData `
-        -TableName "BOILERTelemetryData" `
-        -PartitionKey $PartitionKey `
-        -Data $data 
-
 }
+
+function Send-ToolTelemetry {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$TelemetryName,
+
+        [Parameter(Mandatory=$true)]
+        [string]$EventName,
+
+        [Parameter(Mandatory=$true)]
+        [string]$Version,
+
+        [Parameter(Mandatory=$true)]
+        [string]$Endpoint,
+
+        [int]$ServerCount = 0,
+
+        [int]$GroupCount = 0,
+
+        [switch]$NoGeo,
+
+        [switch]$DebugTelemetry
+    )
+
+    if (-not $script:uploadToAzure) { return }
+
+    if ($EventName -match '^(Startup|Launch|AppStart|ToolStart|TelemetryStartup)$') {
+        if ($script:TelemetryStartupSent) { return }
+        $script:TelemetryStartupSent = $true
+    }
+
+    try {
+        if (-not $NoGeo) {
+            Resolve-TelemetryGeo
+        }
+
+        $rowKey = [guid]::NewGuid().Guid
+        $partitionKey = $TelemetryName -replace 'TelemetryData$',''
+
+        # ONLY requested table columns are placed in Data.
+        $data = [ordered]@{
+            PartitionKey = $partitionKey
+            RowKey       = $rowKey
+            PSVersion    = $PSVersionTable.PSVersion.ToString()
+            Region       = $script:TelemetryGeoData.region
+            countryCode  = $script:TelemetryGeoData.countryCode
+            lon          = $script:TelemetryGeoData.longitude
+            MachineHash  = Get-TelemetryMachineHash
+            geoRegion    = $script:TelemetryGeoData.region
+            lat          = $script:TelemetryGeoData.latitude
+            Version      = $Version
+            timezone     = $script:TelemetryGeoData.timezone
+            ReportID     = $script:TelemetryReportID
+            city         = $script:TelemetryGeoData.city
+            country      = $script:TelemetryGeoData.country
+        }
+
+        # Envelope for the Function only. The Function should write Data only.
+        $payload = @{
+            TelemetryName = $TelemetryName
+            TableName     = $TelemetryName
+            Data          = $data
+        }
+
+        $body = $payload | ConvertTo-Json -Depth 10
+
+        if ($DebugTelemetry) {
+            Write-Host "Telemetry Request:" -ForegroundColor Cyan
+            Write-Host $body
+        }
+
+        $response = Invoke-RestMethod `
+            -Method Post `
+            -Uri $Endpoint `
+            -ContentType "application/json" `
+            -Body $body `
+            -TimeoutSec 15
+
+        if ($DebugTelemetry) {
+            Write-Host "Telemetry Response:" -ForegroundColor Green
+            $response | ConvertTo-Json -Depth 10
+        }
+        else {
+            Write-Indent "Telemetry recorded successfully" 1 Green
+        }
+
+    }
+    catch {
+        if ($DebugTelemetry) {
+            Write-Warning "Telemetry failed: $($_.Exception.Message)"
+            if ($_.ErrorDetails.Message) {
+                Write-Warning $_.ErrorDetails.Message
+            }
+        }
+        return
+    }
+}
+
+ $telemetryParams = @{
+     TelemetryName  = "BOILERTelemetryData"
+     EventName      = "Startup"
+     Version        = $Ver
+     Endpoint       = "https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData"
+     DebugTelemetry = $false
+ }
+
+ Send-ToolTelemetry @telemetryParams
+
 #endregion
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
