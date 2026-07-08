@@ -21,7 +21,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.33
+v1.34
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -97,7 +97,12 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
             else {Install-Module $module -Repository DellGSEPSRepository -SkipPublisherCheck -Force}
         }
     } catch {
-        Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $MyTemp\$branch.zip
+        try {
+            (new-object net.webclient).DownloadFile('https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip',"$MyTemp\$branch.zip")
+        } catch {
+            Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $MyTemp\$branch.zip
+        }
+        Unblock-File "$MyTemp\$branch.zip"
         Expand-Archive -Path $MyTemp\$branch.zip -DestinationPath $MyTemp -Force
         $md = "$env:ProgramFiles\WindowsPowerShell\Modules"
         cp -Recurse $MyTemp\$module-$branch\$module $md -Force -ErrorAction Stop
