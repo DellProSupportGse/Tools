@@ -349,3 +349,4 @@ v$Ver
             Format-Table Node, Counter, Reason -Wrap -AutoSize
     }
 }
+pause
