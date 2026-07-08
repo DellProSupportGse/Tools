@@ -14,7 +14,7 @@ function Invoke-GetHyperVBottlenecks {
         [string]$ClusterName = $env:COMPUTERNAME
     )
 
-$ver="1.4"
+$ver="1.5"
 $text = @"
 v$Ver
    ___     _     _  _                      __   __  ___      _   _   _                 _       
@@ -348,5 +348,5 @@ v$Ver
             Sort-Object Node, Counter |
             Format-Table Node, Counter, Reason -Wrap -AutoSize
     }
+    pause
 }
-pause
