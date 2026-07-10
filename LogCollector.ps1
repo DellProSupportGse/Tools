@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.10"
+$Ver="1.11"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -403,6 +403,10 @@ Function ShowMenu{
         Write-Host ""
         Pause
         ShowMenu
+    }
+    If($selection -eq 5) {
+        $GetSDDCAlso=Read-Host "It's recommended to run TALI with the SDDC to gather a full set of usable logs. Would you like to include the SDDC? ([Y]/n)"
+        If ($GetSDDCAlso -ine "n") {$selection = 15}
     }
     IF($selection -match 0){
         Write-Host "Gathering APEX Logs (ACP/ECE)..."
