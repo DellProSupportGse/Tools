@@ -15,7 +15,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.9'
+    $Ver = '1.91'
 
     $text = @"
 v$Ver
@@ -176,47 +176,86 @@ function Invoke-ToolBoxDownload {
 
     $tempScript = Join-Path $env:TEMP ("ToolBox_{0}_{1}.ps1" -f $Tool.Name, ([guid]::NewGuid().Guid))
 
-    $childCode = @"
-`$ErrorActionPreference = 'Continue'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    If ($Tool.Name -eq "CluChk" -or $Tool.Name -eq "LogCollector") {
+        $childCode = @"
+        `$ErrorActionPreference = 'Continue'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-try {
-    if ('$($Tool.Encoding)' -eq 'UTF8') {
-        `$webClient = New-Object Net.WebClient
-        `$webClient.Encoding = [System.Text.Encoding]::UTF8
-    }
-    else {
-        `$webClient = New-Object Net.WebClient
-    }
-
-    `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts";'
-    `$code += `$webClient.DownloadString('$($Tool.Url)')
-
-    Invoke-Expression `$code
-
-    `$cmd = '$($Tool.Command)'
-
-    if (-not [string]::IsNullOrWhiteSpace(`$cmd)) {
-        if (Get-Command `$cmd -ErrorAction SilentlyContinue) {
-            & `$cmd
+        if ('$($Tool.Encoding)' -eq 'UTF8') {
+            `$webClient = New-Object Net.WebClient
+            `$webClient.Encoding = [System.Text.Encoding]::UTF8
         }
         else {
-            Write-Host ""
-            Write-Host "ERROR: Command not found after loading tool: `$cmd" -ForegroundColor Red
+            `$webClient = New-Object Net.WebClient
         }
-    }
-}
-catch {
-    Write-Host ""
-    Write-Host "ERROR running $($Tool.Name):" -ForegroundColor Red
-    Write-Host `$_.Exception.Message -ForegroundColor Red
-    Start-Sleep -Seconds 4
-}
-finally {
-    try { Remove-Item '$tempScript' -Force -ErrorAction SilentlyContinue } catch {}
-    exit
-}
+
+        `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts";'
+        `$code += `$webClient.DownloadString('$($Tool.Url)')
+
+        Invoke-Expression `$code
+
+        `$cmd = '$($Tool.Command)'
+
+        if (-not [string]::IsNullOrWhiteSpace(`$cmd)) {
+            if (Get-Command `$cmd -ErrorAction SilentlyContinue) {
+                & `$cmd
+            }
+            else {
+                Write-Host ""
+                Write-Host "ERROR: Command not found after loading tool: `$cmd" -ForegroundColor Red
+            }
+        }
+        Write-Host ""
+        Write-Host "ERROR running $($Tool.Name):" -ForegroundColor Red
+        Write-Host `$_.Exception.Message -ForegroundColor Red
+        Start-Sleep -Seconds 4
+        try { Remove-Item '$tempScript' -Force -ErrorAction SilentlyContinue } catch {}
+        exit
 "@
+    } else {
+    
+        $childCode = @"
+        `$ErrorActionPreference = 'Continue'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+        try {
+            if ('$($Tool.Encoding)' -eq 'UTF8') {
+                `$webClient = New-Object Net.WebClient
+                `$webClient.Encoding = [System.Text.Encoding]::UTF8
+            }
+            else {
+                `$webClient = New-Object Net.WebClient
+            }
+
+            `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts";'
+            `$code += `$webClient.DownloadString('$($Tool.Url)')
+
+            Invoke-Expression `$code
+
+            `$cmd = '$($Tool.Command)'
+
+            if (-not [string]::IsNullOrWhiteSpace(`$cmd)) {
+                if (Get-Command `$cmd -ErrorAction SilentlyContinue) {
+                    & `$cmd
+                }
+                else {
+                    Write-Host ""
+                    Write-Host "ERROR: Command not found after loading tool: `$cmd" -ForegroundColor Red
+                }
+            }
+        }
+        catch {
+            Write-Host ""
+            Write-Host "ERROR running $($Tool.Name):" -ForegroundColor Red
+            Write-Host `$_.Exception.Message -ForegroundColor Red
+            Start-Sleep -Seconds 4
+        }
+        finally {
+            try { Remove-Item '$tempScript' -Force -ErrorAction SilentlyContinue } catch {}
+            exit
+        }
+"@
+}
 
     Set-Content -Path $tempScript -Value $childCode -Encoding UTF8
 
@@ -225,6 +264,7 @@ finally {
         '-ExecutionPolicy', 'Bypass',
         '-File', "`"$tempScript`""
     )
+
 }
 
     function ShowMenu {
