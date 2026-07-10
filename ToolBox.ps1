@@ -205,10 +205,6 @@ function Invoke-ToolBoxDownload {
                 Write-Host "ERROR: Command not found after loading tool: `$cmd" -ForegroundColor Red
             }
         }
-        Write-Host ""
-        Write-Host "ERROR running $($Tool.Name):" -ForegroundColor Red
-        Write-Host `$_.Exception.Message -ForegroundColor Red
-        Start-Sleep -Seconds 4
         try { Remove-Item '$tempScript' -Force -ErrorAction SilentlyContinue } catch {}
         exit
 "@
