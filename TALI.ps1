@@ -1935,7 +1935,6 @@ function Send-ToolTelemetry {
             $changed=$true
         }
         If ($FixWarningsAlso -and $failed.MaxPercent -lt 100 -and !($ErrorOnlyCheck) -and $failed.MaxPercent -gt $failed.Threshold) {
-
             Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.MaxPercent). Est Time is less than one minute" -ForegroundColor Cyan
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
             $changed=$true
@@ -1952,7 +1951,7 @@ function Send-ToolTelemetry {
             If ($failed.CurrentPercent -gt $failed.Threshold) {
                 $testPass=2
                 Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)%"
-            } elseif ($failed.MaxPercent -gt $failed.Threshold) {
+            } elseif ($failed.MaxPercent -gt $failed.Threshold -and $failed.Threshold -gt $failed.OptimalPercent) {
                 $testPass=1
                 if ($failed.MaxPercent -lt 100) {
                     Write-Host "Recommendation: Set Thin Provision Threshold to $($failed.MaxPercent)%"
@@ -2085,7 +2084,7 @@ function Send-ToolTelemetry {
     $FailedArcIssues=Test-AksArcIssues
     If ($FailedArcIssues) {
        if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
-            Write-Host "Fixing failed Test-SupportAksArcKnownIssues. Est Time is less than 10 minutes" -ForegroundColor Cyan
+            Write-Host "Fixing failed Test-SupportAksArcKnownIssues. Est Time is less than 60 minutes" -ForegroundColor Cyan
             Invoke-SupportAksArcRemediation
             Sleep 5
             If (Test-AksArcIssues) {Write-ToHost "Failed to fix failed Test-SupportAksArcKnownIssues!!!" -Level 4 -Checkmark 4}
