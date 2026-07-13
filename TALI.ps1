@@ -2084,7 +2084,7 @@ function Send-ToolTelemetry {
     $FailedArcIssues=Test-AksArcIssues
     If ($FailedArcIssues) {
        if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
-            Write-Host "Fixing failed Test-SupportAksArcKnownIssues. Est Time is less than 40 minutes" -ForegroundColor Cyan
+            Write-Host "Fixing failed Test-SupportAksArcKnownIssues. Est Time is less than 60 minutes" -ForegroundColor Cyan
             Invoke-SupportAksArcRemediation
             Sleep 5
             If (Test-AksArcIssues) {Write-ToHost "Failed to fix failed Test-SupportAksArcKnownIssues!!!" -Level 4 -Checkmark 4}
