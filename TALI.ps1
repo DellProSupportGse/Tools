@@ -1954,7 +1954,7 @@ function Send-ToolTelemetry {
                 Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)%"
             } elseif ($failed.MaxPercent -gt $failed.Threshold) {
                 $testPass=1
-                if ($failed.MaxPercent -lt 100) {
+                if ($failed.MaxPercent -lt 100 -and $failed.Treshold -gt $failed.OptimalPercent) {
                     Write-Host "Recommendation: Set Thin Provision Threshold to $($failed.MaxPercent)%"
                 } else {
                     Write-Host "Recommendation: Set Thin Provision Threshold to Optimal setting of $($failed.OptimalPercent)%"
