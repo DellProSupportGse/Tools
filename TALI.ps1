@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.62"
+    $ver="0.63"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -394,11 +394,48 @@ param(
 
                 } | Measure-Object -Sum).Sum
 
-                $usableCapacity = $pool.Size - $pool.Reserved
+                $nodeCount     = (Get-ClusterNode).Count
+                if ($nodeCount -gt 4) {$nodeCount = 4}
+
+                # Core metrics
+                $physicalDisks = $pool | Get-PhysicalDisk
+                $largestDisk     = ($physicalDisks | Measure-Object Size -Maximum).Maximum
+                $totalAllocatedMax = ($vDisks | ForEach-Object {
+                    $copies = $_.NumberOfDataCopies
+                    $multiplier = if ($copies -in 1..6) {
+                        $copies
+                    } else {
+                        2
+                    }
+                    $_.Size * $multiplier
+                } | Measure-Object -Sum).Sum
+                $totalDiskCount   = $physicalDisks.Count
+                $maxFootprint = ($vDisks | ForEach-Object {
+
+                    $copies = $_.NumberOfDataCopies
+
+                    $multiplier = if ($copies -in 1..6) {
+                        $copies
+                    } else {
+                        2
+                    }
+
+                    $_.Size * $multiplier
+
+                } | Measure-Object -Sum).Sum
+                # Failure reserve rule
+                $failureReserve = if ($totalDiskCount -lt 11) {
+                    $largestDisk
+                } else {
+                    $largestDisk * $nodeCount + 100GB
+                }
+
+                $usableCapacity = $pool.Size - $pool.Reserved - $failureReserve
 
                 if ($usableCapacity -gt 0) {
                     $currentPercent = [int](($currentFootprint / $usableCapacity) * 100)
                     $maxPercent     = [int](($maxFootprint / $usableCapacity) * 100)
+                    $optimizedPercent = [int](($maxFootprint / $usableCapacity) * 100)
                 }
                 else {
                     $currentPercent = 101	
@@ -422,6 +459,7 @@ param(
                     CurrentPercent   = [math]::Round($currentPercent, 2)
                     MaxPercent       = [math]::Round($maxPercent, 2)
                     UsableCapacity   = $usableCapacity
+                    OptimalPercent   = [int]($usableCapacity/$maxFootprint*100)
                     Error            = $null
                 }
             }
@@ -1903,19 +1941,24 @@ function Send-ToolTelemetry {
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
             $changed=$true
         }
+        If ($FixWarningsAlso -and $failed.OptimalPercent -lt 100 -and !($ErrorOnlyCheck) -and $failed.OptimalPercent -gt $failed.Threshold) {
+            Write-Host "Setting Thin Provisioning Alert Threshold to Optimal setting of $($failed.OptimalPercent). Est Time is less than one minute" -ForegroundColor Cyan
+            Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.OptimalPercent -Verbose
+            $changed=$true
+        }
         if ($changed) {
             $failed=Test-AzLocalThinProvisioningUtilization
             If (($failed.MaxPercent -gt $failed.Threshold -and $FixWarningsAlso) -or ($failed.CurrentPercent -gt $failed.Threshold)) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             If ($failed.CurrentPercent -gt $failed.Threshold) {
                 $testPass=2
-                Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)"
+                Write-Host "Recommendation: Set Thin Provision Threshold to at least $($failed.CurrentPercent)%"
             } elseif ($failed.MaxPercent -gt $failed.Threshold) {
                 $testPass=1
                 if ($failed.MaxPercent -lt 100) {
-                    Write-Host "Recommendation: Set Thin Provision Threshold to $($failed.MaxPercent)"
+                    Write-Host "Recommendation: Set Thin Provision Threshold to $($failed.MaxPercent)%"
                 } else {
-                    Write-Host "Recommendation: Make sure Vdisk usage does not exceed $($failed.Threshold)%"
+                    Write-Host "Recommendation: Set Thin Provision Threshold to Optimal setting of $($failed.OptimalPercent)%"
                 }
             }
         }        
