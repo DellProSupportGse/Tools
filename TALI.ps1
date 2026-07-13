@@ -435,7 +435,7 @@ param(
                 if ($usableCapacity -gt 0) {
                     $currentPercent = [int](($currentFootprint / $usableCapacity) * 100)
                     $maxPercent     = [int](($maxFootprint / $usableCapacity) * 100)
-                    $optimizedPercent = [int](($maxFootprint / $usableCapacity) * 100)
+                    $optimizedPercent = [int](($usableCapacity/$maxFootprint) * 100)
                 } else {
                     $currentPercent = 101	
                     $maxPercent = $null
