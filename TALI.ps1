@@ -1940,7 +1940,7 @@ function Send-ToolTelemetry {
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.MaxPercent -Verbose
             $changed=$true
         }
-        If ($FixWarningsAlso -and $failed.OptimalPercent -lt 100 -and !($ErrorOnlyCheck) -and $failed.OptimalPercent -gt $failed.Threshold) {
+        If ($FixWarningsAlso -and $failed.OptimalPercent -lt 100 -and !($ErrorOnlyCheck) -and $failed.OptimalPercent -lt $failed.Threshold) {
             Write-Host "Setting Thin Provisioning Alert Threshold to Optimal setting of $($failed.OptimalPercent). Est Time is less than one minute" -ForegroundColor Cyan
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.OptimalPercent -Verbose
             $changed=$true
