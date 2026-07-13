@@ -425,7 +425,7 @@ param(
                 } | Measure-Object -Sum).Sum
                 # Failure reserve rule
                 $failureReserve = if ($totalDiskCount -lt 11) {
-                    $largestDisk
+                    $largestDisk + 100GB
                 } else {
                     $largestDisk * $nodeCount + 100GB
                 }
@@ -436,21 +436,20 @@ param(
                     $currentPercent = [int](($currentFootprint / $usableCapacity) * 100)
                     $maxPercent     = [int](($maxFootprint / $usableCapacity) * 100)
                     $optimizedPercent = [int](($maxFootprint / $usableCapacity) * 100)
-                }
-                else {
+                } else {
                     $currentPercent = 101	
                     $maxPercent = $null
-                }
-
-                if ($maxPercent -gt $threshold -and !($ErrorOnlyCheck)) {
-                        Write-ToHost (
-                            "MAX thin provisioning usage exceeds threshold: $maxPercent% (Threshold: $threshold%)"
-                        ) -Level 2 -Checkmark 2
                 }
                 if ($currentPercent -gt $threshold) {
                     Write-ToHost (
                         "CURRENT thin provisioning usage exceeds threshold: $currentPercent% (Threshold: $threshold%)"
                     ) -Level 3 -Checkmark 3
+                } elseif ($maxPercent -gt $threshold -and !($ErrorOnlyCheck) -and $threshold -gt $optimizedPercent) {
+                        Write-ToHost (
+                            "MAX thin provisioning usage exceeds threshold: $maxPercent% (Threshold: $threshold%)"
+                        ) -Level 2 -Checkmark 2
+                } else {
+                    Write-ToHost "Thin Provisioning Alert Threshold is set correctly"
                 } 
 
                 return [pscustomobject]@{
@@ -459,7 +458,7 @@ param(
                     CurrentPercent   = [math]::Round($currentPercent, 2)
                     MaxPercent       = [math]::Round($maxPercent, 2)
                     UsableCapacity   = $usableCapacity
-                    OptimalPercent   = [int]($usableCapacity/$maxFootprint*100)
+                    OptimalPercent   = $optimizedPercent
                     Error            = $null
                 }
             }
@@ -1948,7 +1947,7 @@ function Send-ToolTelemetry {
         }
         if ($changed) {
             $failed=Test-AzLocalThinProvisioningUtilization
-            If (($failed.MaxPercent -gt $failed.Threshold -and $FixWarningsAlso) -or ($failed.CurrentPercent -gt $failed.Threshold)) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4;$testPass=3}
+            If (($failed.MaxPercent -gt $failed.Threshold -and $FixWarningsAlso -and $failed.Threshold -gt $failed.OptimalPercent) -or ($failed.CurrentPercent -gt $failed.Threshold)) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             If ($failed.CurrentPercent -gt $failed.Threshold) {
                 $testPass=2
