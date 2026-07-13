@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.63"
+    $ver="0.64"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -2084,17 +2084,15 @@ function Send-ToolTelemetry {
     Write-Host ""
     $FailedArcIssues=Test-AksArcIssues
     If ($FailedArcIssues) {
-       <# if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
-            Write-Host "Fixing failed Get-HealthFault command. Est Time is less than two minutes" -ForegroundColor Cyan
-            Invoke-Command -ComputerName $nodes -ScriptBlock {
-                Restart-Service Winmgmt -Force
-            }
+       if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
+            Write-Host "Fixing failed Test-SupportAksArcKnownIssues. Est Time is less than 10 minutes" -ForegroundColor Cyan
+            Invoke-SupportAksArcRemediation
             Sleep 5
-            If ((Test-GetHealthFault) -eq $true) {Write-ToHost "Fix restarting Winmgmt that run on all nodes failed to fix Get-HealthFault command!!!" -Level 4 -Checkmark 4}
-        } else {#>
+            If (Test-AksArcIssues) {Write-ToHost "Failed to fix failed Test-SupportAksArcKnownIssues!!!" -Level 4 -Checkmark 4}
+        } else {
             $testPass=2
             Write-Host "Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem"
-        #}
+        }
     }
     $testReport+= [PSCustomObject] @{TestName="Test-AksArcIssues";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     #Write-Host "Waiting for Get Solution Update command to time out"
