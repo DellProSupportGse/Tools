@@ -24,7 +24,7 @@ Function Invoke-DART {
     [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False,
     $param)
 
-    $ver="1.67"
+    $ver="1.68"
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
@@ -524,7 +524,8 @@ Return $DSUReboot
         $IsDSUInstalled="NO"
         IF(-not ($IsDSUInstalled -eq "YES")){
             Write-Host "Downloading Dell System Update(DSU)..."
-            $LatestDSU = 'https://dl.dell.com/FOLDER12418375M/1/Systems-Management_Application_03GC8_WN64_2.1.1.0_A00.EXE'
+            #$LatestDSU = 'https://dl.dell.com/FOLDER12418375M/1/Systems-Management_Application_03GC8_WN64_2.1.1.0_A00.EXE'
+            $LatestDSU = 'https://dl.dell.com/FOLDER14217017M/1/Systems-Management_Application_RXKJ5_WN64_2.2.0.1_A00.EXE'
             $DSUInstallerLocation=Download-File $LatestDSU
             Write-Host "Installing DSU..."
             Start-Process $DSUInstallerLocation -ArgumentList '/s' -NoNewWindow -Wait
