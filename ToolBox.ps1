@@ -15,7 +15,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.91'
+    $Ver = '1.92'
 
     $text = @"
 v$Ver
@@ -174,93 +174,163 @@ function Invoke-ToolBoxDownload {
 
     $ps5 = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
 
-    $tempScript = Join-Path $env:TEMP ("ToolBox_{0}_{1}.ps1" -f $Tool.Name, ([guid]::NewGuid().Guid))
+    $safeToolName = $Tool.Name -replace '[^\w.-]', '_'
 
-    If ($Tool.Name -eq "CluChk" -or $Tool.Name -eq "LogCollector") {
-        $childCode = @"
-        `$ErrorActionPreference = 'Continue'
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-        if ('$($Tool.Encoding)' -eq 'UTF8') {
-            `$webClient = New-Object Net.WebClient
-            `$webClient.Encoding = [System.Text.Encoding]::UTF8
-        }
-        else {
-            `$webClient = New-Object Net.WebClient
-        }
-
-        `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts";'
-        `$code += `$webClient.DownloadString('$($Tool.Url)')
-
-        Invoke-Expression `$code
-
-        `$cmd = '$($Tool.Command)'
-
-        if (-not [string]::IsNullOrWhiteSpace(`$cmd)) {
-            if (Get-Command `$cmd -ErrorAction SilentlyContinue) {
-                & `$cmd
-            }
-            else {
-                Write-Host ""
-                Write-Host "ERROR: Command not found after loading tool: `$cmd" -ForegroundColor Red
-            }
-        }
-        try { Remove-Item '$tempScript' -Force -ErrorAction SilentlyContinue } catch {}
-        exit
-"@
-    } else {
-    
-        $childCode = @"
-        `$ErrorActionPreference = 'Continue'
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-        try {
-            if ('$($Tool.Encoding)' -eq 'UTF8') {
-                `$webClient = New-Object Net.WebClient
-                `$webClient.Encoding = [System.Text.Encoding]::UTF8
-            }
-            else {
-                `$webClient = New-Object Net.WebClient
-            }
-
-            `$code = '`$module="$($Tool.Module)";`$repo="PowershellScripts";'
-            `$code += `$webClient.DownloadString('$($Tool.Url)')
-
-            Invoke-Expression `$code
-
-            `$cmd = '$($Tool.Command)'
-
-            if (-not [string]::IsNullOrWhiteSpace(`$cmd)) {
-                if (Get-Command `$cmd -ErrorAction SilentlyContinue) {
-                    & `$cmd
-                }
-                else {
-                    Write-Host ""
-                    Write-Host "ERROR: Command not found after loading tool: `$cmd" -ForegroundColor Red
-                }
-            }
-        }
-        catch {
-            Write-Host ""
-            Write-Host "ERROR running $($Tool.Name):" -ForegroundColor Red
-            Write-Host `$_.Exception.Message -ForegroundColor Red
-            Start-Sleep -Seconds 4
-        }
-        finally {
-            try { Remove-Item '$tempScript' -Force -ErrorAction SilentlyContinue } catch {}
-            exit
-        }
-"@
-}
-
-    Set-Content -Path $tempScript -Value $childCode -Encoding UTF8
-
-    Start-Process -FilePath $ps5 -ArgumentList @(
-        '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
-        '-File', "`"$tempScript`""
+    $tempScript = Join-Path $env:TEMP (
+        "ToolBox_{0}_{1}.ps1" -f $safeToolName, ([guid]::NewGuid().Guid)
     )
 
+    if ($Tool.Name -eq 'CluChk' -or $Tool.Name -eq 'LogCollector') {
+        $childCode = @"
+`$ErrorActionPreference = 'Continue'
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+try {
+    if ('$($Tool.Encoding)' -eq 'UTF8') {
+        `$webClient = New-Object Net.WebClient
+        `$webClient.Encoding = [System.Text.Encoding]::UTF8
+    }
+    else {
+        `$webClient = New-Object Net.WebClient
+    }
+
+    # Set variables separately so the downloaded script remains unchanged.
+    # This allows a script-level param() block to remain the first statement.
+    `$module = '$($Tool.Module)'
+    `$repo   = 'PowershellScripts'
+
+    `$code = `$webClient.DownloadString('$($Tool.Url)')
+
+    Invoke-Expression `$code
+
+    `$cmd = '$($Tool.Command)'
+
+    if (-not [string]::IsNullOrWhiteSpace(`$cmd)) {
+        if (Get-Command `$cmd -ErrorAction SilentlyContinue) {
+            & `$cmd
+        }
+        else {
+            Write-Host ''
+            Write-Host "ERROR: Command not found after loading tool: `$cmd" `
+                -ForegroundColor Red
+        }
+    }
+}
+catch {
+    Write-Host ''
+    Write-Host 'ERROR running $($Tool.Name):' -ForegroundColor Red
+    Write-Host `$_.Exception.Message -ForegroundColor Red
+}
+finally {
+    if (`$null -ne `$webClient) {
+        try {
+            `$webClient.Dispose()
+        }
+        catch {}
+    }
+
+    try {
+        Remove-Item -LiteralPath '$tempScript' `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
+    catch {}
+
+    exit
+}
+"@
+    }
+    else {
+        $childCode = @"
+`$ErrorActionPreference = 'Continue'
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+try {
+    if ('$($Tool.Encoding)' -eq 'UTF8') {
+        `$webClient = New-Object Net.WebClient
+        `$webClient.Encoding = [System.Text.Encoding]::UTF8
+    }
+    else {
+        `$webClient = New-Object Net.WebClient
+    }
+
+    # Set variables separately so the downloaded script remains unchanged.
+    # This allows a script-level param() block to remain the first statement.
+    `$module = '$($Tool.Module)'
+    `$repo   = 'PowershellScripts'
+
+    `$code = `$webClient.DownloadString('$($Tool.Url)')
+
+    Invoke-Expression `$code
+
+    `$cmd = '$($Tool.Command)'
+
+    if (-not [string]::IsNullOrWhiteSpace(`$cmd)) {
+        if (Get-Command `$cmd -ErrorAction SilentlyContinue) {
+            & `$cmd
+        }
+        else {
+            Write-Host ''
+            Write-Host "ERROR: Command not found after loading tool: `$cmd" `
+                -ForegroundColor Red
+        }
+    }
+}
+catch {
+    Write-Host ''
+    Write-Host 'ERROR running $($Tool.Name):' -ForegroundColor Red
+    Write-Host `$_.Exception.Message -ForegroundColor Red
+    Start-Sleep -Seconds 4
+}
+finally {
+    if (`$null -ne `$webClient) {
+        try {
+            `$webClient.Dispose()
+        }
+        catch {}
+    }
+
+    try {
+        Remove-Item -LiteralPath '$tempScript' `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
+    catch {}
+
+    exit
+}
+"@
+    }
+
+    try {
+        Set-Content `
+            -LiteralPath $tempScript `
+            -Value $childCode `
+            -Encoding UTF8 `
+            -ErrorAction Stop
+
+        Start-Process -FilePath $ps5 -ArgumentList @(
+            '-NoProfile'
+            '-ExecutionPolicy'
+            'Bypass'
+            '-File'
+            "`"$tempScript`""
+        ) -ErrorAction Stop
+    }
+    catch {
+        Write-Host ''
+        Write-Host "ERROR starting $($Tool.Name):" -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+
+        try {
+            Remove-Item -LiteralPath $tempScript `
+                -Force `
+                -ErrorAction SilentlyContinue
+        }
+        catch {}
+    }
 }
 
     function ShowMenu {
