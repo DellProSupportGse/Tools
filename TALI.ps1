@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.64"
+    $ver="0.65"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -668,9 +668,9 @@ param(
             $FailedServicesOnNode
         } -ArgumentList (,$AzureLocalServices)
         If ($FailedServices) {
-            Write-ToHost "Azure local required all node services $(($FailedServices.Name | Sort -Unique) -join ',') are NOT running on ALL nodes" -Level 3 -Checkmark 3
+            Write-ToHost "Azure local required node services $(($FailedServices.Name | Sort -Unique) -join ',') are NOT running on ALL nodes" -Level 3 -Checkmark 3
         } else {
-            Write-ToHost "All Azure local required all node services are running" -Level 1 -Checkmark 1
+            Write-ToHost "All Azure local required node services are running" -Level 1 -Checkmark 1
         }
         return $FailedServices
     }
@@ -2058,7 +2058,7 @@ function Send-ToolTelemetry {
     $testReport+= [PSCustomObject] @{TestName="Test-CauReportError";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0 
     If ($ErrorReport -ne $null) {Write-Host ""}
     $controlPlaneVMDown=Test-ControlPlaneVMNetwork
-    If ($controlPlaneVMDown -eq $true) {
+    If ($controlPlaneVMDown) {
         If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Rebooting Control Plane VM to fix it's network" -ForegroundColor Cyan
             $CPVM="*-control-plan*"
