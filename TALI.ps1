@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.65"
+    $ver="0.651"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1164,13 +1164,14 @@ param(
             If ((ping -n 2 $controlPlaneIp | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
         #}
         $result=($pingablecount -eq 0 -and !($tcpClient.Connected))
+        $WarningPreference='Continue'
         if ($result) {
             Write-ToHost "Azure Control Plane VM with IP $controlPlaneIp is not healthy!" -Checkmark 3 -Level 3
+            return $true
         } else {
             Write-ToHost "Control Plane VM network checks out"
+            return $false
         }
-        $WarningPreference='Continue'
-        return $result
     }
     Function Test-AksArcIssues {
         $failedAksArcIssues=@()
