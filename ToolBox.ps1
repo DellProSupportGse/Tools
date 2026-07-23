@@ -15,7 +15,7 @@ function EndScript {
 function Invoke-ToolBox {
     Clear-Host
 
-    $Ver = '1.92'
+    $Ver = '1.93'
 
     $text = @"
 v$Ver
@@ -186,7 +186,7 @@ function Invoke-ToolBoxDownload {
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-try {
+
     if ('$($Tool.Encoding)' -eq 'UTF8') {
         `$webClient = New-Object Net.WebClient
         `$webClient.Encoding = [System.Text.Encoding]::UTF8
@@ -216,13 +216,6 @@ try {
                 -ForegroundColor Red
         }
     }
-}
-catch {
-    Write-Host ''
-    Write-Host 'ERROR running $($Tool.Name):' -ForegroundColor Red
-    Write-Host `$_.Exception.Message -ForegroundColor Red
-}
-finally {
     if (`$null -ne `$webClient) {
         try {
             `$webClient.Dispose()
@@ -238,7 +231,7 @@ finally {
     catch {}
 
     exit
-}
+
 "@
     }
     else {
