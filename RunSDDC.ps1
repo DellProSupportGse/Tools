@@ -21,7 +21,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.41
+v1.42
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -55,7 +55,7 @@ if ($Host.Name -eq "Visual Studio Code Host" -or $null -eq [Console]::KeyAvailab
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $timeoutMilliseconds = $TimeoutSeconds * 1000
 
-    while ($stopwatch.ElapsedMilliseconds -lt $timeoutMilliseconds -and $finalInput -eq $null) {
+    while ($stopwatch.ElapsedMilliseconds -lt $timeoutMilliseconds -and $finalInput -eq $null -and $HoursOfEvents -eq 168) {
         if ([Console]::KeyAvailable) {
             $key = [Console]::ReadKey($true)
 
@@ -87,9 +87,8 @@ if ($Host.Name -eq "Visual Studio Code Host" -or $null -eq [Console]::KeyAvailab
         }
     }
 
-    # Timeout reached
     Write-Host "" # Move to next line
-    Write-Host "Timeout reached. Proceeding with default: $DefaultValue"
+    If ($finalInput -eq $null) { Write-Host "Timeout reached. Proceeding with default: $DefaultValue"}
 }
 If ($HoursOfEvents -eq 168) {$HoursOfEvents=($DaysOfLogs+1)*24}
 # Fix 8.3 temp paths
