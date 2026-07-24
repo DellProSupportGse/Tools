@@ -21,7 +21,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.4
+v1.41
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -42,6 +42,7 @@ if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the cas
 [string]$Prompt = "How many days to collect? [$DefaultValue]: "
 
 [int]$DaysOfLogs = $DefaultValue
+$finalInput=$null
 
 # Verify Console is available (fails in ISE, works in standard console/terminal/VS Code)
 if ($Host.Name -eq "Visual Studio Code Host" -or $null -eq [Console]::KeyAvailable) {
@@ -54,7 +55,7 @@ if ($Host.Name -eq "Visual Studio Code Host" -or $null -eq [Console]::KeyAvailab
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $timeoutMilliseconds = $TimeoutSeconds * 1000
 
-    while ($stopwatch.ElapsedMilliseconds -lt $timeoutMilliseconds) {
+    while ($stopwatch.ElapsedMilliseconds -lt $timeoutMilliseconds -and $finalInput -eq $null) {
         if ([Console]::KeyAvailable) {
             $key = [Console]::ReadKey($true)
 
@@ -63,6 +64,7 @@ if ($Host.Name -eq "Visual Studio Code Host" -or $null -eq [Console]::KeyAvailab
                 Write-Host "" # Move to next line
                 $finalInput = $inputBuffer.ToString()
                 if (!([string]::IsNullOrEmpty($finalInput))) { $DaysOfLogs=$finalInput }
+
             }
 
             # Case 2: User pressed Backspace
