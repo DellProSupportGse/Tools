@@ -95,6 +95,7 @@ If ($HoursOfEvents -eq 168) {$HoursOfEvents=($DaysOfLogs+1)*24}
     $MyTemp=(Get-Item $env:temp).fullname
 # Clean old PrivateCloud.DiagnosticInfo
 Write-Host "Cleaning PrivateCloud.DiagnosticInfo on all nodes..."
+Remove-Item "C:\ProgramData\Dell\DellGSEPSRepository" -Recurse -Force -ErrorAction SilentlyContinue
 IF(Get-Service clussvc -ErrorAction SilentlyContinue){
     $CNames=(Get-ClusterNode).Name
 }Else{$CNames=$env:COMPUTERNAME}
