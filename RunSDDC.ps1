@@ -21,7 +21,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.34
+v1.4
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -36,80 +36,97 @@ $MyTemp=(Get-Item $env:temp).fullname
 $Logs = $MyTemp + "\Logs\"
 New-Item -ItemType Directory -Force -Path $Logs
 if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the case number SDDC is being collected for"}
+
+[int]$TimeoutSeconds = 20
+[string]$DefaultValue = "6"
+[string]$Prompt = "How many days to collect? [$DefaultValue]: "
+
+[int]$DaysOfLogs = $DefaultValue
+
+# Verify Console is available (fails in ISE, works in standard console/terminal/VS Code)
+if ($Host.Name -eq "Visual Studio Code Host" -or $null -eq [Console]::KeyAvailable) {
+    # Fallback if Console API is unavailable
+    Write-Warning "Console API not fully supported in this host. Using default value of $DefaultValue days."
+    $
+} else {
+    Write-Host $Prompt -NoNewline
+    $inputBuffer = New-Object System.Text.StringBuilder
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $timeoutMilliseconds = $TimeoutSeconds * 1000
+
+    while ($stopwatch.ElapsedMilliseconds -lt $timeoutMilliseconds) {
+        if ([Console]::KeyAvailable) {
+            $key = [Console]::ReadKey($true)
+
+            # Case 1: User pressed Enter
+            if ($key.Key -eq [ConsoleKey]::Enter) {
+                Write-Host "" # Move to next line
+                $finalInput = $inputBuffer.ToString()
+                if (!([string]::IsNullOrEmpty($finalInput))) { $DaysOfLogs=$finalInput }
+            }
+
+            # Case 2: User pressed Backspace
+            elseif ($key.Key -eq [ConsoleKey]::Backspace) {
+                if ($inputBuffer.Length -gt 0) {
+                    $inputBuffer.Remove($inputBuffer.Length - 1, 1) | Out-Null
+                    # Erase character visually from console
+                    Write-Host "`b `b" -NoNewline
+                }
+            }
+
+            # Case 3: Enforce numeric input only
+            elseif ($key.KeyChar -match '[0-9]') {
+                $inputBuffer.Append($key.KeyChar) | Out-Null
+                Write-Host $key.KeyChar -NoNewline
+            }
+        }
+        else {
+            Start-Sleep -Milliseconds 50 # Prevent high CPU utilization
+        }
+    }
+
+    # Timeout reached
+    Write-Host "" # Move to next line
+    Write-Host "Timeout reached. Proceeding with default: $DefaultValue"
+}
+If ($HoursOfEvents -eq 168) {$HoursOfEvents=($DaysOfLogs+1)*24}
 # Fix 8.3 temp paths
     $MyTemp=(Get-Item $env:temp).fullname
 # Clean old PrivateCloud.DiagnosticInfo
-    Write-Host "Cleaning PrivateCloud.DiagnosticInfo on all nodes..."
-    IF(Get-Service clussvc -ErrorAction SilentlyContinue){
-        $CNames=(Get-ClusterNode).Name
-    }Else{$CNames=$env:COMPUTERNAME}
-    Invoke-Command -ComputerName $CNames -ScriptBlock {
-        # Remove PrivateCloud.DiagnosticInfo
-            Remove-Module 'PrivateCloud.DiagnosticInfo' -Force -Confirm:$False -ErrorAction SilentlyContinue
+Write-Host "Cleaning PrivateCloud.DiagnosticInfo on all nodes..."
+IF(Get-Service clussvc -ErrorAction SilentlyContinue){
+    $CNames=(Get-ClusterNode).Name
+}Else{$CNames=$env:COMPUTERNAME}
+Invoke-Command -ComputerName $CNames -ScriptBlock {
+    # Remove PrivateCloud.DiagnosticInfo
+        Remove-Module 'PrivateCloud.DiagnosticInfo' -Force -Confirm:$False -ErrorAction SilentlyContinue
 
-        # Clean up PrivateCloud.DiagnosticInfo folders
-            $PowerShellPaths=$Env:PSModulePath -split ';'
-            ForEach ($p in $PowerShellPaths){
-                Remove-Item "$p\PrivateCloud.DiagnosticInfo" -Force -Confirm:$False -Recurse -ErrorAction SilentlyContinue
-            }
-    }
+    # Clean up PrivateCloud.DiagnosticInfo folders
+        $PowerShellPaths=$Env:PSModulePath -split ';'
+        ForEach ($p in $PowerShellPaths){
+            Remove-Item "$p\PrivateCloud.DiagnosticInfo" -Force -Confirm:$False -Recurse -ErrorAction SilentlyContinue
+        }
+}
 
 # Fresh import of PrivateCloud.DiagnosticInfo
-    # Allow Tls12 and Tls11 -- GitHub now requires Tls12
-    # If this is not set, the Invoke-WebRequest fails with "The request was aborted: Could not create SSL/TLS secure channel."
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls11
-    $module = 'PrivateCloud.DiagnosticInfo'; $branch = 'master'
-    try {
-        $DellGSEPSRepository="C:\ProgramData\Dell\DellGSEPSRepository"
-        New-Item -ItemType Directory -Path $DellGSEPSRepository -ErrorAction SilentlyContinue
-        Install-PackageProvider -Name 'Nuget' -ForceBootstrap -Force -ErrorAction SilentlyContinue | Out-Null
- If (-not (Test-Path "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe")) {
-  New-Item -ItemType Directory -Path "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet" -ErrorAction SilentlyContinue
-  $sourceNugetExe = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
-  $targetNugetExe = "C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe"
-  Invoke-WebRequest $sourceNugetExe -OutFile $targetNugetExe
-  Set-Alias nuget $targetNugetExe -Scope Global -Verbose
- }
- Install-Module PowerShellGet -AllowClobber -Force -ErrorAction SilentlyContinue
-        If (-not (Get-PSRepository | ? Name -eq "DellGSEPSRepository")) {
-            $registerPSRepositorySplat = @{
-                Name = 'DellGSEPSRepository'
-                SourceLocation = '\\localhost\c$\ProgramData\Dell\DellGSEPSRepository'
-                ScriptSourceLocation = '\\localhost\c$\ProgramData\Dell\DellGSEPSRepository'
-                InstallationPolicy = 'Trusted'
-            }
-            Register-PSRepository @registerPSRepositorySplat
-        }
-        Remove-Item $DellGSEPSRepository\$module-$branch.zip -Force -ErrorAction SilentlyContinue
-        Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $DellGSEPSRepository\$module-$branch.zip
-        Expand-Archive -Path $DellGSEPSRepository\$module-$branch.zip -DestinationPath $DellGSEPSRepository\DellSDDCSource -Force
-        $publishModuleSplat = @{
-            Path = "$DellGSEPSRepository\DellSDDCsource\$module-$branch\$module"
-            Repository = 'DellGSEPSRepository'
-            NuGetApiKey = 'ProsupportGSE'
-        }
-        Publish-Module @publishModuleSplat -Verbose
-        $DellSDDCInstalledVerson=try {(Get-InstalledModule $module -ErrorAction SilentlyContinue).Version} catch {}
-        if ($DellSDDCInstalledVerson -eq $Null) {$DellSDDCInstalledVerson=[Version]'0.0.1.0'}
- Write-Host "Currently Installed Dell Cluster Log Collector: $($DellSDDCInstalledVerson.tostring())"
-        if ($DellSDDCInstalledVerson -lt ((Find-Module $module -Repository DellGSEPSRepository).version)) {
-            if ($DellSDDCInstalledVerson -gt [version]'0.9') {Update-Module $module -Verbose}
-            else {Install-Module $module -Repository DellGSEPSRepository -SkipPublisherCheck -Force}
-        }
-    } catch {
-        try {
-            (new-object net.webclient).DownloadFile('https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip',"$MyTemp\$branch.zip")
-        } catch {
-            Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $MyTemp\$branch.zip
-        }
-        Unblock-File "$MyTemp\$branch.zip"
-        Expand-Archive -Path $MyTemp\$branch.zip -DestinationPath $MyTemp -Force
-        $md = "$env:ProgramFiles\WindowsPowerShell\Modules"
-        cp -Recurse $MyTemp\$module-$branch\$module $md -Force -ErrorAction Stop
-        rm -Recurse $MyTemp\$module-$branch,$MyTemp\$branch.zip
-        $ModulePath=$md+"\"+$module
-        Import-Module $ModulePath -Force
-    }
+# Allow Tls12 and Tls11 -- GitHub now requires Tls12
+# If this is not set, the Invoke-WebRequest fails with "The request was aborted: Could not create SSL/TLS secure channel."
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls11
+$module = 'PrivateCloud.DiagnosticInfo'; $branch = 'master'
+
+try {
+    (new-object net.webclient).DownloadFile('https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip',"$MyTemp\$branch.zip")
+} catch {
+    Invoke-WebRequest -Uri https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip -OutFile $MyTemp\$branch.zip
+}
+Unblock-File "$MyTemp\$branch.zip"
+Expand-Archive -Path $MyTemp\$branch.zip -DestinationPath $MyTemp -Force
+$md = "$env:ProgramFiles\WindowsPowerShell\Modules"
+cp -Recurse $MyTemp\$module-$branch\$module $md -Force -ErrorAction Stop
+rm -Recurse $MyTemp\$module-$branch,$MyTemp\$branch.zip
+$ModulePath=$md+"\"+$module
+Import-Module $ModulePath -Force -Verbose
+
  
 # Clean up old SDDC's
     IF(Test-Path "$env:USERPROFILE\HealthTest-*.zip"){Remove-Item $env:USERPROFILE\HealthTest-*.zip -Force}    
