@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.12"
+$Ver="1.13"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -357,7 +357,8 @@ $x=0
         $x++
         try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases.id} catch {}
         If (!($Global:CaseSrId)) {Write-Host "Invalid Case Number. Please try again" -ForegroundColor Yellow}
-    } else {If (!($Global:CaseNumber)) {$Global:CaseNumber="99999999999"}}
+    } else {try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
+    If (!($Global:CaseNumber)) {$Global:CaseNumber="99999999999"}}
  } while ($x -lt 4 -and !($Global:CaseSrId) -and $consent -eq "Y")
  If ($x -eq 4) {
     Write-Host "    ERROR: Too many tries. Exiting..." -ForegroundColor Red
@@ -461,7 +462,6 @@ Function ShowMenu{
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
         If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
         Write-Host "Collecting Azure Local/HCI/S2D logs (SDDC)..."
-        if (-not ($Global:CaseNumber)) {$Global:CaseNumber = Read-Host -Prompt "Please Provide the case number SDDC is being collected for"}
         $Global:CollectSDDC = "Y"
         [int]$TimeoutSeconds = 20
         [int]$HoursOfEvents = 168
