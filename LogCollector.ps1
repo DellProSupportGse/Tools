@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.11"
+$Ver="1.12"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -296,6 +296,10 @@ Clear-Host
 # Logs
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector_$DateTime.log"
+Write-Host "" 
+$MyTemp=(Get-Item $env:temp).fullname
+$Logs = $MyTemp + "\Logs\"
+New-Item -ItemType Directory -Force -Path $Logs -ErrorAction SilentlyContinue
 # Clean up
 IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
 try {Start-Job -Name "Telemetry" -ScriptBlock {
@@ -375,6 +379,7 @@ Function ShowMenu{
          Write-Host "3)  Switch logs (Show Tech)"
          Write-Host "4)  Windows Failover Clustering, Hyper-v and Standalone Server (TSS)"
          Write-Host "5)  Test Dell Azure Local Issues (TALI)"
+         Write-Host "6)  Deprecated - Use old method to colect Azure Local/HCI/S2D logs"
          Write-Host "Q to Quit"
          Write-Host ""
          $selection = Read-Host "Type a number(s) (ex. 15) and press [Enter]"
@@ -453,6 +458,78 @@ Function ShowMenu{
         }
     }
     IF($selection -match 1){
+        if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
+        If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
+        Write-Host "Collecting Azure Local/HCI/S2D logs (SDDC)..."
+        $Global:CollectSDDC = "Y"
+        [int]$TimeoutSeconds = 20
+        [string]$DefaultValue = "6"
+        [string]$Prompt = "How many days to collect? [$DefaultValue]: "
+
+        [int]$DaysOfLogs = $DefaultValue
+        $finalInput=$null
+
+        # Verify Console is available (fails in ISE, works in standard console/terminal/VS Code)
+        if ($Host.Name -eq "Visual Studio Code Host" -or $null -eq [Console]::KeyAvailable) {
+            # Fallback if Console API is unavailable
+            Write-Warning "Console API not fully supported in this host. Using default value of $DefaultValue days."
+            $
+        } else {
+            Write-Host $Prompt -NoNewline
+            $inputBuffer = New-Object System.Text.StringBuilder
+            $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+            $timeoutMilliseconds = $TimeoutSeconds * 1000
+
+            while ($stopwatch.ElapsedMilliseconds -lt $timeoutMilliseconds -and $finalInput -eq $null -and $HoursOfEvents -eq 168) {
+                if ([Console]::KeyAvailable) {
+                    $key = [Console]::ReadKey($true)
+
+                    # Case 1: User pressed Enter
+                    if ($key.Key -eq [ConsoleKey]::Enter) {
+                        Write-Host "" # Move to next line
+                        $finalInput = $inputBuffer.ToString()
+                        if (!([string]::IsNullOrEmpty($finalInput))) { $DaysOfLogs=$finalInput }
+
+                    }
+
+                    # Case 2: User pressed Backspace
+                    elseif ($key.Key -eq [ConsoleKey]::Backspace) {
+                        if ($inputBuffer.Length -gt 0) {
+                            $inputBuffer.Remove($inputBuffer.Length - 1, 1) | Out-Null
+                            # Erase character visually from console
+                            Write-Host "`b `b" -NoNewline
+                        }
+                    }
+
+                    # Case 3: Enforce numeric input only
+                    elseif ($key.KeyChar -match '[0-9]') {
+                        $inputBuffer.Append($key.KeyChar) | Out-Null
+                        Write-Host $key.KeyChar -NoNewline
+                    }
+                }
+                else {
+                    Start-Sleep -Milliseconds 50 # Prevent high CPU utilization
+                }
+            }
+
+            Write-Host "" # Move to next line
+            If ($finalInput -eq $null) { Write-Host "Timeout reached. Proceeding with default: $DefaultValue"}
+        }
+        If ($HoursOfEvents -eq 168) {$HoursOfEvents=($DaysOfLogs+1)*24}
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetDellSDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/refs/heads/main/GetDellSDDC.ps1'))
+        Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30 -RunCluChk
+        IF(Test-Path -Path "$MyTemp\logs"){
+            Copy-Item -Path "$env:USERPROFILE\HealthTest-*.zip" -Destination "$MyTemp\logs\"
+            $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*.zip
+            $HealthZipNew = $HealthZip.BaseName + "-" + $CaseNumber + ".zip"
+            Rename-Item -Path $HealthZip -NewName $HealthZipNew
+            $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*.zip
+            #Get the File-Name without path
+            $name = (Get-Item $HealthZip).Name
+        }
+
+    }
+    IF($selection -match 6){
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
         If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
         Write-Host "Collecting Azure Local/HCI/S2D logs (SDDC)..."
