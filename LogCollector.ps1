@@ -461,7 +461,7 @@ Function ShowMenu{
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
         If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
         Write-Host "Collecting Azure Local/HCI/S2D logs (SDDC)..."
-        if (-not ($Casenumber)) {$CaseNumber = Read-Host -Prompt "Please Provide the case number SDDC is being collected for"}
+        if (-not ($Global:CaseNumber)) {$Global:CaseNumber = Read-Host -Prompt "Please Provide the case number SDDC is being collected for"}
         $Global:CollectSDDC = "Y"
         [int]$TimeoutSeconds = 20
         [int]$HoursOfEvents = 168
