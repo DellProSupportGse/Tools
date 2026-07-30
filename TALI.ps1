@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.654"
+    $ver="0.655"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -2073,12 +2073,14 @@ function Send-ToolTelemetry {
             while(($tcpClient.Connected) -eq $false -and $dtime -lt 500) {Write-Host "." -NoNewline;sleep 1;$dtime++}
             Write-Host ""
             $controlPlaneVMDown=Test-ControlPlaneVMNetwork
-            if ($controlPlaneVMDown) {Write-ToHost "Rebooting Control Plane VM did not resolve the issue!!!" -Checkmark 4 -Level 4;$testPass=2
+            if ($controlPlaneVMDown) {Write-ToHost "Rebooting Control Plane VM did not resolve the issue!!!" -Checkmark 4 -Level 4;$testPass=4
             } else {
+                $testPass=0
+            } 
+        } else {
                 $testPass=2
                 Write-Host "Recommendation: Reboot the Control Plane VM"
-            } 
-        }
+        } 
     }
     $testReport+= [PSCustomObject] @{TestName="Test-ControlPlaneVMNetwork";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
