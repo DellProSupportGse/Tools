@@ -437,6 +437,7 @@ Transcript stopped, output file is C:\ProgramData\Dell\Test-DellAzureLocalIssues
 
 </details>
 -------------------------------------------------------------------------------------------------------------------------------------------------
+
 ## FLCkr
    **FL**tmc **C**hec**k**e**r**
    This tool lookups up filter drivers in Microsoft's known good list
