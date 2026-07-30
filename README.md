@@ -257,9 +257,7 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 ```Powershell
 Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1'));Test-DellAzureLocalIssues
 ```
-## Test output
 Here is an example of a run of TALI
-
 ## Test-DellAzureLocalIssues Output
 
 ```
