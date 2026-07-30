@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.653"
+    $ver="0.654"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1929,7 +1929,6 @@ function Send-ToolTelemetry {
     if ($failed.MaxPercent -lt 99) {$failed.MaxPercent=$failed.MaxPercent+1}
     If ($failed.CurrentPercent -gt $failed.Threshold -or $failed.MaxPercent -gt $failed.Threshold) {
         $changed=$false
-        $testPass=2
         If ($FixErrors -and $failed.CurrentPercent -lt 100 -and $failed.CurrentPercent -gt $failed.Threshold) {
             Write-Host "Setting Thin Provisioning Alert Threshold to $($failed.CurrentPercent). Est Time is less than one minute" -ForegroundColor Cyan
             Get-StoragePool | ? IsPrimordial -eq $false | Set-StoragePool -ThinProvisioningAlertThresholds $failed.CurrentPercent -Verbose
