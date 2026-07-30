@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.14"
+$Ver="1.15"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -383,8 +383,8 @@ Function ShowMenu{
          Write-Host "6)  Deprecated - Use old method to colect Azure Local/HCI/S2D logs"
          Write-Host "Q to Quit"
          Write-Host ""
-         Write-Host "NOTE: Initial logs for ALL Azure Local cases should at minimum type 15 for both an SDDC and TALI logs."
-         Write-Host "      If TSRs are also needed then put in 125"
+         Write-Host "NOTE: Initial logs for ALL Azure Local (not S2D) cases should at minimum type 15 for both an SDDC and TALI logs." -ForegroundColor Yellow
+         Write-Host "      If TSRs are also needed then put in 125" -ForegroundColor Yellow
          Write-Host ""
          $selection = Read-Host "Type a number(s) (ex. 15) and press [Enter]"
      }
