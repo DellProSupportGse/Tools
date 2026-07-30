@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.651"
+    $ver="0.652"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -744,7 +744,7 @@ param(
                             # If distribution is Normal, expect >99% within 3 deviations
                             If ($Deviation -Gt 3) {
                                 $FoundOutlier = $True
-                                [PSCustomerObject] @{
+                                [PSCustomObject] @{
                                     "SerialNumber"   = $_.SerialNumber
                                     "MediaType"      = $_.MediaType
                                     "PSComputerName" = "$env:COMPUTERNAME"
