@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.652"
+    $ver="0.653"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1946,6 +1946,7 @@ function Send-ToolTelemetry {
             $changed=$true
         }
         if ($changed) {
+            $testpass=0
             $failed=Test-AzLocalThinProvisioningUtilization
             If (($failed.MaxPercent -gt $failed.Threshold -and $FixWarningsAlso -and $failed.Threshold -gt $failed.OptimalPercent) -or ($failed.CurrentPercent -gt $failed.Threshold)) {Write-ToHost "Fix setting Thin Provisioning Alert Threshold failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
@@ -2088,7 +2089,7 @@ function Send-ToolTelemetry {
             Write-Host "Fixing failed Test-SupportAksArcKnownIssues. Est Time is less than 60 minutes" -ForegroundColor Cyan
             Invoke-SupportAksArcRemediation
             Sleep 5
-            If (Test-AksArcIssues) {Write-ToHost "Failed to fix failed Test-SupportAksArcKnownIssues!!!" -Level 4 -Checkmark 4}
+            If (Test-AksArcIssues) {Write-ToHost "Failed to fix failed Test-SupportAksArcKnownIssues!!!" -Level 4 -Checkmark 4;$testpass=3}
         } else {
             $testPass=2
             Write-Host "Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem"
