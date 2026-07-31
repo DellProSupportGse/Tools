@@ -357,7 +357,7 @@ $x=0
         try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
         $x++
         try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases} catch {}
-        If (!($Global:CaseSrId.Id) -or $Global:CaseSrId.status -eq "Closed") {Write-Host "Invalid Case Number or Case is Closed. Please try again" -ForegroundColor Yellow}
+        If (!($Global:CaseSrId.Id) -or $Global:CaseSrId.status -eq "Closed") {Write-Host "Invalid Case Number or Case is Closed. Please try again" -ForegroundColor Yellow;$Global:CaseSrId=$null}
     } else {try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
     If (!($Global:CaseNumber)) {$Global:CaseNumber="99999999999"}}
  } while ($x -lt 4 -and !($Global:CaseSrId) -and $consent -eq "Y")
