@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.16"
+$Ver="1.17"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -356,8 +356,8 @@ $x=0
     If ($consent -eq "Y") {
         try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
         $x++
-        try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases.id} catch {}
-        If (!($Global:CaseSrId)) {Write-Host "Invalid Case Number. Please try again" -ForegroundColor Yellow}
+        try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases} catch {}
+        If (!($Global:CaseSrId.Id) -or $Global:CaseSrId.status -eq "Closed") {Write-Host "Invalid Case Number or Case is Closed. Please try again" -ForegroundColor Yellow}
     } else {try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
     If (!($Global:CaseNumber)) {$Global:CaseNumber="99999999999"}}
  } while ($x -lt 4 -and !($Global:CaseSrId) -and $consent -eq "Y")
