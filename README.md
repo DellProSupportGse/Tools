@@ -366,7 +366,7 @@ VERBOSE: Found package Microsoft.AzureStack.Solution.Deploy.EnterpriseCloudEngin
 
   Testing Control Plane VM network...
 - ✖ Azure Control Plane VM with IP 100.72.44.142 is not healthy!
--   Recommendation: Reboot the Control Plane VM
+   Recommendation: Reboot the Control Plane VM
 
   Testing Aks Arc Known Issues...
   Running test: Failover Cluster service not responsive or not running with ID: FC-0011
@@ -394,8 +394,10 @@ VERBOSE: Found package Microsoft.AzureStack.Solution.Deploy.EnterpriseCloudEngin
   Running test: Validate user storage container exist with ID: MOC-0020
   Some tests failed. Run Invoke-SupportAksArcRemediation to remediate issues.
 - ✖ Some Aks Arc tests failed
--   Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem
+   Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem
+```
 
+```
 TestName                                TestResult
 --------                                ----------
 Test-ClusterControlPlaneHealth          Passed
