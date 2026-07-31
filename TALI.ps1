@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.655"
+    $ver="0.66"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1545,6 +1545,9 @@ function Send-ToolTelemetry {
     $testPass=0
     $badNodes=Test-ClusterControlPlaneHealth
     If ($badNodes.count) {
+        if ($FixErrors) {
+            Write-Host "No fix is currently available. Plese reboot the nodes and check again" -ForegroundColor Cyan
+        }
         Write-Host "Recommendation: Restart node(s) $($badNodes.Node -join ',') to resolve service issue"
         $testPass=2
     } 
@@ -1654,19 +1657,30 @@ function Send-ToolTelemetry {
                 $credential=Get-Credential -Message "Please enter the iDrac creds for host $($failediDracRedfish[0].PSComputerName)" -UserName root;$cred2=Get-Credential -Message "Confirm iDRAC Password" -UserName $credential.GetNetworkCredential().UserName
             } while (($credential.GetNetworkCredential().Password -ne $cred2.GetNetworkCredential().Password) -or ($credential.GetNetworkCredential().UserName -ne $cred2.GetNetworkCredential().UserName))
             $IdracReboots=@()
-            $IdracReboots+=$failediDracRedfish.PSComputerName | %{Invoke-Command -ComputerName $_ -ScriptBlock {
+            $IdracReboots+=$failediDracRedfish.PSComputerName | %{$failedDrac=$_;Invoke-Command -ComputerName $_ -ScriptBlock {
                 add-type "using System.Net;using System.Security.Cryptography.X509Certificates;public class T : ICertificatePolicy {public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate,WebRequest request, int certificateProblem) {return true;}}";[System.Net.ServicePointManager]::CertificatePolicy = New-Object T
                 $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
-                if ($IDracIP -le "") {$iDracIP=(Get-PcsvDevice).IPv4Address}
+                $extIP=$iDracIP=(Get-PcsvDevice).IPv4Address
                 $credential=$using:credential
-                $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$iDracIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr
+                $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$iDracIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr -ErrorAction SilentlyContinue
                 IF($RespErr -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
                     $RespErr=""
                     $password=Read-Host "Password incorrect for iDrac on host $($env:COMPUTERNAME). Please enter $($credential.UserName) password" -AsSecureString
                     $credential = New-Object System.Management.Automation.PSCredential($credential.UserName, $password)
-                    $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$iDracIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr
+                    $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$iDracIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr -ErrorAction SilentlyContinue
                 }
-                If ($RespErr) {Write-Warning $RespErr}
+                If ($RespErr) {
+                    Write-Warning $RespErr
+                    Write-Host "Trying external IP address $($ExtIP)"
+                    $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$ExtIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr -ErrorAction SilentlyContinue
+                    IF($RespErr -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
+                        $RespErr=""
+                        $password=Read-Host "Password incorrect for iDrac on host $($env:COMPUTERNAME). Please enter $($credential.UserName) password" -AsSecureString
+                        $credential = New-Object System.Management.Automation.PSCredential($credential.UserName, $password)
+                        $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$ExtIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr -ErrorAction SilentlyContinue
+                    }
+                    If ($RespErr) {Write-Warning $RespErr}
+                }
                 if ($post_result.StatusCode -eq 204) {
                     Write-Host "iDRAC with ip $iDracIP will be back up within five minutes`n"
                     return $true
@@ -2053,7 +2067,10 @@ function Send-ToolTelemetry {
     $ErrorReport=Test-CauErrorAudit
     If ($ErrorReport) {
         $testPass=2
-        Write-Host "Recommendation: Repair issue causing the CAU failure"
+        if ($FixErrors) {
+            Write-Host "No fix is currently available. The error will persist until the update can be completed successfully" -ForegroundColor Cyan
+        }
+        Write-Host "Recommendation: Repair issue causing the CAU failure. This error will persist until the update is completed successfully"
         Write-Host ""
     }
     $testReport+= [PSCustomObject] @{TestName="Test-CauReportError";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0 
