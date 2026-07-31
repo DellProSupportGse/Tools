@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.15"
+$Ver="1.17"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -215,7 +215,9 @@ param (
 )
 $dfilename=Split-Path -Leaf $FilePath
 If (!($Global:CaseSrId)) {$Global:CaseSrId= (Invoke-RestMethod -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$CaseNumber").cases.id}
-$body = @{"customerEmail"="$Email";"fileName"="$dfilename";"fileSize"="20";"lightningCaseId"="$($Global:CaseSrId)";"preferredName"="$PreferredName";"serviceRequestNb"="$CaseNumber"} | ConvertTo-Json
+$filesize=(Get-Item $FilePath).length
+#$body = @{"customerEmail"="$Email";"fileName"="$dfilename";"fileSize"="20";"lightningCaseId"="$($Global:CaseSrId)";"preferredName"="$PreferredName";"serviceRequestNb"="$CaseNumber"} | ConvertTo-Json
+$body = @{"companyName"="";"customerEmail"="$Email";"dellContactEmail"="";"fileName"="$dfilename";"fileSize"="$filesize";"preferredName"="$PreferredName";"serviceRequestNb"="$CaseNumber"} | ConvertTo-Json
 $header = @{
  "Accept"="application/json"
  "Content-Type"="application/json"
@@ -248,8 +250,7 @@ try {
         $outputStream = $null
         $chunkIndex++
     } while ($totalBytesRead -ge $chunkSize)
-}
-finally {$inputStream.Close()}
+} finally {$inputStream.Close()}
 $percChunk=100/($chunkIndex-1)
 Add-Type -AssemblyName 'System.Net.Http'
 $httpClient = New-Object System.Net.Http.Httpclient
@@ -271,7 +272,7 @@ Foreach ($chunkFile in (gci $tempdir -File | Sort LastWriteTime)) {
     $content.add((New-Object System.Net.Http.StringContent "$chunkNumber"),'chunkNumber')
     $content.Add($streamContent)
     $httpClient = New-Object System.Net.Http.Httpclient
-    $response=$httpClient.PostAsync("https://tdm.dell.com/tdm-file-upload/public/v2/upload-chunk", $content).Result
+    $response=$httpClient.PostAsync("https://tdm.dell.com/tdm-file-upload/public/v3/upload-chunk", $content).Result
     if ($response.StatusCode -ne "204") {Write-Warning "Chunk $chunkNumber upload failed!!";$response;$packageFileStream.close();return 1}
     $packageFileStream.close()
     Write-Host -NoNewLine "$([int]($chunkNumber*$percChunk))%."
@@ -355,8 +356,8 @@ $x=0
     If ($consent -eq "Y") {
         try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
         $x++
-        try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases.id} catch {}
-        If (!($Global:CaseSrId)) {Write-Host "Invalid Case Number. Please try again" -ForegroundColor Yellow}
+        try {$Global:CaseSrId= (Invoke-RestMethod -ErrorAction SilentlyContinue -Uri "https://tdm.dell.com/tdm-file-upload/public/v2/cases-by-generic-id/$($Global:CaseNumber)").cases} catch {}
+        If (!($Global:CaseSrId.Id) -or $Global:CaseSrId.status -eq "Closed") {Write-Host "Invalid Case Number or Case is Closed. Please try again" -ForegroundColor Yellow;$Global:CaseSrId=$null}
     } else {try {$Global:CaseNumber = [long] (Read-Host -Prompt "Please enter the relevant technical support case number")} catch {}
     If (!($Global:CaseNumber)) {$Global:CaseNumber="99999999999"}}
  } while ($x -lt 4 -and !($Global:CaseSrId) -and $consent -eq "Y")
