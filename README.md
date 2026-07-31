@@ -257,7 +257,182 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 ```Powershell
 Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1'));Test-DellAzureLocalIssues
 ```
+Here is an example of a run of TALI
+## Test-DellAzureLocalIssues Output
+
+```
+v0.653
+______   ______     __         __
+/\__  _\ /\_  _ \   /\ \       /\ \
+\/_/\ \/ \ \   **\  \ \ \**__  \ \ \
+   \ \_\  \ \_\ \_\  \ \_____\  \ \_\
+    \/_/   \/_/\/_/   \/_____/   \/_/
+                      by: Tommy Paulk
+Logging Telemetry Information...
+  Resolving Geo Location...
+    Country: United States
+    Region : Texas
+  Telemetry recorded successfully
+Checking for running action plans
+VERBOSE: Looking up shared vhd product drive letter.
+VERBOSE: Acquiring providers for assembly: ...PackageManagement.NuGetProvider.dll
+VERBOSE: Acquiring providers for assembly: ...PackageManagement.ArchiverProviders.dll
+VERBOSE: Acquiring providers for assembly: ...PackageManagement.CoreProviders.dll
+VERBOSE: Acquiring providers for assembly: ...PackageManagement.MsuProvider.dll
+VERBOSE: Acquiring providers for assembly: ...PackageManagement.MetaProvider.PowerShell.dll
+VERBOSE: Acquiring providers for assembly: ...PackageManagement.MsiProvider.dll
+VERBOSE: Suppressed Warning Unknown category for 'NuGet'::'GetDynamicOptions': 'Provider'
+VERBOSE: Get-Package returned with Success:True
+VERBOSE: Found package Microsoft.AzureStack.LcmUpdateService.PowerShell with version 2.2604.0.40
+WARNING: Unable to find volume with label Deployment
+VERBOSE: Found package Microsoft.AzureStack.Solution.Deploy.EnterpriseCloudEngine.Client.Deployment with version 10.2604.0.1251
+```
+
+```diff
+  Testing WMI, VMMS and Cluster service
++ ✓ All nodes WMI, VMMS and Cluster services check out
+
+  Checking Solution Update command...
++ ✓ Get Solution Update command successful
+
+  Checking Net Intents...
++ ✓ Net Intent check successful
+
+  Checking iDrac host nics have DHCP enabled...
++ ✓ All iDrac host network adapters have DHCP enabled
+```
+<details>
+<summary><u>Expand remaining output</u></summary>
+
+```diff
+  Checking iDrac redfish url...
++ ✓ All hosts can access their iDrac redfish url
+
+  Testing that all nodes have been rebooted within 99 days...
++ ✓ All nodes have been rebooted within 99 days
+
+  Testing that all nodes have the HWTimeout registry key set to at least 10000...
++ ✓ All nodes have HWtimeout set to at least 10000
+
+  Testing that all nodes have the VM migration performance option set to SMB...
++ ✓ All nodes have SMB for the VM migration performance option
+
+  Testing if nodes are up but disks are still in maintenance mode...
++ ✓ All disks are in proper status
+
+  Testing that all nodes have the same time zone...
++ ✓ All nodes have the same time zone
+
+  Testing cluster shutdown timeout...
++ ✓ Cluster shutdown time in minutes is set correctly
+
+  Testing for invalid CAU Reports...
++ ✓ Cluster nodes have no invalid CAU Reports
+
+  Testing for invalid compute Net Intent Network Direct configuration...
++ ✓ Compute Net Intents Network Direct are configured correctly
+
+  Testing for invalid Net Intent Network Direct Technology configuration on storage intents...
++ ✓ Storage Net Intents Network Direct Technology are configured correctly
+
+  Analyzing non-Windows VM live migration / failback failures (last 7 days across all nodes)...
++ ✓ No migration or failback failures detected in last 7 days
+
+  Checking per node services vital to Azure local...
++ ✓ All Azure local required node services are running
+
+  Testing for Over Provisioned Virtual Disks on Storage Pool
+! ⚠ If volumes are filled, there will not be enough space for disk repairs. -1050 GB
+    Each node virtual disk can be up to 1.67 TB
+    Recommendation: Make sure Storage Pool space does not run below best practice levels
+
+  Testing Virtual Disk Thin Provisioning Alert Threshold
++ ✓ Thin Provisioning Alert Threshold is set correctly
+
+  Testing cluster memory N-1 resiliency (largest-node failure model)...
++ ✓ Cluster is N-1 safe for memory (headroom: 224 GB)
+
+  Testing cluster CPU vCPU overcommit risk (N-1 model, 200% threshold)...
++ ✓ CPU overcommit within acceptable N-1 threshold
+
+  Looking at physical disk latency in the past week...
++ ✓ All physical disks passed
+
+  Testing that Get-HealthFault command works
++ ✓ Get-HealthFault command succeeded
+
+  Testing for mismatched PS module errors
++ ✓ No mismatched PS modules found
+
+  Testing Control Plane VM network...
+- ✖ Azure Control Plane VM with IP 100.72.44.142 is not healthy!
+   Recommendation: Reboot the Control Plane VM
+
+  Testing Aks Arc Known Issues...
+  Running test: Failover Cluster service not responsive or not running with ID: FC-0011
+  Running test: Registry path missing for the MOC PS Config with ID: MOC-0019
+  Running test: MOC Not on Latest Patch Version with ID: MOC-0001
+  Running test: MOC missing Cloud agent Issues with ID: MOC-0012
+  Running test: MOC Cloud Agent Not Running with ID: MOC-0003
+  Running test: MOC Admin Token Expiry with ID: MOC-0010
+  Running test: MOC Missing Node Agent Issues with ID: MOC-0011
+  Running test: MOC Missing MocHostAgent Issues with ID: MOC-0014
+  Running test: MOC NodeAgent Cert Hostname Drift with ID: MOC-0021
+  Running test: MOC Expired Certificates with ID: MOC-0013
+  Running test: MOC Nodes Not Active with ID: MOC-0004
+  Running test: MOC Nodes Out of Sync with Cluster Nodes with ID: MOC-0005
+  Running test: Multiple MOC Cloud Agent Instances with ID: MOC-0006
+  Running test: MOC Powershell Stuck in Updating State with ID: MOC-0007
+  Running test: Windows Event Log Not Running with ID: MOC-0008
+  Running test: Gallery Image Stuck in Deleting State with ID: MOC-0009
+  Running test: Virtual Machine Stuck in Pending State with ID: MOC-0010
+  Running test: Virtual Machine Stuck in Delete_Failed State due to OSDisk with ID: MOC-0017
+  Running test: Virtual Machine Management service not responsive or not running with ID: VMMS-0012
+  Running test: Validate for empty MOC Identity Tokens with ID: MOC-0015
+  Running test: Validate for corrupted MOC PS Configuration with ID: MOC-0016
+  Running test: Validate if Cloud Agent's ClusterAffinityRule is present with ID: MOC-0018
+  Running test: Validate user storage container exist with ID: MOC-0020
+  Some tests failed. Run Invoke-SupportAksArcRemediation to remediate issues.
+- ✖ Some Aks Arc tests failed
+   Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem
+```
+
+```
+TestName                                TestResult
+--------                                ----------
+Test-ClusterControlPlaneHealth          Passed
+Test-SolutionUpdateCommand              Passed
+Test-NetIntents                         Passed
+Test-iDracHostNicDHCP                   Passed
+Test-iDracRedfish                       Passed
+Test-OsBootTimeOver99Days               Passed
+Test-HWTimeoutKey                       Passed
+Test-VMMIgrationPerformanceOption       Passed
+Test-NodesUpDisksinMaintMode            Passed
+Test-TimeZone                           Passed
+Test-ClusterShutdownTime                Passed
+Test-InvalidCAUReports                  Passed
+Test-NetworkDirectOnComputeIntents      Passed
+Test-NetworkDirectOnStorageIntents      Passed
+Test-AzLocalVmMigrationFailures         Passed
+Test-AzureLocalNodeServices             Passed
+Test-AzLocalOverProvisionedVirtualDisks Warning
+Test-AzLocalThinProvisioningUtilization Passed
+Test-AzLocalMemoryNMinusOne             Passed
+Test-AzLocalCpuNumMinusOne              Passed
+Test-DiskLatencyOutlier                 Passed
+Test-GetHealthFault                     Passed
+Test-MismatchedPSModules                Passed
+Test-CauReportError                     Passed
+Test-ControlPlaneVMNetwork              Error
+Test-AksArcIssues                       Error
+
+Transcript stopped, output file is C:\ProgramData\Dell\Test-DellAzureLocalIssues-20260730.txt
+```
+
+</details>
 -------------------------------------------------------------------------------------------------------------------------------------------------
+
 ## FLCkr
    **FL**tmc **C**hec**k**e**r**
    This tool lookups up filter drivers in Microsoft's known good list
@@ -288,6 +463,3 @@ Copy the below powershell code and paste into PowerShell
 Echo MakeIso;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="MakeIso";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/isomaker.ps1'));Invoke-MakeISO
 ``` 
 -------------------------------------------------------------------------------------------------------------------------------------------------
-
-### Report problems or provide feedback
-If you run into any problems or would like to provide feedback, please open an issue here https://github.com/DellProSupportGse/Tools/issues
