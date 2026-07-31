@@ -301,10 +301,8 @@ VERBOSE: Found package Microsoft.AzureStack.Solution.Deploy.EnterpriseCloudEngin
   Checking iDrac host nics have DHCP enabled...
 + ✓ All iDrac host network adapters have DHCP enabled
 ```
-
 <details>
 <summary><u>Expand remaining output</u></summary>
-
 ```diff
   Checking iDrac redfish url...
 + ✓ All hosts can access their iDrac redfish url
@@ -393,13 +391,10 @@ VERBOSE: Found package Microsoft.AzureStack.Solution.Deploy.EnterpriseCloudEngin
   Running test: Validate for corrupted MOC PS Configuration with ID: MOC-0016
   Running test: Validate if Cloud Agent's ClusterAffinityRule is present with ID: MOC-0018
   Running test: Validate user storage container exist with ID: MOC-0020
+  Some tests failed. Run Invoke-SupportAksArcRemediation to remediate issues.
 - ✖ Some Aks Arc tests failed
 -   Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem
-```
 
-### Summary
-
-```
 TestName                                TestResult
 --------                                ----------
 Test-ClusterControlPlaneHealth          Passed
@@ -428,9 +423,7 @@ Test-MismatchedPSModules                Passed
 Test-CauReportError                     Passed
 Test-ControlPlaneVMNetwork              Error
 Test-AksArcIssues                       Error
-```
 
-```
 Transcript stopped, output file is C:\ProgramData\Dell\Test-DellAzureLocalIssues-20260730.txt
 ```
 
