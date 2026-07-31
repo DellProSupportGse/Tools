@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.67"
+    $ver="0.671"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1192,7 +1192,7 @@ param(
             $testErr=$null
             $arctest=$null
             $Tests=Test-SupportAksArcKnownIssues -ErrorVariable testErr -WarningAction SilentlyContinue -InformationVariable arctest 4> $null
-            try {$testErr=$testErr | ? {$_.Trim() -ne "System error."}} catch {}
+            try {$testErr=$testErr | ? {$_ -notlike "*System error.*"}} catch {}
             Get-PSRepository "PSGallery" | Set-PSRepository -InstallationPolicy $iPolicy -Verbose:$false -WarningAction SilentlyContinue
             $failedTests=$Tests | ? Status -eq "Failed"
             $failedTests | ft -AutoSize
@@ -1204,7 +1204,7 @@ param(
                 Write-ToHost "All Aks Arc Issues tests passed"
                 return $failedTests
             } else {
-                Write-ToHost "Aks Arc test failed hard" -Level 3 -Checkmark 3
+                Write-ToHost "Aks Arc test failed" -Level 3 -Checkmark 3
                 return "Aks Arc test failed hard"
             }
         } else {
