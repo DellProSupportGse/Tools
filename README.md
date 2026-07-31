@@ -286,6 +286,7 @@ VERBOSE: Get-Package returned with Success:True
 VERBOSE: Found package Microsoft.AzureStack.LcmUpdateService.PowerShell with version 2.2604.0.40
 WARNING: Unable to find volume with label Deployment
 VERBOSE: Found package Microsoft.AzureStack.Solution.Deploy.EnterpriseCloudEngine.Client.Deployment with version 10.2604.0.1251
+```
 
 ```diff
   Testing WMI, VMMS and Cluster service
