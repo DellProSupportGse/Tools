@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.66"
+    $ver="0.67"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1159,11 +1159,15 @@ param(
         #$CPIPs=[ipaddress[]](get-vm -ComputerName $nodes "*-control-plan*" | Get-VMNetworkAdapter).IPAddresses | ? isIPv6LinkLocal -eq $false
         $tcpClient = New-Object System.Net.Sockets.TcpClient -Verbose:$false -WarningAction Ignore
         $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500) | Out-Null
+        $tcpClient2 = New-Object System.Net.Sockets.TcpClient -Verbose:$false -WarningAction Ignore
+        $tcpClient2.ConnectAsync((get-service -ComputerName (GEt-ClusterNode).name "wssdcloudagent" | ? Status -eq Running).MachineName,45000).Wait(500) | Out-Null
+        $tcpClient3 = New-Object System.Net.Sockets.TcpClient -Verbose:$false -WarningAction Ignore
+        $tcpClient3.ConnectAsync((get-service -ComputerName (GEt-ClusterNode).name "wssdcloudagent" | ? Status -eq Running).MachineName,55000).Wait(500) | Out-Null
         $pingablecount=0
         #Foreach ($IP in $CPIPs.IPAddressToString) {
             If ((ping -n 2 $controlPlaneIp | Select-String "Reply from.*TTL.*").count) {$pingablecount++}
         #}
-        $result=($pingablecount -eq 0 -and !($tcpClient.Connected))
+        $result=($pingablecount -eq 0 -or !($tcpClient.Connected) -or !($tcpClient2.Connected) -or !($tcpClient3.Connected))
         $WarningPreference='Continue'
         if ($result) {
             Write-ToHost "Azure Control Plane VM with IP $controlPlaneIp is not healthy!" -Checkmark 3 -Level 3
@@ -2088,6 +2092,7 @@ function Send-ToolTelemetry {
             $tcpClient = New-Object System.Net.Sockets.TcpClient
             $tcpClient.ConnectAsync($controlPlaneIp,6443).Wait(500) | Out-Null
             while(($tcpClient.Connected) -eq $false -and $dtime -lt 500) {Write-Host "." -NoNewline;sleep 1;$dtime++}
+            Restart-Service -ComputerName (get-service -ComputerName (GEt-ClusterNode).name "wssdcloudagent" | ? Status -eq Running).MachineName "wssdcloudagent" -Verbose
             Write-Host ""
             $controlPlaneVMDown=Test-ControlPlaneVMNetwork
             if ($controlPlaneVMDown) {Write-ToHost "Rebooting Control Plane VM did not resolve the issue!!!" -Checkmark 4 -Level 4;$testPass=4
