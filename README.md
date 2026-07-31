@@ -303,6 +303,7 @@ VERBOSE: Found package Microsoft.AzureStack.Solution.Deploy.EnterpriseCloudEngin
 ```
 <details>
 <summary><u>Expand remaining output</u></summary>
+
 ```diff
   Checking iDrac redfish url...
 + ✓ All hosts can access their iDrac redfish url
