@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.671"
+    $ver="0.672"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1549,8 +1549,8 @@ function Send-ToolTelemetry {
     $testPass=0
     $badNodes=Test-ClusterControlPlaneHealth
     If ($badNodes.count) {
-        if ($FixErrors) {
-            Write-Host "No fix is currently available. Plese reboot the nodes and check again" -ForegroundColor Cyan
+        if ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "No fix is currently available. Please reboot the failing nodes and check again" -ForegroundColor Cyan
         }
         Write-Host "Recommendation: Restart node(s) $($badNodes.Node -join ',') to resolve service issue"
         $testPass=2
@@ -1922,9 +1922,48 @@ function Send-ToolTelemetry {
     If ($FailedServices) {
         if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Fixing stopped required services for Azure Local that run on all nodes. Est Time is less than two minutes" -ForegroundColor Cyan
+            Write-Host ""
             Foreach ($FailedService in $FailedServices) {
+                # Start the service asynchronously on the remote machine
+                Write-Host "Starting service $($FailedService.Name) on $($FailedService.PSComputerName)" -NoNewline
                 Invoke-Command -ComputerName $FailedService.PSComputerName -ScriptBlock {
-                    $using:FailedService | Start-Service
+                    param($serviceName)
+
+                    try {
+                        $svc = Get-Service -Name $serviceName -ErrorAction Stop
+
+                        # If already running, do nothing
+                        if ($svc.Status -ne 'Running') {
+                            $svc.Start()   # Returns immediately
+                        }
+
+                        $true
+                    }
+                    catch {
+                        Write-Error $_
+                        $false
+                    }
+                } -ArgumentList $FailedService.Name | Out-Null
+
+                # Wait up to 60 seconds for the service to reach Running
+                $timeout  = [TimeSpan]::FromMinutes(1)
+                $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+                do {
+                    Start-Sleep -Seconds 2
+
+                    $status = (Get-Service -ComputerName $FailedService.PSComputerName $FailedService.Name -ErrorAction SilentlyContinue).Status
+
+                    if ($status -eq 'Running') {
+                        Write-Host "Service '$($FailedService.Name)' started successfully on $($FailedService.PSComputerName)."
+                        $started = $true
+                        break
+                    }
+                    Write-Host "." -NoNewline
+                } while ($stopwatch.Elapsed -lt $timeout)
+                Write-Host ""
+                if (-not $started) {
+                    Write-Warning "Service '$($FailedService.Name)' did not reach Running state within 60 seconds on $($FailedService.PSComputerName)."
                 }
             }
             $FailedServices=Test-AzureLocalNodeServices
@@ -2071,7 +2110,7 @@ function Send-ToolTelemetry {
     $ErrorReport=Test-CauErrorAudit
     If ($ErrorReport) {
         $testPass=2
-        if ($FixErrors) {
+        if ($FixErrors -or $FixWarningsAlso) {
             Write-Host "No fix is currently available. The error will persist until the update can be completed successfully" -ForegroundColor Cyan
         }
         Write-Host "Recommendation: Repair issue causing the CAU failure. This error will persist until the update is completed successfully"
