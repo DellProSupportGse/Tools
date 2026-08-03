@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.672"
+    $ver="0.673"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1666,24 +1666,129 @@ function Send-ToolTelemetry {
                 $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
                 $extIP=$iDracIP=(Get-PcsvDevice).IPv4Address
                 $credential=$using:credential
-                $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$iDracIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr -ErrorAction SilentlyContinue
+                $token=$null
+                # 1. Create a session and get X-auth token
+                $loginUri = "https://$iDracIP/redfish/v1/SessionService/Sessions"
+ 
+                $body = @{
+                    UserName = $credential.UserName
+                    Password = $credential.GetNetworkCredential().Password
+                } | ConvertTo-Json
+                $session=$null
+                $RespErr=$null
+                $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
+ 
+                # Token is returned in the X-Auth-Token response header
+                $token = $token = $session.Headers['X-Auth-Token'].Trim()
+                $sessionUrl = $session.Headers['Location']
+ 
+                # Location is usually relative, e.g. /redfish/v1/SessionService/Sessions/1
+                if ($sessionUrl -and -not $sessionUrl.StartsWith('http')) {
+                    $sessionUrl = "https://$iDracIP$sessionUrl"
+                }
+                $headers = @{
+                    'Content-Type' = 'application/json'
+                    'X-Auth-Token' = $token
+                }
                 IF($RespErr -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
                     $RespErr=""
                     $password=Read-Host "Password incorrect for iDrac on host $($env:COMPUTERNAME). Please enter $($credential.UserName) password" -AsSecureString
                     $credential = New-Object System.Management.Automation.PSCredential($credential.UserName, $password)
-                    $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$iDracIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr -ErrorAction SilentlyContinue
+                    $token=$null
+                    # 1. Create a session and get X-auth token
+                    $loginUri = "https://$iDracIP/redfish/v1/SessionService/Sessions"
+ 
+                    $body = @{
+                        UserName = $credential.UserName
+                        Password = $credential.GetNetworkCredential().Password
+                    } | ConvertTo-Json
+                    $session=$null
+                    $RespErr=$null
+                    $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
+ 
+                    # Token is returned in the X-Auth-Token response header
+                    $token = $token = $session.Headers['X-Auth-Token'].Trim()
+                    $sessionUrl = $session.Headers['Location']
+ 
+                    # Location is usually relative, e.g. /redfish/v1/SessionService/Sessions/1
+                    if ($sessionUrl -and -not $sessionUrl.StartsWith('http')) {
+                        $sessionUrl = "https://$iDracIP$sessionUrl"
+                    }
+                }
+                $headers = @{
+                    'Content-Type' = 'application/json'
+                    'X-Auth-Token' = $token
+                }
+                $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$iDracIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers $headers -ErrorVariable RespErr -ErrorAction SilentlyContinue
+                if ($sessionUrl -and $token) {
+                try {
+                    Invoke-WebRequest -Uri $sessionUrl -Method Delete -Headers @{'X-Auth-Token' = $token} -UseBasicParsing -ErrorAction SilentlyContinue | Out-Null
+                } catch {}
                 }
                 If ($RespErr) {
                     Write-Warning $RespErr
                     Write-Host "Trying external IP address $($ExtIP)"
-                    $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$ExtIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr -ErrorAction SilentlyContinue
+                    $token=$null
+                    # 1. Create a session and get X-auth token
+                    $loginUri = "https://$iDracIP/redfish/v1/SessionService/Sessions"
+ 
+                    $body = @{
+                        UserName = $credential.UserName
+                        Password = $credential.GetNetworkCredential().Password
+                    } | ConvertTo-Json
+                    $session=$null
+                    $RespErr=$null
+                    $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
+ 
+                    # Token is returned in the X-Auth-Token response header
+                    $token = $token = $session.Headers['X-Auth-Token'].Trim()
+                    $sessionUrl = $session.Headers['Location']
+ 
+                    # Location is usually relative, e.g. /redfish/v1/SessionService/Sessions/1
+                    if ($sessionUrl -and -not $sessionUrl.StartsWith('http')) {
+                        $sessionUrl = "https://$iDracIP$sessionUrl"
+                    }
+                    $headers = @{
+                        'Content-Type' = 'application/json'
+                        'X-Auth-Token' = $token
+                    }
                     IF($RespErr -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
                         $RespErr=""
                         $password=Read-Host "Password incorrect for iDrac on host $($env:COMPUTERNAME). Please enter $($credential.UserName) password" -AsSecureString
                         $credential = New-Object System.Management.Automation.PSCredential($credential.UserName, $password)
-                        $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$ExtIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers @{"Accept" = "application/json"} -Credential $credential -ErrorVariable RespErr -ErrorAction SilentlyContinue
+                        
+                        $token=$null
+                        # 1. Create a session and get X-auth token
+                        $loginUri = "https://$iDracIP/redfish/v1/SessionService/Sessions"
+ 
+                        $body = @{
+                            UserName = $credential.UserName
+                            Password = $credential.GetNetworkCredential().Password
+                        } | ConvertTo-Json
+                        $session=$null
+                        $RespErr=$null
+                        $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
+ 
+                        # Token is returned in the X-Auth-Token response header
+                        $token = $token = $session.Headers['X-Auth-Token'].Trim()
+                        $sessionUrl = $session.Headers['Location']
+ 
+                        # Location is usually relative, e.g. /redfish/v1/SessionService/Sessions/1
+                        if ($sessionUrl -and -not $sessionUrl.StartsWith('http')) {
+                            $sessionUrl = "https://$iDracIP$sessionUrl"
+                        }
                     }
+                    $headers = @{
+                        'Content-Type' = 'application/json'
+                        'X-Auth-Token' = $token
+                    }
+                    $post_result = Invoke-WebRequest -UseBasicParsing -Uri "https://$ExtIP/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Manager.Reset" -Method Post -Body (@{"ResetType"="GracefulRestart"} | ConvertTo-Json -Compress) -ContentType 'application/json' -Headers $headers -ErrorVariable RespErr -ErrorAction SilentlyContinue
                     If ($RespErr) {Write-Warning $RespErr}
+                }
+                if ($sessionUrl -and $token) {
+                try {
+                    Invoke-WebRequest -Uri $sessionUrl -Method Delete -Headers @{'X-Auth-Token' = $token} -UseBasicParsing -ErrorAction SilentlyContinue | Out-Null
+                } catch {}
                 }
                 if ($post_result.StatusCode -eq 204) {
                     Write-Host "iDRAC with ip $iDracIP will be back up within five minutes`n"
