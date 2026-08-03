@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.19"
+$Ver="1.2"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -553,11 +553,11 @@ Function ShowMenu{
     IF($Global:CollectTSR -eq "Y") {
     $i=0
     #Write-Host "iDrac IPs $iDRACIPs and count is $($iDRACIPs.count)"
-    if (($iDRACIPs -match ".").count) {
+    if (($iDRACIPs.iDracIP -match ".").count) {
         New-Item "$MyTemp\logs\TSRCollector" -ItemType "directory" -ErrorAction SilentlyContinue | Out-Null
         do {
             $idracCount=$iDRACIPs.count
-            foreach ($IP in $iDRACIPs) {
+            foreach ($IP in ($iDRACIPs | ?{$_.iDracIP -gt ""})) {
                $idrac_ip=$IP.iDracIP
                
                if (!($idrac_ip.Contains("#"))) {
@@ -592,7 +592,6 @@ Function ShowMenu{
                     'Content-Type' = 'application/json'
                     'X-auth-token' = $token
                }
-               $idrac_ip=$idrac_ip.replace("!","")
                if (!($idrac_ip.Contains("#"))) {
                     $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
                     $result = Invoke-WebRequest -Uri $uri -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers $headers
@@ -615,7 +614,7 @@ Function ShowMenu{
         }
         while ($totalTSRsCollected -lt $idracCount -and $i -le 20)
         Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse | Compress-Archive -DestinationPath "$MyTemp\logs\TSRReports_$(get-date -Format "yyyyMMdd-HHmm")_$($CaseNumber)"
-         foreach ($idrac_ip in $iDRACIPs) {if (($idrac_ip -match "#")) {Write-Host "ERROR: Failed to capture TSR from $idrac_ip" -ForegroundColor Red}}
+         foreach ($idrac_ip in $iDRACIPs.iDracIP) {if (($idrac_ip -match "#")) {Write-Host "ERROR: Failed to capture TSR from $idrac_ip" -ForegroundColor Red}}
     }
     }
     IF($selection -imatch 'q'){
