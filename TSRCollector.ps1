@@ -45,7 +45,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 #Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 write-host "$(Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log")"
 $text=@"
-v1.92
+v1.921
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -131,8 +131,8 @@ $session = $null
     ForEach($IP in $iDRACIPs){
         $credfail=$null
         $result=@()
-        Write-Host "Starting TSR collection from: $IP..."
         $idrac_ip=$IP.iDracIP
+        Write-Host "Starting TSR collection from: $idrac_ip..."
         $token=$null      
         try {
             # 1. Create a session and get X-auth token
@@ -188,7 +188,7 @@ $session = $null
             }
         }
         $session=$null
-        $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="$credfail$idrac_ip"
+        $IP.iDracIP="$credfail$idrac_ip"
         # 2. Use the token for a GET request
       <#  $uri = "https://$idracIP/api/Systems(1)"
         $response = Invoke-WebRequest -Uri $uri -Method Get -Headers $headers -UseBasicParsing
@@ -230,7 +230,7 @@ $session = $null
     }
     IF($result.StatusCode -eq 202){Write-Host "    StatusCode:"$result.StatusCode "Successfully scheduled TSR" }
     Else{
-        $iDRACIPs[$iDRACIPs.IndexOf("$credfail$idrac_ip")]="#$idrac_ip"
+        $IP.iDracIP="#$idrac_ip"
         Write-Host "    ERROR: StatusCode:" $result.StatusCode "Failed to scheduled TSR" -ForegroundColor Red
         }
     }
