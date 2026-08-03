@@ -45,7 +45,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 #Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 write-host "$(Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log")"
 $text=@"
-v1.9
+v1.91
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -137,13 +137,14 @@ $draccreds=@{}
                 UserName = $credential.UserName
                 Password = $credential.GetNetworkCredential().Password
             } | ConvertTo-Json
- 
+            $session=$null
+            $RespErr=$null
             $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
  
             # Token is returned in the X-Auth-Token response header
             $token = $session.Headers.'X-Auth-Token'
         } catch {
-            Try {$RespErrMessage=($RespErr.message| ConvertFrom-Json).error.'@Message.ExtendedInfo'.message} catch {}
+            Try {if ($RespErr) {$RespErrMessage=($RespErr.message| ConvertFrom-Json).error.'@Message.ExtendedInfo'.message}} catch {}
             IF($RespErrMessage -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
                 $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="!$idrac_ip"
                 $credfail="!"
@@ -162,7 +163,7 @@ $draccreds=@{}
  
                 # Token is returned in the X-Auth-Token response header
                 $token = $session.Headers.'X-Auth-Token'
-                $draccreds.add("!$idrac_ip",$token)
+                $draccreds.add("!$idrac_ip",$newcredential)
             }
         }
         $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="$($iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)])_$token"
@@ -216,13 +217,27 @@ if ($dowait) {
     do {
         $idracCount=$iDRACIPs.count
         foreach ($idrac_ip in $iDRACIPs) {
-           $drac_Cred=($idrac_ip -split "_")[-1]
+           #$drac_Cred=($idrac_ip.split("_"))[-1].trim()
            #if ($idrac_ip.contains("!") -and -not $idrac_ip.Contains("#")) {$drac_Cred=$draccreds[$idrac_ip]}
-                   $headers = @{
-            'Content-Type' = 'application/json'
-            'X-auth-token' = $drac_cred
-        }
+           $drac_Cred=$credential
+           if ($idrac_ip.contains("!") -and -not $idrac_ip.Contains("#")) {$drac_Cred=$draccreds[$idrac_ip]}
            $idrac_ip=$idrac_ip.split("_")[0].replace("!","")
+            $body = @{
+                UserName = $drac_Cred.UserName
+                Password = $drac_Cred.GetNetworkCredential().Password
+            } | ConvertTo-Json
+            $session=$null
+            $RespErr=$null
+            $loginUri = "https://$idrac_ip/redfish/v1/SessionService/Sessions"
+            $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
+ 
+            # Token is returned in the X-Auth-Token response header
+            $token = $session.Headers.'X-Auth-Token'
+            $headers = @{
+              'Content-Type' = 'application/json'
+              'X-auth-token' = $token
+           }
+           Write-Host "Checking $drac_ip with token $token"
            if (!($idrac_ip.Contains("#"))) {
                 $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
                 $result = Invoke-WebRequest -Uri $uri -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers $headers
