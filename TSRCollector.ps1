@@ -45,7 +45,7 @@ $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 #Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log"
 write-host "$(Start-Transcript -NoClobber -Path "C:\programdata\Dell\TSRCollector\TSRCollector_$DateTime.log")"
 $text=@"
-v1.83
+v1.9
   _____ ___ ___    ___     _ _        _           
  |_   _/ __| _ \  / __|___| | |___ __| |_ ___ _ _ 
    | | \__ \   / | (__/ _ \ | / -_) _|  _/ _ \ '_|
@@ -127,30 +127,69 @@ $draccreds=@{}
     ForEach($IP in $iDRACIPs){
         $result=@()
         Write-Host "Collecting TSR from: $IP..."
-        $idrac_ip=$IP            
+        $idrac_ip=$IP
+        $token=$null      
+        try {
+            # 1. Create a session and get X-auth token
+            $loginUri = "https://$idrac_ip/redfish/v1/SessionService/Sessions"
+ 
+            $body = @{
+                UserName = $credential.UserName
+                Password = $credential.GetNetworkCredential().Password
+            } | ConvertTo-Json
+ 
+            $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
+ 
+            # Token is returned in the X-Auth-Token response header
+            $token = $session.Headers.'X-Auth-Token'
+        } catch {
+            Try {$RespErrMessage=($RespErr.message| ConvertFrom-Json).error.'@Message.ExtendedInfo'.message} catch {}
+            IF($RespErrMessage -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
+                $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="!$idrac_ip"
+                $credfail="!"
+                $dowait=$true
+                $newcredential=Get-Credential -Message "Please enter the iDRAC Administrator credentials for $idrac_ip"
+                
+                                # 1. Create a session and get X-auth token
+                $loginUri = "https://$idrac_ip/redfish/v1/SessionService/Sessions"
+ 
+                $body = @{
+                    UserName = $newcredential.UserName
+                    Password = $newcredential.GetNetworkCredential().Password
+                } | ConvertTo-Json
+ 
+                $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
+ 
+                # Token is returned in the X-Auth-Token response header
+                $token = $session.Headers.'X-Auth-Token'
+                $draccreds.add("!$idrac_ip",$token)
+            }
+        }
+        $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="$($iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)])_$token"
+        # 2. Use the token for a GET request
+      <#  $uri = "https://$idracIP/api/Systems(1)"
+        $response = Invoke-WebRequest -Uri $uri -Method Get -Headers $headers -UseBasicParsing
+
+        $response.Content | ConvertFrom-Json#>
         $Body = @{"ShareType"="Local";"DataSelectorArrayIn"=''}
         $Body["DataSelectorArrayIn"] = $DataSelector
         $Body = $Body | ConvertTo-Json -Compress
+        $headers = @{
+            'Content-Type' = 'application/json'
+            'X-auth-token' = $token
+        }
         $uri = "https://$idrac_ip/redfish/v1/Dell/Managers/iDRAC.Embedded.1/DellLCService/Actions/DellLCService.SupportAssistCollection"
         Try{
             $RespErr =""
-            $result=Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $credential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr 
+            #$result=Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $credential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr 
+            $result=Invoke-WebRequest -UseBasicParsing -Uri $URI -Method POST -Headers $headers -Body $body -ErrorVariable RespErr 
             Write-Host "$(($result.Content| ConvertFrom-Json).'@Message.ExtendedInfo')"
-        }
-        Catch{
+        } Catch{
             $RespErrMessage=$null
             $credfail=""
             Try {$RespErrMessage=($RespErr.message| ConvertFrom-Json).error.'@Message.ExtendedInfo'.message} catch {}
             IF($RespErrMessage -match 'already running'){
                 Write-Host "    ERROR: A SupportAssist job is already running on the server. Please try again later." -ForegroundColor Red
-            } ElseIF($RespErrMessage -match 'The authentication credentials included with this request are missing or invalid.' -or $RespErr.Message -eq "The remote server returned an error: (401) Unauthorized."){
-                $iDRACIPs[$iDRACIPs.IndexOf($idrac_ip)]="!$idrac_ip"
-                $credfail="!"
-                $dowait=$true
-                $newcredential=Get-Credential -Message "Please enter the iDRAC Administrator credentials for $idrac_ip"
-                $draccreds.add("!$idrac_ip",$newcredential)
-                $result= Invoke-WebRequest -UseBasicParsing -Uri $URI -Credential $newcredential -Method POST -Headers @{'content-type'='application/json';'Accept'='application/json'} -Body $body -ErrorVariable RespErr
-                Write-Host "$(($result.Content| ConvertFrom-Json).'@Message.ExtendedInfo')"
             }
         }
     IF($RespErrMessage -match "Unable to run the method because the requested HTTP method is not allowed.") {
@@ -175,17 +214,21 @@ $draccreds=@{}
 if ($dowait) {
     New-Item "$MyTemp\logs\TSRCollector" -ItemType "directory" -ErrorAction SilentlyContinue | Out-Null
     do {
-        $drac_Cred=$credential
         $idracCount=$iDRACIPs.count
         foreach ($idrac_ip in $iDRACIPs) {
-           if ($idrac_ip.contains("!") -and -not $idrac_ip.Contains("#")) {$drac_Cred=$draccreds[$idrac_ip]}
-           $idrac_ip=$idrac_ip.replace("!","")
+           $drac_Cred=($idrac_ip -split "_")[-1]
+           #if ($idrac_ip.contains("!") -and -not $idrac_ip.Contains("#")) {$drac_Cred=$draccreds[$idrac_ip]}
+                   $headers = @{
+            'Content-Type' = 'application/json'
+            'X-auth-token' = $drac_cred
+        }
+           $idrac_ip=$idrac_ip.split("_")[0].replace("!","")
            if (!($idrac_ip.Contains("#"))) {
                 $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
-                $result = Invoke-WebRequest -Uri $uri -Credential $drac_Cred -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers @{"Accept"="application/json"}
+                $result = Invoke-WebRequest -Uri $uri -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers $headers
                 $servicetag = ($result.Content | ConvertFrom-Json).Oem.Dell.DellSystem.ChassisServiceTag
                 if (!(test-path "$MyTemp\logs\TSRCollector\TSR*_$($servicetag).zip")) {
-                    try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Credential $drac_Cred -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr} catch {}
+                    try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Headers $headers -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr} catch {}
                 } 
            } else {$idracCount--}
 
