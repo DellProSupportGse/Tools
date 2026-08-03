@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.17"
+$Ver="1.19"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -557,15 +557,55 @@ Function ShowMenu{
         New-Item "$MyTemp\logs\TSRCollector" -ItemType "directory" -ErrorAction SilentlyContinue | Out-Null
         do {
             $idracCount=$iDRACIPs.count
-            foreach ($idrac_ip in $iDRACIPs) {
-               if (!($idrac_ip -match "!|#")) {
+            foreach ($IP in $iDRACIPs) {
+               $idrac_ip=$IP.iDracIP
+               
+               if (!($idrac_ip.Contains("#"))) {
+                   $drac_Cred=$IP.Credential
+                   #if ($idrac_ip.contains("!") -and -not $idrac_ip.Contains("#")) {$drac_Cred=$draccreds[$idrac_ip]}
+                   $idrac_ip=$idrac_ip.replace("!","")
+                    $body = @{
+                        UserName = $drac_Cred.UserName
+                        Password = $drac_Cred.GetNetworkCredential().Password
+                    } | ConvertTo-Json
+                    $session=$null
+                    $RespErr=$null
+                    $loginUri = "https://$idrac_ip/redfish/v1/SessionService/Sessions"
+                    $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
+ 
+                    # Token is returned in the X-Auth-Token response header
+                    $token = $session.Headers['X-Auth-Token'].Trim()
+                    $sessionUrl = $session.Headers['Location']
+ 
+                    # Location is usually relative, e.g. /redfish/v1/SessionService/Sessions/1
+                    if ($sessionUrl -and -not $sessionUrl.StartsWith('http')) {
+                        $sessionUrl = "https://$idrac_ip$sessionUrl"
+                    }
+                    $headers = @{
+                      'Content-Type' = 'application/json'
+                      'X-Auth-Token' = $token
+                   }
+                   #Write-Host "Checking $idrac_ip with token $token"
+               }
+
+               $headers = @{
+                    'Content-Type' = 'application/json'
+                    'X-auth-token' = $token
+               }
+               $idrac_ip=$idrac_ip.replace("!","")
+               if (!($idrac_ip.Contains("#"))) {
                     $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
-                    $result = Invoke-WebRequest -Uri $uri -Credential $credential -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers @{"Accept"="application/json"}
+                    $result = Invoke-WebRequest -Uri $uri -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers $headers
                     $servicetag = ($result.Content | ConvertFrom-Json).Oem.Dell.DellSystem.ChassisServiceTag
                     if (!(test-path "$MyTemp\logs\TSRCollector\TSR*_$($servicetag).zip")) {
-                        try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Credential $credential -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr} catch {}
-                    }
+                        try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Headers $headers -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr} catch {}
+                    } 
                } else {$idracCount--}
+               if ($sessionUrl -and $token) {
+                  try {
+                      Invoke-WebRequest -Uri $sessionUrl -Method Delete -Headers @{'X-Auth-Token' = $token} -UseBasicParsing -ErrorAction SilentlyContinue | Out-Null
+                  } catch {}
+               }
             }
             $TSRsCollected = (Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse)
             $totalTSRsCollected = $TSRsCollected.Count
@@ -575,7 +615,7 @@ Function ShowMenu{
         }
         while ($totalTSRsCollected -lt $idracCount -and $i -le 20)
         Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse | Compress-Archive -DestinationPath "$MyTemp\logs\TSRReports_$(get-date -Format "yyyyMMdd-HHmm")_$($CaseNumber)"
-         foreach ($idrac_ip in $iDRACIPs) {if (($idrac_ip -match "!|#")) {Write-Host "ERROR: Failed to capture TSR from $idrac_ip" -ForegroundColor Red}}
+         foreach ($idrac_ip in $iDRACIPs) {if (($idrac_ip -match "#")) {Write-Host "ERROR: Failed to capture TSR from $idrac_ip" -ForegroundColor Red}}
     }
     }
     IF($selection -imatch 'q'){
