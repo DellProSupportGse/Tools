@@ -11,7 +11,7 @@
 #>
 Function Invoke-BOILER{
     #region Opening Banner and menu
-    $Ver="1.38"
+    $Ver="1.39"
 
     # =====================================================
     #region Telemetry Information
@@ -433,56 +433,111 @@ ___  ___ ___ _    ___ ___
     Stop-Transcript
     Pause
 }
-            #function from https://gist.github.com/potatoqualitee/b5ed9d584c79f4b662ec38bd63e70a2d
-            function Get-KBLink {
-                param(
-                    [Parameter(Mandatory)]
-                    [string]$Name
-                )
-                $kb = $Name.Replace("KB", "")
-                $results = Invoke-WebRequest -Uri "https://www.catalog.update.microsoft.com/Search.aspx?q=KB$kb"
-                $kbids = $results.InputFields |
-                    Where-Object { $_.type -eq 'Button' -and $_.Value -eq 'Download' } |
-                    Select-Object -ExpandProperty  ID
+#JG - updated for the URL change from download.windowsupdate.com to catalog.sf.dl.delivery.mp.microsoft.com
+function Get-KBLink {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
 
-                Write-Verbose -Message "$kbids"
+        [string[]]$Filter = @('server', 'x64')
+    )
 
-                if (-not $kbids) {
-                    Write-Warning -Message "No results found for $Name"
-                    return
-                }
-                #$results.Links | Where-Object ID -match '_link'
-                $guids = $results.Links |
-                    Where-Object ID -match '_link' |
-                    Where-Object { ($_.OuterHTML -match ( "(?=.*" + ( $Filter -join ")(?=.*" ) + ")" ) -and $_.OuterHTML -imatch "server" )} |
-                    ForEach-Object { $_.id.replace('_link', '') } |
-                    Where-Object { $_ -in $kbids }
+    $kb = $Name -replace '(?i)^KB', ''
 
-                if (-not $guids) {
-                    Write-Warning -Message "No file found for $Name"
-                    return
-                }
+    $search = Invoke-WebRequest `
+        -Uri "https://www.catalog.update.microsoft.com/Search.aspx?q=KB$kb" `
+        -UseBasicParsing `
+        -ErrorAction Stop
 
-                foreach ($guid in $guids) {
-                    Write-Verbose -Message "Downloading information for $guid"
-                    $post = @{ size = 0; updateID = $guid; uidInfo = $guid } | ConvertTo-Json -Compress
-                    $body = @{ updateIDs = "[$post]" }
-                    $request=Invoke-WebRequest -Uri 'https://www.catalog.update.microsoft.com/DownloadDialog.aspx' -Method Post -Body $body
-                    #$request.Content
-                    #downloadInformation[0].enTitle ='2023-10 Cumulative Update for Microsoft server operating system, version 22H2 for x64-based Systems (KB5031364)';
-                    $links = $request |
-                        Select-Object -ExpandProperty Content |
-                        Select-String -AllMatches -Pattern "(http[s]?\://.*download\.windowsupdate\.com\/[^\'\""]*)" |
-                        Select-Object -Unique
-                        # 'https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2023/10/windows10.0-kb5031364-x64_03606fb9b116659d52e2b5f5a8914bbbaaab6810.msu';
-                    if (-not $links) {
-                        Write-Warning -Message "No file found for $Name"
-                        return
-                    }
+    $updates = [regex]::Matches(
+        $search.Content,
+        '(?is)<tr[^>]*>.*?(?<Guid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_link.*?</tr>'
+    ) | ForEach-Object {
 
-                    foreach ($link in $links) {
-                        $link.matches.value
-                    }
-                }
-            }
-        
+        $rowText = [System.Net.WebUtility]::HtmlDecode(
+            (($_.Value -replace '<[^>]+>', ' ') -replace '\s+', ' ').Trim()
+        )
+
+        [pscustomobject]@{
+            Guid  = $_.Groups['Guid'].Value
+            Title = $rowText
+        }
+    }
+
+    $updates = $updates | Where-Object {
+        $title = $_.Title
+
+        -not ($Filter | Where-Object {
+            $title -notmatch [regex]::Escape($_)
+        })
+    }
+
+    if (-not $updates) {
+        Write-Warning "No matching result found for KB$kb"
+        return
+    }
+
+    foreach ($update in $updates) {
+        Write-Verbose "Selected: $($update.Title)"
+        Write-Verbose "GUID: $($update.Guid)"
+
+        $post = @{
+            size     = 0
+            updateID = $update.Guid
+            uidInfo  = $update.Guid
+        } | ConvertTo-Json -Compress
+
+        $request = Invoke-WebRequest `
+            -Uri 'https://www.catalog.update.microsoft.com/DownloadDialog.aspx' `
+            -Method Post `
+            -Body @{ updateIDs = "[$post]" } `
+            -ContentType 'application/x-www-form-urlencoded' `
+            -UseBasicParsing `
+            -ErrorAction Stop
+
+        # Extract the URL from the JavaScript downloadInformation structure.
+        # Do not restrict it to download.windowsupdate.com because Microsoft
+        # now also uses dl.delivery.mp.microsoft.com.
+        $downloadLinks = [regex]::Matches(
+            $request.Content,
+            "(?is)downloadInformation\[\d+\]\.files\[\d+\]\.url\s*=\s*['""](?<URL>https?://[^'""]+)['""]"
+        ) | ForEach-Object {
+            $url = $_.Groups['URL'].Value
+            $url = [System.Net.WebUtility]::HtmlDecode($url)
+            $url -replace '\\/', '/'
+        } | Sort-Object -Unique
+
+        # Fallback: find any HTTP URL ending in a normal update-file extension.
+        if (-not $downloadLinks) {
+            $downloadLinks = [regex]::Matches(
+                $request.Content,
+                "https?://[^'""<>\s]+?\.(?:msu|cab|exe)(?:\?[^'""<>\s]*)?"
+            ).Value | ForEach-Object {
+                [System.Net.WebUtility]::HtmlDecode($_) -replace '\\/', '/'
+            } | Sort-Object -Unique
+        }
+
+        if (-not $downloadLinks) {
+            Write-Warning "The dialog returned data, but no package URL was found for $($update.Title)"
+
+            # Save the response for inspection.
+            $debugPath = Join-Path $env:TEMP "KB$kb-DownloadDialog.html"
+            $request.Content | Set-Content -Path $debugPath -Encoding UTF8
+
+            Write-Warning "The response was saved to: $debugPath"
+            continue
+        }
+
+    $downloadLinks = $downloadLinks |
+        Where-Object {
+            $_ -match '(?i)[-_]x64[-_]' -and
+            $_ -notmatch '(?i)arm64'
+        } |
+        Sort-Object -Unique
+
+    foreach ($url in $downloadLinks) {
+        $url
+    }
+    }
+}
