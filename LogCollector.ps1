@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.2"
+$Ver="1.21"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -629,8 +629,9 @@ Function ShowMenu{
         # 5. Cleanup the signal file and resume execution
         Remove-Item $SignalFile -Force -ErrorAction SilentlyContinue
     }
-    IF($consent -eq "Y") {UploadLogs}
+    UploadLogs
 }#End of ShowMenu
+
 Function ZipNClean{
     # Zip up
         Write-Host "Compressing Logs..."
@@ -657,62 +658,83 @@ Function ZipNClean{
 }
 Function UploadLogs {
     $MyTemp=(Get-Item $env:temp).fullname
-    Write-Host "Uploading files. Please wait...."
+    $consent=$using:consent
+    if ($consent -eq "Y") {Write-Host "Uploading files. Please wait...." -ForegroundColor Cyan} else {Write-Host "Please upload the following logs using https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
     # Upload ACPECE logs
         IF($ACPLogPath){
-            $s=Upload-FileToCase -FilePath $ACPLogPath -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
-        if ($s -eq 0) {Write-Host "ACP/ECE logs uploaded to case $CaseNumber" -ForegroundColor Green}
-            else {Write-Warning "ACP/ECE logs upload FAILED!!. Please upload $($ACPLogPath) using https://tdm.dell.com/file-upload"}
-        }
+            Write-Host "ACP log path $ACPLogPath" -ForegroundColor Cyan
+            If ($consent -eq "Y") {
+                $s=Upload-FileToCase -FilePath $ACPLogPath -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
+                if ($s -eq 0) {Write-Host "ACP/ECE logs uploaded to case $CaseNumber" -ForegroundColor Green}
+                    else {Write-Host "ACP/ECE logs upload FAILED!!. Please upload $($ACPLogPath) using " -NoNewline -ForegroundColor DarkYellow;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
+                }
+            }
 
     #Upload SDDC
     IF(Test-Path -Path "$MyTemp\logs\Healthtest*$CaseNumber*"){
         $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*$CaseNumber* | sort lastwritetime | select -last 1 
-        $s=Upload-FileToCase -FilePath $HealthZip.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
+        Write-Host "SDDC log path $($HealthZip.Fullname)" -ForegroundColor Cyan
+        If ($consent -eq "Y") {
+            $s=Upload-FileToCase -FilePath $HealthZip.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
         
-        #Upload File...
-        #$resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
-        if ($s -eq 0) {Write-Host "SDDC uploaded to case $CaseNumber" -ForegroundColor Green}
-        else {Write-Warning "SDDC upload FAILED!!. Please upload $($HealthZip.Fullname) using https://tdm.dell.com/file-upload"}
+            #Upload File...
+            #$resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
+            if ($s -eq 0) {Write-Host "SDDC uploaded to case $CaseNumber" -ForegroundColor Green}
+            else {Write-Host "SDDC upload FAILED!!. Please upload $($HealthZip.Fullname) using "-NoNewline -ForegroundColor DarkYellow;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
+
+        }
+
     }
     #Upload ShowTech
     IF(Test-Path -Path "$MyTemp\logs\ShowTechs_$CaseNumber*"){
-        $ZipPath=Get-ChildItem $MyTemp\logs\ShowTechs_$CaseNumber* | sort lastwritetime | select -Last 1 
-        Expand-Archive -Path $ZipPath.Fullname -DestinationPath ($env:temp+"\$($ZipPath.BaseName)")
-        $content= Get-Content (Get-ChildItem ($env:temp + "\$($ZipPath.BaseName)") -File | Select -First 1).Fullname
-        Remove-Item ($env:temp + "\$($ZipPath.BaseName)") -Recurse -Force
-        $parsed=($content | Select-String -context 0,2 -SimpleMatch "Svc Tag").ToString()
-        $servicetag=(($parsed.split("`r")[2]) -split "  ")[-2]
-        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
+        $ZipPath=Get-ChildItem $MyTemp\logs\ShowTechs_$CaseNumber* | sort lastwritetime | select -Last 1
+        Write-Host "ShowTech log path $($ZipPath.Fullname)" -ForegroundColor Cyan
+        if ($consent -eq "Y") {
+            Expand-Archive -Path $ZipPath.Fullname -DestinationPath ($env:temp+"\$($ZipPath.BaseName)")
+            $content= Get-Content (Get-ChildItem ($env:temp + "\$($ZipPath.BaseName)") -File | Select -First 1).Fullname
+            Remove-Item ($env:temp + "\$($ZipPath.BaseName)") -Recurse -Force
+            $parsed=($content | Select-String -context 0,2 -SimpleMatch "Svc Tag").ToString()
+            $servicetag=(($parsed.split("`r")[2]) -split "  ")[-2]
+            $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
 
-        #Upload File...
-        #$resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
-        if ($s -eq 0) {Write-Host "Showtech uploaded to case $CaseNumber" -ForegroundColor Green}
-        else {Write-Warning "Showtech upload FAILED!!. Please upload $($ZipPath.Fullname) using https://tdm.dell.com/file-upload"}
+            #Upload File...
+            #$resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
+            if ($s -eq 0) {Write-Host "Showtech uploaded to case $CaseNumber" -ForegroundColor Green}
+            else {Write-Host "Showtech upload FAILED!!. Please upload $($ZipPath.Fullname) using " -NoNewline -ForegroundColor DarkYellow ;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
+        }
     }
     #Upload TSS
     IF((Get-ChildItem -Path "C:\Dell\Logs" -Filter "$($CaseNumber).zip" -Recurse).count){
         $ZipPath=Get-ChildItem -Path "C:\Dell\Logs" -Filter "$($CaseNumber).zip" -Recurse | sort lastwritetime | select -last 1
         $ZipPath=Rename-Item $ZipPath.FullName "TSS-$($ZipPath.Name)" -PassThru
-        #Upload File...
-        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
-        if ($s -eq 0) {Write-Host "TSS uploaded on case $CaseNumber" -ForegroundColor Green}
-        else {Write-Warning "TSS upload FAILED!!. Please upload $($ZipPath.Fullname) using https://tdm.dell.com/file-upload"}
+        Write-Host "TSS log path $($ZipPath.Fullname)" -ForegroundColor Cyan
+        if ($consent -eq "Y") {
+            #Upload File...
+            $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
+            if ($s -eq 0) {Write-Host "TSS uploaded on case $CaseNumber" -ForegroundColor Green}
+            else {Write-Host "TSS upload FAILED!!. Please upload $($ZipPath.Fullname) using " -NoNewline -ForegroundColor DarkYellow ;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
+        }
     }
     #Upload TSR
     IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse).count){
         $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
-        #Upload File...
-        $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
-        if ($s -eq 0) {Write-Host "TSRs uploaded on case $CaseNumber" -ForegroundColor Green}
-        else {Write-Warning "TSRs upload FAILED!!. Please upload $($ZipPath.Fullname) using https://tdm.dell.com/file-upload"}
+        Write-Host "TSR log path $($ZipPath.Fullname)" -ForegroundColor Cyan
+        if ($consent -eq "Y") {
+            #Upload File...
+            $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
+            if ($s -eq 0) {Write-Host "TSRs uploaded on case $CaseNumber" -ForegroundColor Green}
+            else {Write-Host "TSR upload FAILED!!. Please upload $($ZipPath.Fullname) using " -NoNewline -ForegroundColor DarkYellow ;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
+        }
     }
     IF($Global:CollectTALI -eq "Y" -and  (Get-ChildItem -Path "C:\ProgramData\Dell\Test-DellAzureLocalIssues-*").count){
         $TALI=Get-ChildItem "C:\ProgramData\Dell\Test-DellAzureLocalIssues-*" | sort lastwritetime | select -last 1 
-        #Upload File...
-        $s=Upload-FileToCase -FilePath $TALI.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
-        if ($s -eq 0) {Write-Host "TALI uploaded on case $CaseNumber" -ForegroundColor Green}
-        else {Write-Warning "TALI upload FAILED!!. Please upload $($TALI.FullName) using https://tdm.dell.com/file-upload"}
+        Write-Host "TALI log path $($TALI.Fullname)" -ForegroundColor Cyan
+        if ($consent -eq "Y") {
+            #Upload File...
+            $s=Upload-FileToCase -FilePath $TALI.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
+            if ($s -eq 0) {Write-Host "TALI uploaded on case $CaseNumber" -ForegroundColor Green}
+            else {Write-Host "TALI upload FAILED!!. Please upload $($TALI.Fullname) using " -NoNewline -ForegroundColor DarkYellow ;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
+        }
     }
 }
 ShowMenu
