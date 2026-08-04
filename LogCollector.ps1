@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.21"
+$Ver="1.22"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -521,18 +521,12 @@ Function ShowMenu{
             If ($finalInput -eq $null) { Write-Host "Timeout reached. Proceeding with default: $DefaultValue"}
         }
         If ($HoursOfEvents -eq 168) {$HoursOfEvents=($DaysOfLogs+1)*24}
+        If (gcm Get-Cluster) {$ClusterName=(Get-Cluster).Name} else {$ClusterName=$env:COMPUTERNAME}
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetDellSDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/refs/heads/main/GetDellSDDC.ps1'))
         Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30 -RunCluChk
-        IF(Test-Path -Path "$MyTemp\logs"){
-            Copy-Item -Path "$env:USERPROFILE\HealthTest-*.zip" -Destination "$MyTemp\logs\"
-            $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*.zip
-            $HealthZipNew = $HealthZip.BaseName + "-" + $CaseNumber + ".zip"
-            Rename-Item -Path $HealthZip -NewName $HealthZipNew
-            $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*.zip
-            #Get the File-Name without path
-            $name = (Get-Item $HealthZip).Name
-        }
-
+        $HealthZip = Get-ChildItem "$($env:USERPROFILE)\HealthTest-$ClusterName-*.zip" | sort lastwritetime | select -last 1
+        $HealthZipNew = $HealthZip.BaseName + "-" + $CaseNumber + ".zip"
+        Rename-Item -Path $HealthZip -NewName $HealthZipNew -Verbose
     }
     IF($selection -match 6){
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
@@ -671,8 +665,8 @@ Function UploadLogs {
             }
 
     #Upload SDDC
-    IF(Test-Path -Path "$MyTemp\logs\Healthtest*$CaseNumber*"){
-        $HealthZip = Get-ChildItem $MyTemp\logs\Healthtest*$CaseNumber* | sort lastwritetime | select -last 1 
+    IF(Test-Path -Path "$($env:USERPROFILE)\Healthtest*$CaseNumber*"){
+        $HealthZip = Get-ChildItem "$($env:USERPROFILE)\Healthtest*$CaseNumber*" | sort lastwritetime | select -last 1 
         Write-Host "SDDC log path $($HealthZip.Fullname)" -ForegroundColor Cyan
         If ($consent -eq "Y") {
             $s=Upload-FileToCase -FilePath $HealthZip.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
