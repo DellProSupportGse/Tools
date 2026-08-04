@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.674"
+    $ver="0.675"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -104,7 +104,8 @@ param(
             $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
             $result=try {Invoke-RestMethod https://$iDracIP/redfish/v1/ -UseBasicParsing} catch {}
             If ($result.Vendor -ne 'Dell') {$work=$false} else {$work=$true}
-            [PSCustomObject]@{"PSComputerName"=$env:COMPUTERNAME;"Success"=$work}
+            $IPAddress=(Get-PcsvDevice).IPv4Address
+            [PSCustomObject]@{"PSComputerName"=$env:COMPUTERNAME;"Success"=$work;"IPAddress"=$IPAddress}
         }
         $Redfish=$Redfish | ? Success -eq $false
         If ($Redfish.Success -match $false) {
@@ -1801,11 +1802,7 @@ function Send-ToolTelemetry {
             }}
             if ($IdracReboots.Contains($true)) {
                $i=0
-               $iDracIPs=Foreach ($dracreboot in $IdracReboots) {if ($dracreboot) {Invoke-Command -ComputerName $failediDracRedfish[$i].PSComputerName -ScriptBlock {
-                        (Get-PcsvDevice).IPv4Addres
-                    }}
-                    $i++
-               }
+               $iDracIPs=@($failediDracRedfish.IPAddress)
                $iDracIP=$iDracIPs[0]
                Write-Host "Waiting for iDrac with ip $iDracIP to shutdown"
                $dtime=0
