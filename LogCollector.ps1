@@ -658,8 +658,8 @@ Function ZipNClean{
 }
 Function UploadLogs {
     $MyTemp=(Get-Item $env:temp).fullname
-    $consent=$using:consent
     if ($consent -eq "Y") {Write-Host "Uploading files. Please wait...." -ForegroundColor Cyan} else {Write-Host "Please upload the following logs using https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
+    $consent
     # Upload ACPECE logs
         IF($ACPLogPath){
             Write-Host "ACP log path $ACPLogPath" -ForegroundColor Cyan
