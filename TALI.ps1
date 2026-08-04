@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.673"
+    $ver="0.675"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -104,7 +104,8 @@ param(
             $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
             $result=try {Invoke-RestMethod https://$iDracIP/redfish/v1/ -UseBasicParsing} catch {}
             If ($result.Vendor -ne 'Dell') {$work=$false} else {$work=$true}
-            [PSCustomObject]@{"PSComputerName"=$env:COMPUTERNAME;"Success"=$work}
+            $IPAddress=(Get-PcsvDevice).IPv4Address
+            [PSCustomObject]@{"PSComputerName"=$env:COMPUTERNAME;"Success"=$work;"IPAddress"=$IPAddress}
         }
         $Redfish=$Redfish | ? Success -eq $false
         If ($Redfish.Success -match $false) {
@@ -1715,6 +1716,7 @@ function Send-ToolTelemetry {
                         $sessionUrl = "https://$iDracIP$sessionUrl"
                     }
                 }
+
                 $headers = @{
                     'Content-Type' = 'application/json'
                     'X-Auth-Token' = $token
@@ -1792,27 +1794,33 @@ function Send-ToolTelemetry {
                 }
                 if ($post_result.StatusCode -eq 204) {
                     Write-Host "iDRAC with ip $iDracIP will be back up within five minutes`n"
-                    return $true
+                    $true
                 } else {
-                    Write-Host "IDrac with ip $iDracIP failed to intiate reboot!" -ForegroundColor Red
-                    return $false
+                    Write-Host "iDrac with ip $iDracIP failed to intiate reboot!" -ForegroundColor Red
+                    $false
                 }
             }}
-            if ($IdracReboots.Contains($true)) {Invoke-Command -ComputerName $failediDracRedfish[$IdracReboots.IndexOf($true)].PSComputerName -ScriptBlock {
-               $iDracIP=(Get-CimInstance win32_networkadapterconfiguration | ? Description -like "*NDIS*" -ErrorAction SilentlyContinue).DHCPServer
-               if ($IDracIP -le "") {$iDracIP=(Get-PcsvDevice).IPv4Address}
+            if ($IdracReboots.Contains($true)) {
+               $i=0
+               $iDracIPs=@($failediDracRedfish.IPAddress)
+               $iDracIP=$iDracIPs[0]
                Write-Host "Waiting for iDrac with ip $iDracIP to shutdown"
                $dtime=0
                While ($dtime -lt 30 -and (((Test-NetConnection -ComputerName $iDracIP -WarningAction SilentlyContinue).PingSucceeded) -or ((Test-NetConnection -ComputerName $iDracIP -WarningAction SilentlyContinue).PingSucceeded))) {Write-Host -NoNewline ".";sleep 10;$dtime++}
-               Write-Host "."
+               Write-Host ""
                $dtime=0
                Write-Host "Waiting for iDrac with ip $iDracIP to boot"
                While ($dtime -lt 50 -and !((Test-NetConnection -ComputerName $iDracIP -WarningAction SilentlyContinue).PingSucceeded)) {Write-Host -NoNewline ".";sleep 10;$dtime++}
-               Write-Host "."
-               Write-Host "Waiting 30 seconds for iDrac services to come up"
+               Foreach ($IDracIP in ($iDracIPs | select -Skip 1)) {
+                   Write-Host ""
+                   Write-Host "Waiting for iDrac with ip $iDracIP to boot"
+                   While ($dtime -lt 50 -and !((Test-NetConnection -ComputerName $iDracIP -WarningAction SilentlyContinue).PingSucceeded)) {Write-Host -NoNewline ".";sleep 10;$dtime++}
+               }
+               Write-Host ""
+               Write-Host "Waiting 30 seconds for iDrac services to come up on all rebooted iDracs"
                (1..3) | %{Write-Host "." -NoNewline;sleep 10}
-               Write-Host "."
-            }}
+               Write-Host ""
+            }
             $failediDracRedfish=Test-iDracRedfish
             If ($failediDracRedfish) {Write-ToHost "Fix iDrac redfish FAILED! May need to drain flea power on host" -Level 4 -Checkmark 4;$testPass=3}
         } else {
