@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.22"
+$Ver="1.23"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -523,7 +523,7 @@ Function ShowMenu{
         If ($HoursOfEvents -eq 168) {$HoursOfEvents=($DaysOfLogs+1)*24}
         If (gcm Get-Cluster) {$ClusterName=(Get-Cluster).Name} else {$ClusterName=$env:COMPUTERNAME}
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetDellSDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/refs/heads/main/GetDellSDDC.ps1'))
-        Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30 -RunCluChk
+        Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples 30 -RunCluChk
         $HealthZip = Get-ChildItem "$($env:USERPROFILE)\HealthTest-$ClusterName-*.zip" | sort lastwritetime | select -last 1
         $HealthZipNew = $HealthZip.BaseName + "-" + $CaseNumber + ".zip"
         Rename-Item -Path $HealthZip -NewName $HealthZipNew -Verbose
