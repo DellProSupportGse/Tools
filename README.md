@@ -213,7 +213,7 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 1. If **Sconfig** launches, choose **option 15** to exit to PowerShell.
 2. Launch **Notepad** (type `notepad`).
 3. Paste the contents of the SDDC Powershell file into a blank notepad window.
-4. Use **File > Save As**, choose **Save as type** -> **All Files** and put in the name **GetDellSDDC.ps1**.
+4. Use **File > Save As**, choose **Save as type > All Files** and put in the name **GetDellSDDC.ps1**.
 5. Close notepad
 
 ## Step 2: Run the script
