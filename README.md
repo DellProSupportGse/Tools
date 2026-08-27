@@ -199,41 +199,25 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC
 ```
 -------------------------------------------------------------------------------------------------------------------------------------------------
-# Using SDDC Offline Tool
+# Using SDDC Offline
 
-## Step 1: Prepare Files
+## Step 1: Prepare File
 
 ### On a machine with internet access:
 
-1. Download the **SDDC master file**:  
-   [https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip](https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip)
-2. Copy the file.
+1. Copy the contents of the **SDDC Powershell (PS1) file**:  
+   [https://raw.githubusercontent.com/TommyPaulkDell/source/refs/heads/main/GetDellSDDC.ps1](https://raw.githubusercontent.com/TommyPaulkDell/source/refs/heads/main/GetDellSDDC.ps1)
 
 ### RDP into a cluster node:
 
 1. If **Sconfig** launches, choose **option 15** to exit to PowerShell.
 2. Launch **Notepad** (type `notepad`).
-3. Use **File > Save As** to paste and save `master.zip`.
-
-
-## Step 2: Get the Script
-
-### On the internet-connected machine:
-
-1. Go to [https://github.com/DellProSupportGse/Tools/SDDCOffline.ps1](https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/SDDCOffline.ps1).
-2. Click **Raw**, then press **Ctrl + A** to select all and **Ctrl + C** to copy.
-
-### Back in the RDP session:
-
-1. Paste the script into **PowerShell** and press **Enter**.
-2. Type **y** when prompted to run and confirm local copy.
-3. Browse to `C:\Dell`, select the `master.zip` file, and click **Open**.
-
-
-## Step 3: Run & Finish
-
-- The tool extracts to all nodes and starts data collection (takes several minutes).  
-- When prompted, choose to delete (**y**) or keep (**n**) the master file.  
+3. Paste the contents of the SDDC Powershell file into a blank notepad window.
+4. Use **File > Save As**, choose **Save as type > All Files** and put in the name **GetDellSDDC.ps1**.
+5. Close notepad
+6. Run **Import-Module $env:USERPROFILE\Documents\GetDellSDDC.ps1**
+7. Run **Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30**
+- The tool starts data collection (takes several minutes).   
 - Output will be saved in: C:\Users\<current user>\, starting with (**HealthTest**).
 	   
 -------------------------------------------------------------------------------------------------------------------------------------------------
