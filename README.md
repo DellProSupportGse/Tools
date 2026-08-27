@@ -215,13 +215,8 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 3. Paste the contents of the SDDC Powershell file into a blank notepad window.
 4. Use **File > Save As**, choose **Save as type > All Files** and put in the name **GetDellSDDC.ps1**.
 5. Close notepad
-
-## Step 2: Run the script
-
-### Back in the RDP session:
-
-1. Run **Import-Module $env:USERPROFILE\Documents\GetDellSDDC.ps1**
-2. Run **Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30**
+6. Run **Import-Module $env:USERPROFILE\Documents\GetDellSDDC.ps1**
+7. Run **Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30**
 - The tool starts data collection (takes several minutes).   
 - Output will be saved in: C:\Users\<current user>\, starting with (**HealthTest**).
 	   
