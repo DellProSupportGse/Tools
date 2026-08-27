@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.676"
+    $ver="0.677"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1220,16 +1220,9 @@ param(
             $nodeName=$env:COMPUTERNAME
             $hasWIMMount=$false
             
-            # Check for event 5125 in System log
+            # Check for WIMMOUNT filter driver
             try {
-                $event5125=Get-WinEvent -LogName System -FilterHashtable @{Id=5125} -MaxEvents 1 -ErrorAction SilentlyContinue
-                if ($event5125) {
-                    $eventMessage=$event5125.Message
-                    # Look for "Active filter drivers found:" section with "WIMMount (HSM)"
-                    if ($eventMessage -match "Active filter drivers found:" -and $eventMessage -match "WIMMount \(HSM\)") {
-                        $hasWIMMount=$true
-                    }
-                }
+                if ((fltmc | Select-String WIMMOUNT)) {$hasWIMMount=$true}
             } catch {
                 # Event 5125 not found or error accessing event log
             }
@@ -2316,6 +2309,8 @@ function Send-ToolTelemetry {
                 Write-Host "Unloading WIMMount filter driver on $env:COMPUTERNAME"
                 try {
                     fltmc unload WIMMount
+                    sc.exe stop WIMMount
+                    sc.exe config WIMMount start= disabled
                     Write-Host "Successfully unloaded WIMMount filter driver on $env:COMPUTERNAME"
                     $true
                 } catch {
@@ -2328,7 +2323,7 @@ function Send-ToolTelemetry {
             If ($nonCompliantWIMMount) {Write-ToHost "Fix unloading WIMMount filter driver failed!!!" -Level 4 -Checkmark 4;$testPass=3}
         } else {
             $testPass=2
-            Write-Host "Recommendation: Run 'fltmc unload WIMMount' on node(s) $($nonCompliantWIMMount.NodeName -join ',')"
+            Write-Host "Recommendation: Run 'fltmc unload WIMMount',then stop and disable the driver on node(s) $($nonCompliantWIMMount.NodeName -join ',')"
         }
     }
     $testReport+= [PSCustomObject] @{TestName="Test-WIMMountFilterDriver";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
