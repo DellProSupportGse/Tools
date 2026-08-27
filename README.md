@@ -201,7 +201,7 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 -------------------------------------------------------------------------------------------------------------------------------------------------
 # Using SDDC Offline
 
-## Step 1: Prepare Files
+## Step 1: Prepare File
 
 ### On a machine with internet access:
 
