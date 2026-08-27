@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.675"
+    $ver="0.677"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1213,6 +1213,35 @@ param(
             return $null
         }
     }
+    Function Test-WIMMountFilterDriver {
+        Write-Host "Checking for WIMMount filter driver in system logs..."
+        $nonCompliantNodes=@()
+        $nonCompliantNodes+=Invoke-Command -ComputerName $nodes -ScriptBlock {
+            $nodeName=$env:COMPUTERNAME
+            $hasWIMMount=$false
+            
+            # Check for WIMMOUNT filter driver
+            try {
+                if ((fltmc | Select-String WIMMOUNT)) {$hasWIMMount=$true}
+            } catch {
+                # Event 5125 not found or error accessing event log
+            }
+            
+            [PSCustomObject]@{
+                NodeName=$nodeName
+                HasWIMMount=$hasWIMMount
+            }
+        }
+        
+        $nonCompliantNodes=$nonCompliantNodes | ? HasWIMMount -eq $true
+        
+        If ($nonCompliantNodes) {
+            Write-ToHost "Node(s) $($nonCompliantNodes.NodeName -join ',') have WIMMount filter driver loaded (noncompliant)" -Checkmark 3 -Level 3
+        } else {
+            Write-ToHost "No nodes have WIMMount filter driver loaded"
+        }
+        return $nonCompliantNodes
+    }
 
     #endregion Test Scripts
 
@@ -2271,6 +2300,33 @@ function Send-ToolTelemetry {
         }
     }
     $testReport+= [PSCustomObject] @{TestName="Test-AksArcIssues";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
+    Write-Host ""
+    $nonCompliantWIMMount=Test-WIMMountFilterDriver
+    If ($nonCompliantWIMMount) {
+        If ($FixErrors -or $FixWarningsAlso) {
+            Write-Host "Fixing WIMMount filter driver on noncompliant nodes. Est Time is less than one minute" -ForegroundColor Cyan
+            Invoke-Command -ComputerName $nonCompliantWIMMount.NodeName -ScriptBlock {
+                Write-Host "Unloading WIMMount filter driver on $env:COMPUTERNAME"
+                try {
+                    fltmc unload WIMMount
+                    sc.exe stop WIMMount
+                    sc.exe config WIMMount start= disabled
+                    Write-Host "Successfully unloaded WIMMount filter driver on $env:COMPUTERNAME"
+                    $true
+                } catch {
+                    Write-Warning "Failed to unload WIMMount filter driver on $env:COMPUTERNAME: $($_.Exception.Message)"
+                    $false
+                }
+            }
+            Sleep 5
+            $nonCompliantWIMMount=Test-WIMMountFilterDriver
+            If ($nonCompliantWIMMount) {Write-ToHost "Fix unloading WIMMount filter driver failed!!!" -Level 4 -Checkmark 4;$testPass=3}
+        } else {
+            $testPass=2
+            Write-Host "Recommendation: Run 'fltmc unload WIMMount',then stop and disable the driver on node(s) $($nonCompliantWIMMount.NodeName -join ',')"
+        }
+    }
+    $testReport+= [PSCustomObject] @{TestName="Test-WIMMountFilterDriver";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
     #Write-Host "."
