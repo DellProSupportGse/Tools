@@ -222,7 +222,6 @@ Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtoco
 
 1. Run **Import-Module $env:USERPROFILE\Documents\GetDellSDDC.ps1**
 2. Run **Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30**
-3. Browse to `C:\Dell`, select the `master.zip` file, and click **Open**.
 - The tool starts data collection (takes several minutes).   
 - Output will be saved in: C:\Users\<current user>\, starting with (**HealthTest**).
 	   
