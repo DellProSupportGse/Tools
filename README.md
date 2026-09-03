@@ -1,449 +1,482 @@
-# Tools
-  NOTE: All tools should be run from ISE as administorator unless otherwise noted. 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/DellProSupportGse/Tools/main/readme/dell-prosupport-tools-banner.png"
+       alt="Dell ProSupport Tools for Windows Server and Azure Local"
+       width="100%">
+</p>
 
-### Licensing/Support
-We'd like to inform you that this code is freely available under the [MIT License](https://github.com/DellProSupportGse/Tools/blob/main/License) and is utilized by numerous individuals worldwide on a daily basis. Should you encounter any challenges, we kindly request you to submit them via the designated "Issues" section. Your contributions are greatly appreciated.
+<p align="center">
+  <strong>PowerShell troubleshooting, diagnostics, log collection, and maintenance utilities for Dell PowerEdge, Windows Server, Hyper-V, and Azure Local environments.</strong>
+</p>
 
--------------------------------------------------------------------------------------------------------------------------------------------------
-## Tool Box
-Tool Box is a menu of all the tools to run them from one place
-	 
-   ![alt text](readme/ToolBox.jpg)
-   
-### Usage
-Copy the below powershell code and paste into PowerShell
-```Powershell
-Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/ToolBox.ps1'));Invoke-ToolBox
-```
-### Issue:
-##### If you see the following error:
-![alt text](readme/ToolBoxProxyError.jpg)
-### Solution:
- 	$browser = New-Object System.Net.WebClient;$browser.Proxy.Credentials =[System.Net.CredentialCache]::DefaultNetworkCredentials;Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/ToolBox.ps1'));Invoke-ToolBox
--------------------------------------------------------------------------------------------------------------------------------------------------
-## APEX VM Log Collection
-   This script is used to collect logs from a APEX VM
-	
-### Usage
-Copy the code and paste it into the terminal on your APEX VM after elevating to root
-```Bash
-curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && chmod 755 log_collect.sh && bash ./log_collect.sh
-``` 
--------------------------------------------------------------------------------------------------------------------------------------------------
-## AzHCIUrlChecker
-   This script checks the URLs that the Azure Stack HCI operating system may need to access as per Microsoft Doc: 
-	https://docs.microsoft.com/en-us/azure-stack/hci/concepts/firewall-requirements
-	
-### Usage
-Copy the below powershell code and paste into PowerShell
-```Powershell
-Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="AzHCIUrlChecker";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/AzHCIUrlChecker.ps1'));Invoke-AzHCIUrlChecker
-``` 
--------------------------------------------------------------------------------------------------------------------------------------------------
-## BOILER
-   Filters the CBS/DISM logs for Errors/Fails/Warnings to quickly identify failing KB's, Language Tags or
-   corruption plus, it provides Suggested fixes.
-   
-   ![alt text](readme/boiler.jpg)
-   
-   ### Documentation:
-    1. Copy/Paste PowerShell code below
-    2. Answer the Rady to run? Y/N
-    3. Provide the log to analize in the popup
-          - Supports running locally or remotly by feeding it a ZIP file of the logs or just log file.
-    4. Review the output for the finds and suggested fixes
-    
-   ### Supported Scenarios:
-    - Failing KBs
-        Shows any KBs that are failing to install, provides the link to download them if available and the how to DISM install it for best success.
-    - Failing Language Packs
-        Shows any language tag that is failing with the process to download and install to repair it
-    - Corruption identified by the log
-        Show any corruption identified in the log and the steps to restore health with eval ISO
-    - Display Errors, Fails and Warnings
-        If no other scenario is found but we still see Errors, Fails and Warnings then they are displayed
-    
-   ### PowerShell
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="BOILER";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/BOILER.ps1'));Invoke-BOILER
-```   
-  
--------------------------------------------------------------------------------------------------------------------------------------------------
-## DART
-**DO NOT USE on 23H2**
+<p align="center">
+  <img alt="PowerShell" src="https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white">
+  <img alt="Windows Server" src="https://img.shields.io/badge/Windows-Server-0078D4?logo=windows&logoColor=white">
+  <img alt="Azure Local" src="https://img.shields.io/badge/Azure-Local-0078D4?logo=microsoftazure&logoColor=white">
+  <img alt="Status" src="https://img.shields.io/badge/Status-Active-success">
+</p>
 
-   **D**ell **A**utomated se**R**ver upda**T**er is a Windows Failover Cluster and HCI/S2D aware tool that will automatically download and 
-   install Windows Updates, Drivers/Firmware on Dell Servers.
-  
-  ![alt text](readme/dart.jpg)
-  
-  How To Use:
-    From PowerShell as admin execute the following:
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/DART.ps1'));Invoke-DART
+> [!CAUTION]
+> These tools are provided **as-is** for troubleshooting, diagnostic, and convenience purposes. Review, test, and validate all scripts before using them in a production environment. **No official support or warranty is provided.**
+>
+> See [Disclaimer & Support](#-disclaimer--support) for details.
+
+---
+
+## 🚀 Quick Start
+
+### 🧰 Dell ProSupport ToolBox
+
+**Recommended for most users.** ToolBox provides one interface for launching the available support utilities.
+
+> [!NOTE]
+> Run PowerShell or PowerShell ISE **as Administrator** unless a tool specifically states otherwise.
+
+```powershell
+Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/ToolBox.ps1'));Invoke-ToolBox
 ```
 
-### Documentation:
-   1. Checks to make sure your running on a Dell server
-   2. Checks to see if have the latest Dell System Update is installed
-   3. If not then it downloads and installs the latest version of DSU
-   4. Is Azure Stack HCI (Storage Spaces Direct Ready Node or AX node)
-      - We download and extract the AZHCI-Catalog to use with DSU
-      - We Pause & Drain the node and Enable Storage Maintenance Mode
-      - Installs Windows Updates (Only pre 23H2 OS releases)
-      - Runs DSU
-        - No reboot required: We resume the node, disable Storage Maintenance Mode and show Installation Report
-        - Reboot Required: We setup a logon task that will resume the node and disable Storage Maintenance Mode after the reboot and logon
-        - Failed Update: We show you the failed update and exit so we can look into the errors and decide how to proceed.
-   6. Is Cluster member
-      - We Pause & Drain the node and Enable Storage Maintenance Mode
-      - Installs Windows Updates
-      - Runs DSU
-        - No reboot required: We resume the node and show Installation Report
-        - Reboot Required: We setup a logon task that will resume the node after the reboot and logon
-        - Failed Update: We show you the failed update and exit so we can look into the errors and decide how to proceed.
-   8. Is Regular Power Edge Server
-      - Installs Windows Updates 
-      - Runs DSU
-        - No reboot required: Show Installation Report
-        - Failed Update: We show you the failed update and exit so we can look into the errors and decide how to proceed.
-   
-   Transcript Logging: C:\ProgramData\Dell\DART
-   
-   Use -IgnoreChecks:$True to install updates without suspending cluster node or enabling storage maintenance mode for Azure Stack HCI
-   
-   Use -IgnoreVersion:$True to ignore the block to Dell updates if MS Solution Update is deployed
-   
--------------------------------------------------------------------------------------------------------------------------------------------------
-## FLEP
-   
-   This tool is used to filter Windows event logs.
- 
- ![alt text](readme/FLEP.jpg)
-   
-  ### Supported Scenarios:
-    
-      1 Filter System Event logs
-        Filters the system event log for the 24 most common events 13,20,28,41,57,129,153,134,301,1001,1017,1018,1135,5120,6003-6009
-      2 Filter for 505 Events
-        Filters the Microsoft-Windows-Storage-Storport/Operational event logs for event id 505 to be able to see S2D/HCI storage latancy buckets
-    
-   ### PowerShell
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLEP";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLEP.ps1'));Invoke-FLEP
-```  
-   
--------------------------------------------------------------------------------------------------------------------------------------------------
-## GetHyperVBottlenecks
-   
-   This is a tool to detect bottlenecks in a Hyper-V environment
-     
-   How To Use: 
-      From PowerShell as admin execute the following and follow the prompts:
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetHyperVBottlenecks";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/GetHyperVBottlenecks.ps1'));Invoke-GetHyperVBottlenecks
-```
--------------------------------------------------------------------------------------------------------------------------------------------------
-## iDRAC Connection Manager
-   
-   iDRACCMan provides simplified iDRAC access using PowerShell Windows Forms interface for managing Dell iDRAC
-    GUI and console sessions from a grouped server tree.
-   
-   ![alt text](readme/iDCMan.jpg)
-   
-   How To Use: 
-      From PowerShell as admin execute the following and follow the prompts:
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;$wc=New-Object Net.WebClient;$wc.Encoding=[System.Text.Encoding]::UTF8;Invoke-Expression('$module="iDRACCMan";$repo="PowershellScripts"'+$wc.DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/iDRACCMan/iDRAC-ConnectionManager.ps1'))
-```
--------------------------------------------------------------------------------------------------------------------------------------------------
-## KeyRelay
-   
-   This is a GUI tool to send text to applications that do not allow pasting.
-   
-   ![alt text](readme/KeyRelayScreenShot.jpg)
-   
-   How To Use: 
-      From PowerShell as admin execute the following and follow the prompts:
-```Powershell
-Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="KeyRelay";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.ps1'));Invoke-KeyRelay
-```
-
--------------------------------------------------------------------------------------------------------------------------------------------------
-## LogCollector
-   
-   This tool is used to collect all the logs Switches, Servers and OS
-   
-   ![alt text](readme/LogCollector_v1.81.jpg)
-   
-   How To Use: 
-      From PowerShell as admin execute the following and follow the prompts:
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="LogCollector";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/LogCollector.ps1'));Invoke-LogCollector
-```
--------------------------------------------------------------------------------------------------------------------------------------------------
-## GetShowTech
-   
-   This tool is used to collect Dell switch logs
-   
-   How To Use: 
-      From PowerShell as admin execute the following and follow the prompts:
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech
-```
--------------------------------------------------------------------------------------------------------------------------------------------------
-## Run SDDC
- How To Use:
-    From ISE or PowerShell as admin execute the following:
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC
-```
--------------------------------------------------------------------------------------------------------------------------------------------------
-# Using SDDC Offline
-
-## Step 1: Prepare File
-
-### On a machine with internet access:
-
-1. Copy the contents of the **SDDC Powershell (PS1) file**:  
-   [https://raw.githubusercontent.com/TommyPaulkDell/source/refs/heads/main/GetDellSDDC.ps1](https://raw.githubusercontent.com/TommyPaulkDell/source/refs/heads/main/GetDellSDDC.ps1)
-
-### RDP into a cluster node:
-
-1. If **Sconfig** launches, choose **option 15** to exit to PowerShell.
-2. Launch **Notepad** (type `notepad`).
-3. Paste the contents of the SDDC Powershell file into a blank notepad window.
-4. Use **File > Save As**, choose **Save as type > All Files** and put in the name **GetDellSDDC.ps1**.
-5. Close notepad
-6. Run **Import-Module $env:USERPROFILE\Documents\GetDellSDDC.ps1**
-7. Run **Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30**
-- The tool starts data collection (takes several minutes).   
-- Output will be saved in: C:\Users\<current user>\, starting with (**HealthTest**).
-	   
--------------------------------------------------------------------------------------------------------------------------------------------------
-## TSR Collector
-   This tool is used to collect TSRs from
-    all nodes in a cluster"
-
-  How To Use:
-    From ISE or PowerShell as admin execute the following:
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
-```
--------------------------------------------------------------------------------------------------------------------------------------------------
-## TALI
-   This tool is used to test Dell Azure Local clusters for common issues
-   
-  ![alt text](readme/TALI.jpg)
-  
-  How To Use:
-    From PowerShell as admin execute the following:
-```Powershell
-Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1'));Test-DellAzureLocalIssues
-```
-Here is an example of a run of TALI
-## Test-DellAzureLocalIssues Output
-
-```
-v0.653
-______   ______     __         __
-/\__  _\ /\_  _ \   /\ \       /\ \
-\/_/\ \/ \ \   **\  \ \ \**__  \ \ \
-   \ \_\  \ \_\ \_\  \ \_____\  \ \_\
-    \/_/   \/_/\/_/   \/_____/   \/_/
-                      by: Tommy Paulk
-Logging Telemetry Information...
-  Resolving Geo Location...
-    Country: United States
-    Region : Texas
-  Telemetry recorded successfully
-Checking for running action plans
-VERBOSE: Looking up shared vhd product drive letter.
-VERBOSE: Acquiring providers for assembly: ...PackageManagement.NuGetProvider.dll
-VERBOSE: Acquiring providers for assembly: ...PackageManagement.ArchiverProviders.dll
-VERBOSE: Acquiring providers for assembly: ...PackageManagement.CoreProviders.dll
-VERBOSE: Acquiring providers for assembly: ...PackageManagement.MsuProvider.dll
-VERBOSE: Acquiring providers for assembly: ...PackageManagement.MetaProvider.PowerShell.dll
-VERBOSE: Acquiring providers for assembly: ...PackageManagement.MsiProvider.dll
-VERBOSE: Suppressed Warning Unknown category for 'NuGet'::'GetDynamicOptions': 'Provider'
-VERBOSE: Get-Package returned with Success:True
-VERBOSE: Found package Microsoft.AzureStack.LcmUpdateService.PowerShell with version 2.2604.0.40
-WARNING: Unable to find volume with label Deployment
-VERBOSE: Found package Microsoft.AzureStack.Solution.Deploy.EnterpriseCloudEngine.Client.Deployment with version 10.2604.0.1251
-```
-
-```diff
-  Testing WMI, VMMS and Cluster service
-+ ✓ All nodes WMI, VMMS and Cluster services check out
-
-  Checking Solution Update command...
-+ ✓ Get Solution Update command successful
-
-  Checking Net Intents...
-+ ✓ Net Intent check successful
-
-  Checking iDrac host nics have DHCP enabled...
-+ ✓ All iDrac host network adapters have DHCP enabled
-```
 <details>
-<summary><u>Expand remaining output</u></summary>
+<summary><strong>📖 ToolBox documentation and proxy troubleshooting</strong></summary>
 
-```diff
-  Checking iDrac redfish url...
-+ ✓ All hosts can access their iDrac redfish url
+<br>
 
-  Testing that all nodes have been rebooted within 99 days...
-+ ✓ All nodes have been rebooted within 99 days
+ToolBox is the central launcher for the tools in this repository.
 
-  Testing that all nodes have the HWTimeout registry key set to at least 10000...
-+ ✓ All nodes have HWtimeout set to at least 10000
+![Dell ProSupport ToolBox](readme/ToolBox.jpg)
 
-  Testing that all nodes have the VM migration performance option set to SMB...
-+ ✓ All nodes have SMB for the VM migration performance option
+### Proxy error
 
-  Testing if nodes are up but disks are still in maintenance mode...
-+ ✓ All disks are in proper status
+If ToolBox cannot download scripts because the environment requires authenticated proxy access, try:
 
-  Testing that all nodes have the same time zone...
-+ ✓ All nodes have the same time zone
-
-  Testing cluster shutdown timeout...
-+ ✓ Cluster shutdown time in minutes is set correctly
-
-  Testing for invalid CAU Reports...
-+ ✓ Cluster nodes have no invalid CAU Reports
-
-  Testing for invalid compute Net Intent Network Direct configuration...
-+ ✓ Compute Net Intents Network Direct are configured correctly
-
-  Testing for invalid Net Intent Network Direct Technology configuration on storage intents...
-+ ✓ Storage Net Intents Network Direct Technology are configured correctly
-
-  Analyzing non-Windows VM live migration / failback failures (last 7 days across all nodes)...
-+ ✓ No migration or failback failures detected in last 7 days
-
-  Checking per node services vital to Azure local...
-+ ✓ All Azure local required node services are running
-
-  Testing for Over Provisioned Virtual Disks on Storage Pool
-! ⚠ If volumes are filled, there will not be enough space for disk repairs. -1050 GB
-    Each node virtual disk can be up to 1.67 TB
-    Recommendation: Make sure Storage Pool space does not run below best practice levels
-
-  Testing Virtual Disk Thin Provisioning Alert Threshold
-+ ✓ Thin Provisioning Alert Threshold is set correctly
-
-  Testing cluster memory N-1 resiliency (largest-node failure model)...
-+ ✓ Cluster is N-1 safe for memory (headroom: 224 GB)
-
-  Testing cluster CPU vCPU overcommit risk (N-1 model, 200% threshold)...
-+ ✓ CPU overcommit within acceptable N-1 threshold
-
-  Looking at physical disk latency in the past week...
-+ ✓ All physical disks passed
-
-  Testing that Get-HealthFault command works
-+ ✓ Get-HealthFault command succeeded
-
-  Testing for mismatched PS module errors
-+ ✓ No mismatched PS modules found
-
-  Testing Control Plane VM network...
-- ✖ Azure Control Plane VM with IP 100.72.44.142 is not healthy!
-   Recommendation: Reboot the Control Plane VM
-
-  Testing Aks Arc Known Issues...
-  Running test: Failover Cluster service not responsive or not running with ID: FC-0011
-  Running test: Registry path missing for the MOC PS Config with ID: MOC-0019
-  Running test: MOC Not on Latest Patch Version with ID: MOC-0001
-  Running test: MOC missing Cloud agent Issues with ID: MOC-0012
-  Running test: MOC Cloud Agent Not Running with ID: MOC-0003
-  Running test: MOC Admin Token Expiry with ID: MOC-0010
-  Running test: MOC Missing Node Agent Issues with ID: MOC-0011
-  Running test: MOC Missing MocHostAgent Issues with ID: MOC-0014
-  Running test: MOC NodeAgent Cert Hostname Drift with ID: MOC-0021
-  Running test: MOC Expired Certificates with ID: MOC-0013
-  Running test: MOC Nodes Not Active with ID: MOC-0004
-  Running test: MOC Nodes Out of Sync with Cluster Nodes with ID: MOC-0005
-  Running test: Multiple MOC Cloud Agent Instances with ID: MOC-0006
-  Running test: MOC Powershell Stuck in Updating State with ID: MOC-0007
-  Running test: Windows Event Log Not Running with ID: MOC-0008
-  Running test: Gallery Image Stuck in Deleting State with ID: MOC-0009
-  Running test: Virtual Machine Stuck in Pending State with ID: MOC-0010
-  Running test: Virtual Machine Stuck in Delete_Failed State due to OSDisk with ID: MOC-0017
-  Running test: Virtual Machine Management service not responsive or not running with ID: VMMS-0012
-  Running test: Validate for empty MOC Identity Tokens with ID: MOC-0015
-  Running test: Validate for corrupted MOC PS Configuration with ID: MOC-0016
-  Running test: Validate if Cloud Agent's ClusterAffinityRule is present with ID: MOC-0018
-  Running test: Validate user storage container exist with ID: MOC-0020
-  Some tests failed. Run Invoke-SupportAksArcRemediation to remediate issues.
-- ✖ Some Aks Arc tests failed
-   Recommendation: Please run Invoke-SupportAksArcRemediation to resolve the problem
-```
-
-```
-TestName                                TestResult
---------                                ----------
-Test-ClusterControlPlaneHealth          Passed
-Test-SolutionUpdateCommand              Passed
-Test-NetIntents                         Passed
-Test-iDracHostNicDHCP                   Passed
-Test-iDracRedfish                       Passed
-Test-OsBootTimeOver99Days               Passed
-Test-HWTimeoutKey                       Passed
-Test-VMMIgrationPerformanceOption       Passed
-Test-NodesUpDisksinMaintMode            Passed
-Test-TimeZone                           Passed
-Test-ClusterShutdownTime                Passed
-Test-InvalidCAUReports                  Passed
-Test-NetworkDirectOnComputeIntents      Passed
-Test-NetworkDirectOnStorageIntents      Passed
-Test-AzLocalVmMigrationFailures         Passed
-Test-AzureLocalNodeServices             Passed
-Test-AzLocalOverProvisionedVirtualDisks Warning
-Test-AzLocalThinProvisioningUtilization Passed
-Test-AzLocalMemoryNMinusOne             Passed
-Test-AzLocalCpuNumMinusOne              Passed
-Test-DiskLatencyOutlier                 Passed
-Test-GetHealthFault                     Passed
-Test-MismatchedPSModules                Passed
-Test-CauReportError                     Passed
-Test-ControlPlaneVMNetwork              Error
-Test-AksArcIssues                       Error
-
-Transcript stopped, output file is C:\ProgramData\Dell\Test-DellAzureLocalIssues-20260730.txt
+```powershell
+$browser = New-Object System.Net.WebClient
+$browser.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
+Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/ToolBox.ps1'));Invoke-ToolBox
 ```
 
 </details>
--------------------------------------------------------------------------------------------------------------------------------------------------
 
-## FLCkr
-   **FL**tmc **C**hec**k**e**r**
-   This tool lookups up filter drivers in Microsoft's known good list
-   URL: https://raw.githubusercontent.com/MicrosoftDocs/windows-driver-docs/staging/windows-driver-docs-pr/ifs/allocated-altitudes.md
-   
-   How To Use: 
-      From ISE or PowerShell as admin execute the following and follow the prompts:
-```Powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/FLCkr.ps1'));Invoke-FLCkr
+---
+
+## 🔎 Which Tool Should I Use?
+
+| I need to... | Recommended tool |
+|---|---|
+| Launch utilities from one interface | 🧰 **[ToolBox](#-dell-prosupport-toolbox)** |
+| Check Azure Local endpoint connectivity | 🔗 **[AzHCIUrlChecker](#-azhciurlchecker)** |
+| Analyze CBS or DISM servicing failures and corruption | 🔥 **[BOILER](#-boiler)** |
+| Automate Dell PowerEdge Server & Windows, drivers, and firmware updates | 🎯 **[DART](#-dart)** |
+| Filter common Windows and storage events | 📈 **[FLEP](#-flep)** |
+| Find Hyper-V performance bottlenecks | 🖥️ **[GetHyperVBottlenecks](#-gethypervbottlenecks)** |
+| Manage access to multiple iDRACs | 🛠️ **[iDRAC Connection Manager](#-idrac-connection-manager)** |
+| Send text to applications that block paste | ⌨️ **[KeyRelay](#-keyrelay)** |
+| Collect Windows, PowerEdge Server, and Switch logs | 📦 **[LogCollector](#-logcollector)** |
+| Collect Dell Switch show-tech output | 🧾 **[GetShowTech](#-getshowtech)** |
+| Collect SDDC diagnostic data | 🩺 **[SDDC Dell Enhanced](#-sddc-dell-enhanced)** |
+| Collect SDDC data WITHOUT direct internet access | 💾 **[SDDC Offline Dell Enhanced](#-sddc-offline-dell-enhanced)** |
+| Collect TSRs from all cluster nodes | 📥 **[TSR Collector](#-tsr-collector)** |
+| Test Azure Local clusters for common issues | ✅ **[TALI](#-tali)** |
+| Check file-system filter driver altitudes | 🔎 **[FLCkr](#-flckr)** |
+| Convert Windows ETL network traces to PCAP | 🌐 **[Convert-Etl2Pcap](#-convert-etl2pcap)** |
+
+---
+
+# 🧰 Tools
+
+## 🔗 AzHCIUrlChecker
+
+Checks connectivity to endpoints required by Azure Local noted [Microsoft Azure Local Documentation] https://learn.microsoft.com/en-us/azure/azure-local/concepts/firewall-requirements)  
+
+**Best for:** firewall, proxy, and outbound connectivity troubleshooting.
+
+```powershell
+Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="AzHCIUrlChecker";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/AzHCIUrlChecker.ps1'));Invoke-AzHCIUrlChecker
 ```
--------------------------------------------------------------------------------------------------------------------------------------------------
 
-## Convert-Etl2Pcap
-Convert ETL network traces to PCap for use with WireShark
-   
-### Usage
-Copy the below powershell code and paste into PowerShell
-```Powershell
-Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="Convert-Etl2Pcap";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/Convert-Etl2Pcap.ps1'));Invoke-ETL2PCAP
-``` 
--------------------------------------------------------------------------------------------------------------------------------------------------
-## Make ISO
-Convert a folder to ISO
-   
-### Usage
-Copy the below powershell code and paste into PowerShell
-```Powershell
-Echo MakeIso;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="MakeIso";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/isomaker.ps1'));Invoke-MakeISO
-``` 
--------------------------------------------------------------------------------------------------------------------------------------------------
+---
+
+## 🔥 BOILER
+
+Analyzes **CBS** and **DISM** logs for errors, failures, warnings, failed KBs, language-pack issues, and corruption. BOILER also provides suggested remediation when recognized scenarios are detected.
+
+**Best for:** Windows servicing, Windows Update, component-store, and DISM troubleshooting.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="BOILER";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/BOILER.ps1'));Invoke-BOILER
+```
+
+<details>
+<summary><strong>📖 Documentation</strong></summary>
+
+<br>
+
+![BOILER](readme/boiler.jpg)
+
+### Supported scenarios
+
+- **Failing KBs** — identifies updates that are failing to install and may provide download and DISM installation guidance.
+- **Failing language packs** — identifies failing language tags and provides repair guidance.
+- **Component-store corruption** — highlights corruption found in servicing logs and suggested recovery steps.
+- **Errors, failures, and warnings** — surfaces notable log entries when a known scenario is not detected.
+
+### Basic workflow
+
+1. Run BOILER.
+2. Confirm that you are ready to begin.
+3. Select the log or ZIP file to analyze.
+4. Review the findings and suggested remediation.
+
+BOILER supports analyzing local logs or supplied log files / ZIP archives.
+
+</details>
+
+---
+
+## 🎯 DART
+
+**Dell Automated Server Updater** is a Windows Failover Cluster and HCI/S2D-aware utility that can install Windows Updates and Dell driver / firmware updates.
+
+> [!WARNING]
+> ## **⚠️ Do Not Run on Azure Local POST deployment ⚠️**
+>
+> DART can make system changes, place cluster nodes into maintenance workflows, install updates, and trigger reboots. Review the tool behavior before using it in production.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/DART.ps1'));Invoke-DART
+```
+
+<details>
+<summary><strong>📖 Documentation</strong></summary>
+
+<br>
+
+![DART](readme/dart.jpg)
+
+DART can:
+
+- Verify that it is running on a Dell server.
+- Check for Dell System Update (DSU).
+- Download and install DSU when required.
+- Detect Azure Local / S2D and Windows Failover Cluster scenarios.
+- Pause and drain cluster nodes when appropriate.
+- Enable and disable storage maintenance mode where applicable.
+- Install Windows updates on supported operating-system versions.
+- Install Dell driver and firmware updates through DSU.
+- Resume cluster nodes after maintenance.
+- Create a post-reboot logon task when a reboot is required.
+- Stop and report when an update fails.
+
+### Logging
+
+```text
+C:\ProgramData\Dell\DART
+```
+
+### Optional parameters
+
+```powershell
+-IgnoreChecks:$True
+```
+
+Install updates without suspending the cluster node or enabling Azure Local storage maintenance mode.
+
+```powershell
+-IgnoreVersion:$True
+```
+
+Ignore the block on Dell updates when Microsoft Solution Update is deployed.
+
+</details>
+
+---
+
+## 📈 FLEP
+
+Filters Windows event logs for common server, failover-clustering, storage, and Storport events.
+
+**Best for:** quickly narrowing large event logs to commonly relevant events.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLEP";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/FLEP.ps1'));Invoke-FLEP
+```
+
+<details>
+<summary><strong>📖 Documentation</strong></summary>
+
+<br>
+
+![FLEP](readme/FLEP.jpg)
+
+FLEP can filter:
+
+- Common System event IDs including `13`, `20`, `28`, `41`, `57`, `129`, `134`, `153`, `301`, `1001`, `1017`, `1018`, `1135`, `5120`, and `6003-6009`.
+- Event ID `505` from `Microsoft-Windows-Storage-Storport/Operational` to review S2D / Azure Local storage latency buckets.
+
+</details>
+
+---
+
+## 🖥️ GetHyperVBottlenecks
+
+Detects potential performance bottlenecks in Hyper-V environments.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetHyperVBottlenecks";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/GetHyperVBottlenecks.ps1'));Invoke-GetHyperVBottlenecks
+```
+
+Run as Administrator and follow the interactive prompts.
+
+---
+
+## 🛠️ iDRAC Connection Manager
+
+A PowerShell Windows Forms interface for organizing Dell servers and simplifying iDRAC GUI and console access.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;$wc=New-Object Net.WebClient;$wc.Encoding=[System.Text.Encoding]::UTF8;Invoke-Expression('$module="iDRACCMan";$repo="PowershellScripts"'+$wc.DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/iDRACCMan/iDRAC-ConnectionManager.ps1'))
+```
+
+<details>
+<summary><strong>📖 Screenshot</strong></summary>
+
+<br>
+
+![iDRAC Connection Manager](readme/iDCMan.jpg)
+
+</details>
+
+---
+
+## ⌨️ KeyRelay
+
+GUI utility for sending text to applications that do not allow normal clipboard paste operations.
+
+```powershell
+Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="KeyRelay";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/KeyRelay.ps1'));Invoke-KeyRelay
+```
+
+<details>
+<summary><strong>📖 Screenshot</strong></summary>
+
+<br>
+
+![KeyRelay](readme/KeyRelayScreenShot.jpg)
+
+</details>
+
+---
+
+## 📦 LogCollector
+
+Collects troubleshooting logs from Windows, Dell servers, and supported switches.
+
+**Best for:** preparing diagnostic data for investigation or support cases.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="LogCollector";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/LogCollector.ps1'));Invoke-LogCollector
+```
+
+<details>
+<summary><strong>📖 Screenshot</strong></summary>
+
+<br>
+
+![LogCollector](readme/LogCollector_v1.81.jpg)
+
+</details>
+
+---
+
+## 🧾 GetShowTech
+
+Collects Dell switch **show-tech** diagnostic output.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech
+```
+
+---
+
+## 🩺 SDDC Dell Enhanced
+
+Runs the SDDC diagnostic data-collection workflow.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC
+```
+
+---
+
+## 💾 SDDC Offline Dell Enhanced
+
+Use this workflow to collect SDDC diagnostic information when the target environment does not have direct internet access.
+
+<details>
+<summary><strong>📖 Offline collection procedure</strong></summary>
+
+### 1. Prepare the SDDC package
+
+On a machine with internet access:
+
+1. Download the SDDC master archive from:
+   `https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip`
+2. Transfer `master.zip` to the target cluster environment.
+
+### 2. Transfer the script
+
+Copy the contents of:
+
+```text
+https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/SDDCOffline.ps1
+```
+
+to the target environment.
+
+### 3. Run the collection
+
+1. Open PowerShell as Administrator.
+2. Paste or run the `SDDCOffline.ps1` script.
+3. Confirm execution when prompted.
+4. Select the transferred `master.zip`.
+5. Allow the tool to distribute and run the data collection.
+6. Choose whether to retain or delete the copied master archive when prompted.
+
+The resulting diagnostic package is written beneath the current user's profile and begins with `HealthTest`.
+
+</details>
+
+---
+
+## 📥 TSR Collector
+
+Collects a Dell Technical Support Report (TSRs) from all nodes in a cluster via the iDrac.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
+```
+
+---
+
+## ✅ TALI
+## **⚠️ AZURE LOCAL ONLY — DO NOT RUN ON S2D ⚠️**
+**Test-DellAzureLocalIssues** checks Dell Azure Local clusters for a broad set of common configuration, health, storage, networking, service, control-plane, and AKS Arc issues.
+
+```powershell
+Echo TALI;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/TALI.ps1'));Test-DellAzureLocalIssues
+```
+
+<details>
+<summary><strong>📖 What TALI checks</strong></summary>
+
+<br>
+
+![TALI](readme/TALI.jpg)
+
+TALI includes checks for areas such as:
+
+- WMI, VMMS, and Cluster service health.
+- Solution Update command availability.
+- Network ATC / Net Intent configuration.
+- iDRAC host NIC DHCP and Redfish connectivity.
+- Node uptime.
+- `HWTimeout` configuration.
+- VM migration performance settings.
+- Storage maintenance mode.
+- Node time-zone consistency.
+- Cluster shutdown timeout.
+- Cluster-Aware Updating reports.
+- Network Direct configuration.
+- Azure Local VM migration failures.
+- Required Azure Local services.
+- Storage-pool capacity and thin-provisioning thresholds.
+- N-1 memory resiliency.
+- CPU overcommit risk.
+- Physical-disk latency.
+- `Get-HealthFault`.
+- PowerShell module mismatches.
+- Control-plane VM health.
+- AKS Arc known issues.
+
+TALI writes a transcript beneath:
+
+```text
+C:\ProgramData\Dell\
+```
+
+</details>
+
+---
+
+## 🔎 FLCkr
+
+Checks installed file-system filter drivers against Microsoft's known allocated filter-altitude list.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/FLCkr.ps1'));Invoke-FLCkr
+```
+
+---
+
+## 🌐 Convert-Etl2Pcap
+
+Converts Windows ETL network traces to PCAP format for analysis in Wireshark and other packet-analysis tools.
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="Convert-Etl2Pcap";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/Convert-Etl2Pcap.ps1'));Invoke-ETL2PCAP
+```
+
+---
+
+<br>
+<br>
+
+## 🗃️ No Longer Maintained
+
+The following utilities remain available for historical or specialized use but are **not actively maintained**.
+
+### ☁️ APEX VM Log Collection
+
+Collects logs from an APEX virtual machine.
+
+```bash
+curl -sSL https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/log_collect.sh -o ./log_collect.sh && chmod 755 log_collect.sh && bash ./log_collect.sh
+```
+
+Run from an elevated / root shell on the APEX VM.
+
+### 💿 Make ISO
+
+Converts a folder into an ISO image.
+
+```powershell
+Echo MakeIso;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="MakeIso";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/SeanCrawfordDell/Tools/main/isomaker.ps1'));Invoke-MakeISO
+```
+
+---
+
+## ⚠️ Disclaimer & Support
+
+These tools are provided **"as-is"** for informational, troubleshooting, diagnostic, and convenience purposes only.
+
+No warranties, guarantees, or representations are made regarding their accuracy, reliability, functionality, compatibility, or suitability for any particular purpose.
+
+Use of these tools is **at your own risk**. You are responsible for reviewing, testing, and validating any scripts, commands, or changes before using them in a production environment.
+
+**No official support is provided for these tools.** Issues, failures, data loss, service interruption, system changes, or other consequences resulting from their use are the responsibility of the user.
+
+These tools are not a replacement for official product documentation, supported utilities, or established support processes.
+
+If you identify a problem or have an improvement, use the repository's **Issues** section to document it for the community.
+
+---
+
+## ⚖️ License
+
+This repository is made available under the terms of its included license. See the repository license file for the applicable terms.
+
+---
+
+<p align="center">
+  <strong>Dell ProSupport Tools</strong><br>
+  Windows Server • Azure Local • Hyper-V • Dell PowerEdge
+</p>
