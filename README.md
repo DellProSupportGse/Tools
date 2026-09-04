@@ -32,7 +32,7 @@
 > Run PowerShell or PowerShell ISE **as Administrator** unless a tool specifically states otherwise.
 
 ```powershell
-Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/ToolBox.ps1'));Invoke-ToolBox
+Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/ToolBox.ps1'));Invoke-ToolBox
 ```
 
 <details>
@@ -51,7 +51,7 @@ If ToolBox cannot download scripts because the environment requires authenticate
 ```powershell
 $browser = New-Object System.Net.WebClient
 $browser.Proxy.Credentials = [System.Net.CredentialCache]::DefaultNetworkCredentials
-Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/ToolBox.ps1'));Invoke-ToolBox
+Echo ToolBox;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="ToolBox";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/ToolBox.ps1'));Invoke-ToolBox
 ```
 
 </details>
@@ -90,7 +90,7 @@ Checks connectivity to endpoints required by Azure Local noted [Microsoft Azure 
 **Best for:** firewall, proxy, and outbound connectivity troubleshooting.
 
 ```powershell
-Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="AzHCIUrlChecker";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/AzHCIUrlChecker.ps1'));Invoke-AzHCIUrlChecker
+Echo AzHCIUrlChecker;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="AzHCIUrlChecker";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/AzHCIUrlChecker.ps1'));Invoke-AzHCIUrlChecker
 ```
 
 ---
@@ -102,7 +102,7 @@ Analyzes **CBS** and **DISM** logs for errors, failures, warnings, failed KBs, l
 **Best for:** Windows servicing, Windows Update, component-store, and DISM troubleshooting.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="BOILER";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/BOILER.ps1'));Invoke-BOILER
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="BOILER";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/BOILER.ps1'));Invoke-BOILER
 ```
 
 <details>
@@ -142,7 +142,7 @@ BOILER supports analyzing local logs or supplied log files / ZIP archives.
 > DART can make system changes, place cluster nodes into maintenance workflows, install updates, and trigger reboots. Review the tool behavior before using it in production.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/DART.ps1'));Invoke-DART
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="DART";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/DART.ps1'));Invoke-DART
 ```
 
 <details>
@@ -197,7 +197,7 @@ Filters Windows event logs for common server, failover-clustering, storage, and 
 **Best for:** quickly narrowing large event logs to commonly relevant events.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLEP";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/FLEP.ps1'));Invoke-FLEP
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLEP";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/FLEP.ps1'));Invoke-FLEP
 ```
 
 <details>
@@ -221,7 +221,7 @@ FLEP can filter:
 Detects potential performance bottlenecks in Hyper-V environments.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetHyperVBottlenecks";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/GetHyperVBottlenecks.ps1'));Invoke-GetHyperVBottlenecks
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetHyperVBottlenecks";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/GetHyperVBottlenecks.ps1'));Invoke-GetHyperVBottlenecks
 ```
 
 Run as Administrator and follow the interactive prompts.
@@ -233,7 +233,7 @@ Run as Administrator and follow the interactive prompts.
 A PowerShell Windows Forms interface for organizing Dell servers and simplifying iDRAC GUI and console access.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;$wc=New-Object Net.WebClient;$wc.Encoding=[System.Text.Encoding]::UTF8;Invoke-Expression('$module="iDRACCMan";$repo="PowershellScripts"'+$wc.DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/iDRACCMan/iDRAC-ConnectionManager.ps1'))
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;$wc=New-Object Net.WebClient;$wc.Encoding=[System.Text.Encoding]::UTF8;Invoke-Expression('$module="iDRACCMan";$repo="PowershellScripts"'+$wc.DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/iDRACCMan/iDRAC-ConnectionManager.ps1'))
 ```
 
 <details>
@@ -252,7 +252,7 @@ A PowerShell Windows Forms interface for organizing Dell servers and simplifying
 GUI utility for sending text to applications that do not allow normal clipboard paste operations.
 
 ```powershell
-Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="KeyRelay";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/KeyRelay.ps1'));Invoke-KeyRelay
+Echo KeyRelay;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="KeyRelay";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/KeyRelay.ps1'));Invoke-KeyRelay
 ```
 
 <details>
@@ -273,7 +273,7 @@ Collects troubleshooting logs from Windows, Dell servers, and supported switches
 **Best for:** preparing diagnostic data for investigation or support cases.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="LogCollector";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/LogCollector.ps1'));Invoke-LogCollector
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="LogCollector";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/LogCollector.ps1'));Invoke-LogCollector
 ```
 
 <details>
@@ -292,7 +292,7 @@ Collects troubleshooting logs from Windows, Dell servers, and supported switches
 Collects Dell switch **show-tech** diagnostic output.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/GetShowTech.ps1'));Invoke-GetShowTech
 ```
 
 ---
@@ -302,7 +302,7 @@ Collects Dell switch **show-tech** diagnostic output.
 Runs the SDDC diagnostic data-collection workflow.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/RunSDDC.ps1'));Invoke-RunSDDC
 ```
 
 ---
@@ -352,7 +352,7 @@ The resulting diagnostic package is written beneath the current user's profile a
 Collects a Dell Technical Support Report (TSRs) from all nodes in a cluster via the iDrac.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/TSRCollector.ps1'));Invoke-TSRCollector
 ```
 
 ---
@@ -362,7 +362,7 @@ Collects a Dell Technical Support Report (TSRs) from all nodes in a cluster via 
 **Test-DellAzureLocalIssues** checks Dell Azure Local clusters for a broad set of common configuration, health, storage, networking, service, control-plane, and AKS Arc issues.
 
 ```powershell
-Echo TALI;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/TALI.ps1'));Test-DellAzureLocalIssues
+Echo TALI;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/TALI.ps1'));Test-DellAzureLocalIssues
 ```
 
 <details>
@@ -412,7 +412,7 @@ C:\ProgramData\Dell\
 Checks installed file-system filter drivers against Microsoft's known allocated filter-altitude list.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/FLCkr.ps1'));Invoke-FLCkr
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="FLCkr";$repo="PowershellScripts"'+(New-Object System.Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/FLCkr.ps1'));Invoke-FLCkr
 ```
 
 ---
@@ -422,7 +422,7 @@ Checks installed file-system filter drivers against Microsoft's known allocated 
 Converts Windows ETL network traces to PCAP format for analysis in Wireshark and other packet-analysis tools.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="Convert-Etl2Pcap";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/Convert-Etl2Pcap.ps1'));Invoke-ETL2PCAP
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="Convert-Etl2Pcap";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/Convert-Etl2Pcap.ps1'));Invoke-ETL2PCAP
 ```
 
 ---
@@ -449,7 +449,7 @@ Run from an elevated / root shell on the APEX VM.
 Converts a folder into an ISO image.
 
 ```powershell
-Echo MakeIso;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="MakeIso";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/isomaker.ps1'));Invoke-MakeISO
+Echo MakeIso;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="MakeIso";$repo="PowershellScripts"'+(New-Object Net.WebClient).DownloadString('https:/'+'/raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/isomaker.ps1'));Invoke-MakeISO
 ```
 
 ---
