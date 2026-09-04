@@ -387,7 +387,7 @@ Function ShowMenu{
          Write-Host "3)  Switch logs (Show Tech)"
          Write-Host "4)  Windows Failover Clustering, Hyper-v and Standalone Server (TSS)"
          Write-Host "5)  Test Dell Azure Local Issues (TALI)"
-         Write-Host "6)  Deprecated - Use old method to colect Azure Local/HCI/S2D logs"
+         Write-Host "6)  Deprecated - Use old method to collect Azure Local/HCI/S2D logs"
          Write-Host "Q to Quit"
          Write-Host ""
          Write-Host "NOTE: Initial logs for ALL Azure Local (not S2D) cases should at minimum type 15 for both an SDDC and TALI logs." -ForegroundColor Yellow
