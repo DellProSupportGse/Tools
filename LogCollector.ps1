@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.24"
+$Ver="1.25"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -397,7 +397,7 @@ Function ShowMenu{
          Write-Host ""
          $selection = Read-Host "Type a number(s) (ex. 15) and press [Enter] [$($global:defaultOption)]"
      }
-    until ($selection -match '[0-5,qQ,hH]')
+    until ($selection -match '[0-5,qQ,hH]|^$')
     $Global:CollectACPECE  = "N"
     $Global:CollectSTS     = "N"
     $Global:CollectSDDC    = "N"
