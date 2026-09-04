@@ -13,7 +13,7 @@ Function Invoke-LogCollector{
         param($param)
 
 # Version
-$Ver="1.23"
+$Ver="1.24"
 
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
@@ -297,6 +297,12 @@ Clear-Host
 # Logs
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector_$DateTime.log"
+$global:defaultOption=$null
+If ((Get-Command Get-StampInformation -ErrorAction SilentlyContinue)) {$global:defaultOption="15"} else {
+if ((Get-Service clussvc).StartUpType -ne 'Disabled') {$global:defaultOption="1"} else {
+$global:defaultOption="4"}
+}
+
 Write-Host "" 
 $MyTemp=(Get-Item $env:temp).fullname
 $Logs = $MyTemp + "\Logs\"
@@ -387,7 +393,9 @@ Function ShowMenu{
          Write-Host "NOTE: Initial logs for ALL Azure Local (not S2D) cases should at minimum type 15 for both an SDDC and TALI logs." -ForegroundColor Yellow
          Write-Host "      If TSRs are also needed then put in 125" -ForegroundColor Yellow
          Write-Host ""
-         $selection = Read-Host "Type a number(s) (ex. 15) and press [Enter]"
+         Write-Host "Default option is $($global:defaultOption). To select this just hit enter" -ForegroundColor Cyan
+         Write-Host ""
+         $selection = Read-Host "Type a number(s) (ex. 15) and press [Enter] [$($global:defaultOption)]"
      }
     until ($selection -match '[0-5,qQ,hH]')
     $Global:CollectACPECE  = "N"
@@ -414,6 +422,7 @@ Function ShowMenu{
         Pause
         ShowMenu
     }
+    If($selection -eq "") {$selection=$global:defaultOption}
     If($selection -eq 5) {
         $GetSDDCAlso=Read-Host "It's recommended to run TALI with the SDDC to gather a full set of usable logs. Would you like to include the SDDC? ([Y]/n)"
         If ($GetSDDCAlso -ine "n") {$selection = 15}
