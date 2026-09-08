@@ -33,10 +33,10 @@ $UserCheck = Read-host "Would you like to use the mystic account [y/n]?"
 IF($UserCheck -imatch "y"){
     $SshUsername = "mystic"
     Write-Host "Please enter the SSH password for APEX VM access:"
-    $Result = ssh $SshUsername@$($axvmip.IPAddressToString) "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && rm -f manual_log* && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
+    $Result = ssh $SshUsername@$($axvmip.IPAddressToString) "curl -sSL https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/Scripts/log_collect.sh -o ./log_collect.sh && rm -f manual_log* && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
 }Else{
     $SshUsername = Read-host "Please provide ssh user name"
-    $Result = ssh $SshUsername@$($axvmip.IPAddressToString) "echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | echo -e 'nameserver 172.28.177.1\nnameserver 8.8.8.8' | sudo tee /etc/resolv.conf > /dev/null && curl -sSL --insecure https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/log_collect.sh -o ./log_collect.sh && rm -f manual_log* && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
+    $Result = ssh $SshUsername@$($axvmip.IPAddressToString) "echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | echo -e 'nameserver 172.28.177.1\nnameserver 8.8.8.8' | sudo tee /etc/resolv.conf > /dev/null && curl -sSL --insecure https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/Scripts/log_collect.sh -o ./log_collect.sh && rm -f manual_log* && chmod 755 log_collect.sh && echo ""$([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($rootpwd)))"" | sudo -S bash ./log_collect.sh && rm ./log_collect.sh"
 }
 
 # Clear root password

@@ -233,7 +233,7 @@ $global:History  = @()
 $global:Settings = @{}
 
 $PLACEHOLDER_TEXT  = "Paste your command here that you would like to relay..."
-$SharedCommandsURL = "https://raw.githubusercontent.com/DellProSupportGse/Tools/main/KeyRelay.Shared.json"
+$SharedCommandsURL = "https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/KeyRelay.Shared.json"
 
 # =====================================================
 # KEYBOARD LAYOUT DETECTION

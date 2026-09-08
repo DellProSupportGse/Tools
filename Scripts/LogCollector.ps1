@@ -430,13 +430,13 @@ Function ShowMenu{
     IF($selection -match 0){
         Write-Host "Gathering APEX Logs (ACP/ECE)..."
         $Global:CollectACPECE = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunAcpLogCollector";$repo="PowershellScripts";'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/run_acp_log_collect.ps1'))
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="RunAcpLogCollector";$repo="PowershellScripts";'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/run_acp_log_collect.ps1'))
         $ACPLogPath = Invoke-RunAPEXlogsCollector -confirm:$False
     }
     IF($selection -match 3){
         Write-Host "Gathering Switch logs (Show Tech)..."
         $Global:CollectSTS = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/GetShowTech.ps1'))
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/GetShowTech.ps1'))
         Invoke-GetShowTech -confirm:$False -CaseNumber $Casenumber
 
     }
@@ -448,7 +448,7 @@ Function ShowMenu{
             Do {
                 $credential=Get-Credential -Message "Please enter the iDRAC Administrator credentials" -UserName root;$cred2=Get-Credential -Message "Confirm iDRAC Password" -UserName $credential.GetNetworkCredential().UserName
             } while (($credential.GetNetworkCredential().Password -ne $cred2.GetNetworkCredential().Password) -or ($credential.GetNetworkCredential().UserName -ne $cred2.GetNetworkCredential().UserName))
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/TSRCollector.ps1'))
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/TSRCollector.ps1'))
             $iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
         }
     }
@@ -459,13 +459,13 @@ Function ShowMenu{
         Write-Host "Collecting Test Dell Azure Local Issues script (TALI)..."
         $Global:CollectTALI = "Y"
         If ($selection -notmatch "0|1|2|3|4|6|7|8|9") {
-            Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1'))
+            Echo TALI;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TALI";$repo="PowershellScripts"; '+(new-object net.webclient).DownloadString('http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGse/Tools/main/Scripts/TALI.ps1'))
             Test-DellAzureLocalIssues
         } else {
             $SignalFile = Join-Path $env:TEMP "TALI_Signal_$([Guid]::NewGuid().Guid).tmp"
             # Ensure the file does not exist beforehand
             if (Test-Path $SignalFile) { Remove-Item $SignalFile -Force }
-            $Payload = '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(''$module=''''TALI'''';$repo=''''PowershellScripts''''; ''+(new-object net.webclient).DownloadString(''http''+''s://raw.g''+''ithubusercontent.com/DellProSupportGse/Tools/main/TALI.ps1''));Test-DellAzureLocalIssues'
+            $Payload = '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(''$module=''''TALI'''';$repo=''''PowershellScripts''''; ''+(new-object net.webclient).DownloadString(''http''+''s://raw.g''+''ithubusercontent.com/DellProSupportGse/Tools/main/Scripts/TALI.ps1''));Test-DellAzureLocalIssues'
             $CommandToRun = "$Payload; New-Item -Path '$SignalFile' -ItemType File -Force | Out-Null"
 
             Start-Process powershell -ArgumentList '-NoExit', '-Command', $CommandToRun
@@ -542,7 +542,7 @@ Function ShowMenu{
         If ((invoke-command -scriptblock {try {get-cluster -ErrorAction SilentlyContinue} catch {}}).Name -eq $null) {Write-Host -ForegroundColor DarkYellow "This module MUST be run locally on a cluster node. Waiting 10 seconds.";sleep 10}
         Write-Host "Collecting Azure Local/HCI/S2D logs (SDDC)..."
         $Global:CollectSDDC = "Y"
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/RunSDDC.ps1'))
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/RunSDDC.ps1'))
         Invoke-RunSDDC -confirm:$False -CaseNumber $CaseNumber
 
     }

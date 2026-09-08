@@ -21,7 +21,7 @@
     Created By: Jim Gandy
 
     One-liner usage:
-    $browser = New-Object System.Net.WebClient;$browser.Proxy.Credentials =[System.Net.CredentialCache]::DefaultNetworkCredentials;Echo iDRACCMan;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="iDRACCMan";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/iDRAC-ConnectionManager.ps1'));Invoke-iDRACCMan
+    $browser = New-Object System.Net.WebClient;$browser.Proxy.Credentials =[System.Net.CredentialCache]::DefaultNetworkCredentials;Echo iDRACCMan;[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="iDRACCMan";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('http'+'s://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/iDRACCMan/iDRAC-ConnectionManager.ps1'));Invoke-iDRACCMan
 
     Direct usage:
     powershell.exe -STA -ExecutionPolicy Bypass -File .\iDRAC-ConnectionManager.ps1
