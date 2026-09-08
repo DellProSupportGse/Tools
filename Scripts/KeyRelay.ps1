@@ -1156,11 +1156,11 @@ $menuImportCommands.Add_Click({ Import-CommandsFromFile })
 $menuExportCommands.Add_Click({ Export-CommandsToFile })
 
 $menuDocs.Add_Click({
-    Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/KeyRelayREADME.md"
+    Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/Scripts/KeyRelayREADME.md"
 })
 
 $menuQuick.Add_Click({
-    Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/KeyRelayQuickStart.md"
+    Start-Process "https://github.com/DellProSupportGse/Tools/blob/main/Scripts/KeyRelayQuickStart.md"
 })
 
 $txtInput = New-Object Windows.Forms.TextBox

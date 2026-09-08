@@ -55,7 +55,7 @@ $script:AppVersion   = "1.0.69"
 # Telemetry run-once guard
 $script:TelemetryStartupSent = $false
 $script:TelemetryGeoResolved = $false
-$script:HelpUrl      = "https://github.com/DellProSupportGse/Tools/blob/main/iDRACCMan/help.md"
+$script:HelpUrl      = "https://github.com/DellProSupportGse/Tools/blob/main/Scripts/iDRACCMan/help.md"
 $script:DocumentsRoot = [Environment]::GetFolderPath("MyDocuments")
 $script:AppRoot      = Join-Path $script:DocumentsRoot "iDRACCMan"
 $script:LibRoot      = Join-Path $script:AppRoot "lib"
@@ -4638,7 +4638,7 @@ function Show-iDRACCManSearch {
 function Open-iDRACCManHelp {
     param([string]$Source = "Unknown")
 
-    $helpUrl = "https://github.com/DellProSupportGse/Tools/blob/main/iDRACCMan/help.md"
+    $helpUrl = "https://github.com/DellProSupportGse/Tools/blob/main/Scripts/iDRACCMan/help.md"
 
     try {
         if ($script:HelpUrl -and -not [string]::IsNullOrWhiteSpace([string]$script:HelpUrl)) {
