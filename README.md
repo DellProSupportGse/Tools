@@ -314,34 +314,22 @@ Use this workflow to collect SDDC diagnostic information when the target environ
 <details>
 <summary><strong>📖 Offline collection procedure</strong></summary>
 
-### 1. Prepare the SDDC package
+### On a machine with internet access:
 
-On a machine with internet access:
+1. Copy the contents of the **SDDC Powershell (PS1) file**:  
+   [https://raw.githubusercontent.com/TommyPaulkDell/source/refs/heads/main/GetDellSDDC.ps1](https://raw.githubusercontent.com/TommyPaulkDell/source/refs/heads/main/GetDellSDDC.ps1)
 
-1. Download the SDDC master archive from:
-   `https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip`
-2. Transfer `master.zip` to the target cluster environment.
+### RDP into a cluster node:
 
-### 2. Transfer the script
-
-Copy the contents of:
-
-```text
-http'+'s://raw.g'+'ithubusercontent.com/DellProSupportGSE/Tools/main/Scripts/SDDCOffline.ps1
-```
-
-to the target environment.
-
-### 3. Run the collection
-
-1. Open PowerShell as Administrator.
-2. Paste or run the `SDDCOffline.ps1` script.
-3. Confirm execution when prompted.
-4. Select the transferred `master.zip`.
-5. Allow the tool to distribute and run the data collection.
-6. Choose whether to retain or delete the copied master archive when prompted.
-
-The resulting diagnostic package is written beneath the current user's profile and begins with `HealthTest`.
+1. If **Sconfig** launches, choose **option 15** to exit to PowerShell.
+2. Launch **Notepad** (type `notepad`).
+3. Paste the contents of the SDDC Powershell file into a blank notepad window.
+4. Use **File > Save As**, choose **Save as type > All Files** and put in the name **GetDellSDDC.ps1**.
+5. Close notepad
+6. Run **Import-Module $env:USERPROFILE\Documents\GetDellSDDC.ps1**
+7. Run **Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents 168 -PerfSamples 30**
+- The tool starts data collection (takes several minutes).   
+- Output will be saved in: C:\Users\<current user>\, starting with (**HealthTest**).
 
 </details>
 
