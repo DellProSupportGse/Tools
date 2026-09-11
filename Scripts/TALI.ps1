@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.7"
+    $ver="0.71"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -2420,7 +2420,7 @@ function Send-ToolTelemetry {
         
         if ($outdatedIdracNodes) {
             Write-Host "Recommendation: Update iDrac firmware on node(s) $($outdatedIdracNodes.NodeName -join ',') to version 7.30.30.54 or later"
-            Write-Host "Current iDrac versions: $($outdatedIdracNodes | ForEach-Object { "$($_.NodeName): v$($_.IdracVersion)" } -join ', ')"
+            Write-Host "Current iDrac versions: $(($outdatedIdracNodes | ForEach-Object { "$($_.NodeName): v$($_.IdracVersion)" }) -join ', ')"
         } else {
             Write-Host "Recommendation: Investigate CPU power management settings, BIOS configuration, or thermal throttling on node(s) $($nonCompliantCpuFreq.NodeName -join ',')"
         }
