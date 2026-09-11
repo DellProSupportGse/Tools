@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.677"
+    $ver="0.71"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1242,6 +1242,88 @@ param(
         }
         return $nonCompliantNodes
     }
+    Function Test-CpuFrequencyConsistency {
+        Write-Host "Checking CPU frequency consistency across cluster nodes..."
+        $nonCompliant=@()
+        
+        try {
+            $cpuFreq=(Get-Counter -ComputerName (Get-ClusterNode).Name '\Processor Information(_total)\actual frequency').CounterSamples
+            
+            if ($cpuFreq) {
+                # Calculate average CookedValue
+                $averageFreq = ($cpuFreq | Measure-Object -Property CookedValue -Average).Average
+                $threshold = $averageFreq * 0.9  # 10% below average
+                
+                # Check each node against the threshold and collect iDrac firmware info
+                $nonCompliant += $cpuFreq | ForEach-Object {
+                    # Extract node name from Path (format: \\servername\processor information...)
+                    $nodeName = $_.Path -replace '\\\\([^\\]+)\\.*', '$1'
+                    
+                    # Get iDrac firmware version from the node
+                    $idracVersion = $null
+                    try {
+                        $pcsvDevice = Invoke-Command -ComputerName $nodeName -ScriptBlock { Get-PcsvDevice -ErrorAction SilentlyContinue }
+                        if ($pcsvDevice) {
+                            $firmwareString = $pcsvDevice.CurrentManagementFirmwareVersionString
+                            if ($firmwareString) {
+                                # Parse firmware string like "7-20-00123C32" to version "7.20.60.50"
+                                $parts = $firmwareString -split '-'
+                                if ($parts.Count -ge 3) {
+                                    $major = $parts[0]
+                                    $minor = $parts[1]
+                                    $hexString = $parts[2]
+                                    
+                                    # Convert hex string to two decimal values
+                                    # Ignore first two characters, then take pairs for version numbers
+                                    # "00123C32" -> ignore "00", then "12"->18, "3C"->60, "32"->50
+                                    $hexPart1 = $hexString.Substring(2, 2)  # Characters 2-3
+                                    $hexPart2 = $hexString.Substring(4, 2)  # Characters 4-5
+                                    $hexPart3 = $hexString.Substring(6, 2)  # Characters 6-7 (last two)
+                                    
+                                    # Convert hex to decimal
+                                    $build = [Convert]::ToInt32($hexPart2, 16)    # Middle pair
+                                    $revision = [Convert]::ToInt32($hexPart3, 16) # Last pair
+                                    
+                                    # Create version object
+                                    $idracVersion = [version]::new($major, $minor, $build, $revision)
+                                }
+                            }
+                        }
+                    } catch {
+                        # If we can't get iDrac version, continue without it
+                    }
+                    
+                    # Only add to nonCompliant if CPU frequency is below threshold
+                    if ($_.CookedValue -lt $threshold) {
+                        [PSCustomObject]@{
+                            NodeName = $nodeName
+                            CookedValue = $_.CookedValue
+                            AverageFreq = $averageFreq
+                            Threshold = $threshold
+                            IdracVersion = $idracVersion
+                        }
+                    }
+                }
+                
+                If ($nonCompliant) {
+                    Write-ToHost "Node(s) $($nonCompliant.NodeName -join ',') have CPU frequency below 90% of cluster average" -Checkmark 3 -Level 3
+                    foreach ($node in $nonCompliant) {
+                        $idracInfo = if ($node.IdracVersion) { "iDrac v$($node.IdracVersion)" } else { "iDrac version unknown" }
+                        Write-Host "  $($node.NodeName): Current = $([math]::Round($node.CookedValue,2)) MHz, Average = $([math]::Round($node.AverageFreq,2)) MHz, Threshold = $([math]::Round($node.Threshold,2)) MHz, $idracInfo"
+                    }
+                } else {
+                    Write-ToHost "All nodes have CPU frequency within acceptable range"
+                }
+            } else {
+                Write-ToHost "Could not retrieve CPU frequency data" -Checkmark 2 -Level 2
+            }
+        }
+        catch {
+            Write-ToHost "Error checking CPU frequency: $($_.Exception.Message)" -Checkmark 2 -Level 2
+        }
+        
+        return $nonCompliant
+    }
 
     #endregion Test Scripts
 
@@ -2327,6 +2409,23 @@ function Send-ToolTelemetry {
         }
     }
     $testReport+= [PSCustomObject] @{TestName="Test-WIMMountFilterDriver";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
+    Write-Host ""
+    $nonCompliantCpuFreq=Test-CpuFrequencyConsistency
+    If ($nonCompliantCpuFreq) {
+        $testPass=2
+        
+        # Check if any non-compliant nodes have iDrac version less than 7.30.30.54
+        $minIdracVersion = [version]::new(7, 30, 30, 54)
+        $outdatedIdracNodes = $nonCompliantCpuFreq | Where-Object { $_.IdracVersion -and $_.IdracVersion -lt $minIdracVersion }
+        
+        if ($outdatedIdracNodes) {
+            Write-Host "Recommendation: Update iDrac firmware on node(s) $($outdatedIdracNodes.NodeName -join ',') to version 7.30.30.54 or later"
+            Write-Host "Current iDrac versions: $(($outdatedIdracNodes | ForEach-Object { "$($_.NodeName): v$($_.IdracVersion)" }) -join ', ')"
+        } else {
+            Write-Host "Recommendation: Investigate CPU power management settings, BIOS configuration, or thermal throttling on node(s) $($nonCompliantCpuFreq.NodeName -join ',')"
+        }
+    }
+    $testReport+= [PSCustomObject] @{TestName="Test-CpuFrequencyConsistency";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     #Write-Host "Waiting for Get Solution Update command to time out"
     #While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
     #Write-Host "."
