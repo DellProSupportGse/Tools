@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.71"
+    $ver="0.72"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1385,30 +1385,56 @@ function Resolve-TelemetryGeo {
 
         Write-Indent "Resolving Geo Location..."
 
-        if (-not $global:GeoCache) {
-            $global:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+        try {
+            # Prefer local Windows settings
+            $LocalRegionInfo = [System.Globalization.RegionInfo]::CurrentRegion
+
+            if (-not $LocalRegionInfo.TwoLetterISORegionName) {
+                throw "Unable to determine local region."
+            }
+
+            $script:TelemetryGeoData = @{
+                country     = [string]$LocalRegionInfo.EnglishName
+                countryCode = [string]$LocalRegionInfo.TwoLetterISORegionName
+                timezone    = [string](Get-TimeZone).Id
+            }
+
+            Write-Indent "Country: $($script:TelemetryGeoData.country)" 2
+            Write-Indent "Source : Windows Regional Settings" 2
         }
+        catch {
+            # Fallback to external IP geolocation
+            Write-Indent "WARN: Local region lookup failed - trying ipwho.is" 2 Yellow
 
-        $response = $global:GeoCache
+            if (-not $script:GeoCache) {
+                $script:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
+            }
 
-        if ($response.success -eq $true) {
+            $response = $script:GeoCache
+
+            if ($response.success -ne $true) {
+                throw "ipwho.is did not return a valid response."
+            }
+
             $script:TelemetryGeoData = @{
                 country     = [string]$response.country
                 countryCode = [string]$response.country_code
-                region      = [string]$response.region
-                city        = [string]$response.city
-                latitude    = [string]$response.latitude
-                longitude   = [string]$response.longitude
                 timezone    = [string]$response.timezone.id
             }
 
             Write-Indent "Country: $($script:TelemetryGeoData.country)" 2
-            Write-Indent "Region : $($script:TelemetryGeoData.region)" 2
+            Write-Indent "Source : ipwho.is fallback" 2
         }
     }
     catch {
-        Write-Indent "WARN: ipwho lookup failed" 2 Yellow
-        $script:TelemetryGeoData = @{}
+        Write-Indent "WARN: Unable to determine geographic information" 2 Yellow
+
+        # Always leave a valid object behind
+        $script:TelemetryGeoData = @{
+            country     = $null
+            countryCode = $null
+            timezone    = try { [string](Get-TimeZone).Id } catch { $null }
+        }
     }
     finally {
         $script:TelemetryGeoResolved = $true
@@ -1457,19 +1483,14 @@ function Send-ToolTelemetry {
         # ONLY requested table columns are placed in Data.
         $data = [ordered]@{
             PartitionKey = $partitionKey
-            RowKey       = $rowKey
-            PSVersion    = $PSVersionTable.PSVersion.ToString()
-            Region       = $script:TelemetryGeoData.region
-            countryCode  = $script:TelemetryGeoData.countryCode
-            lon          = $script:TelemetryGeoData.longitude
-            MachineHash  = Get-TelemetryMachineHash
-            geoRegion    = $script:TelemetryGeoData.region
-            lat          = $script:TelemetryGeoData.latitude
-            Version      = $Version
-            timezone     = $script:TelemetryGeoData.timezone
-            ReportID     = $script:TelemetryReportID
-            city         = $script:TelemetryGeoData.city
-            country      = $script:TelemetryGeoData.country
+            RowKey        = $rowKey
+            PSVersion     = $PSVersionTable.PSVersion.ToString()
+            countryCode   = $script:TelemetryGeoData.countryCode
+            MachineHash   = Get-TelemetryMachineHash
+            Version       = $Version
+            timezone      = $script:TelemetryGeoData.timezone
+            ReportID      = $script:TelemetryReportID
+            country       = $script:TelemetryGeoData.country
         }
 
         # Envelope for the Function only. The Function should write Data only.
