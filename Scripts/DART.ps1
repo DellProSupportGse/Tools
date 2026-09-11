@@ -24,7 +24,7 @@ Function Invoke-DART {
     [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False,
     $param)
 
-    $ver="1.69"
+    $ver="1.7"
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 Start-Transcript -NoClobber -Path "C:\programdata\Dell\DART\DART_$DateTime.log"
@@ -558,9 +558,11 @@ Return $DSUReboot
         }
         Write-Host "Gather Server Model Info..."
         # Find Storage Spaces Direct RN or AX info
-            $Model=(Get-WmiObject -Class Win32_ComputerSystem).model
-$IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect).state -eq "Enabled"} catch {}
-            IF($Model -imatch 'Storage Spaces Direct' -or $Model -imatch 'AX' -or $Model -imatch 'MC'){
+            $Model=(Get-WmiObject -Class Win32_ComputerSystem -ErrorAction SilentlyContinue).model
+            $IsS2d=$False;try {$IsS2d=(Get-ClusterStorageSpacesDirect -ErrorAction SilentlyContinue).state -eq "Enabled"} catch {}
+            $NoClusterPre=$True;try {$NoClusterPre=!((Get-Cluster -ErrorAction SilentlyContinue).Name -gt "")} catch {}
+
+            IF(($Model -imatch 'Storage Spaces Direct' -or $Model -imatch 'AX' -or $Model -imatch 'MC')){
                 $ASHCI="YES"
                 $URL="https://downloads.dell.com/catalog/ASHCI-Catalog.xml.gz"
                 $InFile="$MyTemp\ASHCI-Catalog.xml.gz"
