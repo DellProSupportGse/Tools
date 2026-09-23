@@ -42,48 +42,17 @@ function Resolve-DartSbeCatalogItem {
         [Parameter(Mandatory=$true)][string]$Version
     )
 
-    $versionEscaped = [regex]::Escape($Version)
-    $candidateNodes = @($Catalog.SelectNodes('//*') | Where-Object {
-        $_.OuterXml -match $versionEscaped -and $_.OuterXml -match '(?i)\.zip'
-    } | Sort-Object { $_.OuterXml.Length })
-
-    foreach ($node in $candidateNodes) {
-        $blob = [string]$node.OuterXml
-        $urlMatch = [regex]::Match($blob, '(?i)https?://[^\s"''<>]+\.zip')
-        $shaMatch = [regex]::Match($blob, '(?i)(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])')
-        if ($urlMatch.Success -and $shaMatch.Success -and $urlMatch.Value -match $versionEscaped) {
-            $fileName = [IO.Path]::GetFileName(([uri]$urlMatch.Value).AbsolutePath)
-            $family = $null
-            if ($fileName -match ('(?i)^Bundle_SBE_Dell_(.+)_' + $versionEscaped + '\.zip$')) {
-                $family = $Matches[1]
-            }
-            return [pscustomobject]@{
-                Url    = [Net.WebUtility]::HtmlDecode($urlMatch.Value)
-                SHA256 = $shaMatch.Value.ToLowerInvariant()
-                Family = $family
-            }
+    # Match URL and hash within the SAME SBE record; never across siblings.
+    foreach ($node in $Catalog.SelectNodes('/Catalog/Family/SBE')) {
+        if ($node.GetAttribute('Version') -ne $Version) { continue }
+        $url = [string]$node.DownloadURL
+        $sha = [string]$node.PackageHash
+        if ($url -notmatch '^https://(downloads|dl)\.dell\.com/.+\.zip$' -or
+            $sha -notmatch '^[0-9a-fA-F]{64}$') { continue }
+        return [pscustomobject]@{
+            Url=$url; SHA256=$sha.ToLowerInvariant(); Family=$node.ParentNode.GetAttribute('name')
         }
     }
-
-    # Schema-independent fallback: inspect a bounded region surrounding the version.
-    $xmlText = [string]$Catalog.OuterXml
-    $versionIndex = $xmlText.IndexOf($Version, [StringComparison]::OrdinalIgnoreCase)
-    while ($versionIndex -ge 0) {
-        $windowStart = [Math]::Max(0, $versionIndex - 6000)
-        $windowLength = [Math]::Min(12000, $xmlText.Length - $windowStart)
-        $window = $xmlText.Substring($windowStart, $windowLength)
-        $urls = [regex]::Matches($window, '(?i)https?://[^\s"''<>]+\.zip') | ForEach-Object Value
-        $url = $urls | Where-Object { $_ -match $versionEscaped } | Select-Object -First 1
-        $sha = ([regex]::Match($window, '(?i)(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])')).Value
-        if ($url -and $sha) {
-            $fileName = [IO.Path]::GetFileName(([uri]$url).AbsolutePath)
-            $family = $null
-            if ($fileName -match ('(?i)^Bundle_SBE_Dell_(.+)_' + $versionEscaped + '\.zip$')) { $family = $Matches[1] }
-            return [pscustomobject]@{ Url=$url; SHA256=$sha.ToLowerInvariant(); Family=$family }
-        }
-        $versionIndex = $xmlText.IndexOf($Version, $versionIndex + $Version.Length, [StringComparison]::OrdinalIgnoreCase)
-    }
-
     return $null
 }
 
@@ -95,21 +64,20 @@ function Get-DartSbePreset {
         'https://downloads.dell.com/filestore/Prod/SbeDownloadCatalog/AX_SBE_Download_Catalog.xml'
     )
     $cacheRoot = Join-Path $env:ProgramData 'Dell\DART\SBE'
-    $cacheFile = Join-Path $cacheRoot 'SupportMatrixCache.json'
+    $cacheFile = Join-Path $cacheRoot 'SupportMatrixAllReleasesCache.json'
     $headers = @{ 'User-Agent' = 'Dell-DART-SBE' }
 
     try {
-        Write-Host 'Checking Dell Azure Local SupportMatrix for current SBE releases...'
-        $indexHtml = (Invoke-WebRequest -Uri $supportMatrixIndex -Headers $headers -UseBasicParsing -ErrorAction Stop).Content
-        $releases = @([regex]::Matches($indexHtml, '(?i)/docs/hci/supportmatrix/(\d{4})/') |
-            ForEach-Object { $_.Groups[1].Value } |
-            Sort-Object -Unique |
-            Sort-Object { [int]$_ } -Descending)
-        if (-not $releases.Count) { throw 'No current Dell release links were found on the SupportMatrix landing page.' }
+        Write-Host 'Checking all Dell SupportMatrix release notes and historical SBE download entries...'
+        $tree = Invoke-RestMethod -Uri 'https://api.github.com/repos/dell/azurestack-docs/git/trees/main?recursive=1' -Headers $headers -ErrorAction Stop
+        if ($tree.truncated) { throw 'GitHub returned an incomplete SupportMatrix tree.' }
+        $notePaths = @($tree.tree | Where-Object { $_.path -match '^content/en/docs/hci/SupportMatrix/(?:Archive/)?[0-9]{4}/SBEReleaseNotes/_index\.md$' } | ForEach-Object { $_.path })
+        if (-not $notePaths.Count) { throw 'No SBE release-note files were found in the SupportMatrix repository.' }
 
         $releaseRows = [Collections.Generic.List[object]]::new()
-        foreach ($release in $releases) {
-            $notesUrl = "$rawBase/$release/SBEReleaseNotes/_index.md"
+        foreach ($notePath in $notePaths) {
+            $release = ($notePath -split '/')[-3]
+            $notesUrl = "https://raw.githubusercontent.com/dell/azurestack-docs/main/$notePath"
             try {
                 $markdown = (Invoke-WebRequest -Uri $notesUrl -Headers $headers -UseBasicParsing -ErrorAction Stop).Content
             }
@@ -118,9 +86,7 @@ function Get-DartSbePreset {
                 continue
             }
 
-            $tbodyMatch = [regex]::Match($markdown, '(?is)<tbody>(.*?)</tbody>')
-            if (-not $tbodyMatch.Success) { continue }
-            $rowChunks = $tbodyMatch.Groups[1].Value -split '(?i)<tr[^>]*>'
+            $rowChunks = $markdown -split '(?i)<tr[^>]*>'
             foreach ($rowChunk in $rowChunks) {
                 $cells = @([regex]::Matches($rowChunk, '(?is)<td[^>]*>(.*?)</td>') | ForEach-Object { $_.Groups[1].Value })
                 if ($cells.Count -lt 6) { continue }
@@ -134,6 +100,7 @@ function Get-DartSbePreset {
                 $releaseRows.Add([pscustomobject]@{
                     Release          = $release
                     Version          = $version
+                    OS               = ConvertFrom-DartHtmlCell $cells[4]
                     Models           = $models
                     SolutionPatterns = $solutionPatterns
                     Notes            = "https://dell.github.io/azurestack-docs/docs/hci/supportmatrix/$release/sbereleasenotes/"
@@ -169,12 +136,44 @@ function Get-DartSbePreset {
                 Release          = $row.Release
                 Version          = $row.Version
                 Family           = if ($download.Family) { $download.Family } else { 'Dell-AzureLocal' }
+                OS               = $row.OS
+                Historical       = $false
                 Models           = $row.Models
                 SolutionPatterns = $row.SolutionPatterns
                 Url              = $download.Url
                 SHA256           = $download.SHA256
                 Notes            = $row.Notes
             })
+        }
+        # Older bundles remain in Dell's download catalog after release-note pages
+        # are removed. Use Dell AX product families, not newer PowerEdge aliases.
+        $historicalModels = @{
+            'AX-14G' = @('AX-640','AX-740xd')
+            'AX-15G' = @('AX-650','AX-750','AX-6515','AX-7525')
+            'AX-16G-45n0c' = @('AX-660','AX-760','AX-4510C','AX-4520C','APEX MC-660','APEX MC-760','APEX MC-4510C','APEX MC-4520C')
+            'AX-17G' = @('AX-670','AX-770')
+            '16G-45n0c-Intel' = @('AX-660','AX-760','AX-4510C','AX-4520C')
+            '17G-Intel' = @('AX-670','AX-770')
+        }
+        foreach ($familyNode in $catalog.SelectNodes('/Catalog/Family')) {
+            $family = $familyNode.GetAttribute('name')
+            foreach ($item in $familyNode.SelectNodes('SBE')) {
+                $version = $item.GetAttribute('Version')
+                if ($version -notmatch '^\d+\.\d+\.\d{4}\.\d+$' -or @($presets | Where-Object Version -eq $version).Count) { continue }
+                if (-not $historicalModels.ContainsKey($family)) {
+                    Write-Warning "Unmapped SBE family '$family': $version cannot be filtered by model."
+                    continue
+                }
+                $download = Resolve-DartSbeCatalogItem -Catalog $catalog -Version $version
+                if ($null -eq $download) { Write-Warning "No valid Dell URL/hash for $version"; continue }
+                $presets.Add([pscustomobject]@{
+                    Release=($version -split '\.')[2]; Version=$version; Family=$family
+                    Models=$historicalModels[$family]; OS='Verify in historical Dell release notes'
+                    Historical=$true; SolutionPatterns=@('Not supplied by current SupportMatrix; verify before installing')
+                    Url=$download.Url; SHA256=$download.SHA256
+                    Notes=$supportMatrixIndex
+                })
+            }
         }
         if (-not $presets.Count) { throw 'No SupportMatrix SBE releases could be matched to Dell download catalog entries.' }
 
@@ -257,6 +256,13 @@ function Get-DartDriverResult {
 
 function Get-DartSbeArchive {
     param([Parameter(Mandatory=$true)]$Selected, [Parameter(Mandatory=$true)][string]$VersionRoot)
+    if ($Selected.LocalArchive) {
+        # Recheck immediately before extraction in case the file changed after selection.
+        $localHash = (Get-FileHash -LiteralPath $Selected.LocalArchive -Algorithm SHA256 -ErrorAction Stop).Hash
+        if ($localHash -ne $Selected.SHA256) { throw 'Local SBE ZIP changed or failed SHA256 verification. Nothing installed.' }
+        Write-Host 'Using verified local SBE ZIP; download skipped.' -ForegroundColor Green
+        return $Selected.LocalArchive
+    }
     $cache = Join-Path $VersionRoot 'Cache'
     New-Item -Path $cache -ItemType Directory -Force -ErrorAction Stop | Out-Null
     $archive = Join-Path $cache 'Bundle.zip'
@@ -294,38 +300,88 @@ function Get-DartSbeArchive {
     }
 }
 
+function Select-DartLocalSbe {
+    param([object[]]$Choices, [string]$Model)
+    while ($true) {
+        Write-Host 'Enter the downloaded Dell Bundle SBE ZIP path (for example C:\SBE\Bundle_SBE_Dell_....zip).'
+        $path = ([string](Read-Host 'ZIP path, or B to go back')).Trim().Trim('"').Trim("'")
+        if ($path -eq 'B') { return }
+        try {
+            $file = Get-Item -LiteralPath $path -ErrorAction Stop
+            if ($file.PSIsContainer -or $file.Extension -ne '.zip') { throw 'Select a ZIP file, not a folder.' }
+            Write-Host 'Verifying local SBE bundle SHA-256...'
+            $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256 -ErrorAction Stop).Hash
+            $matches = @($Choices | Where-Object { $_.Models -contains $Model -and $_.SHA256 -eq $hash })
+            if ($matches.Count -ne 1) {
+                throw "This ZIP does not match a verified Dell SBE bundle for $Model in the current or cached release list. Select the original outer Bundle ZIP."
+            }
+            $selected = $matches[0].PSObject.Copy()
+            $selected | Add-Member -NotePropertyName LocalArchive -NotePropertyValue $file.FullName -Force
+            Write-Host ("Using local SBE {0}: {1}" -f $selected.Version, $file.FullName) -ForegroundColor Green
+            return $selected
+        } catch { Write-Warning $_.Exception.Message }
+    }
+}
+
+function Select-DartSbeRelease {
+    param([object[]]$Choices, [string]$Model)
+    $current = @($Choices | Where-Object { -not $_.Historical } | Sort-Object { [version]$_.Version } -Descending)
+    $historical = @($Choices | Where-Object { $_.Historical } | Sort-Object { [version]$_.Version } -Descending)
+    $showHistorical = $false
+    while ($true) {
+        $menu = @($current)
+        $title = 'Current'
+        if ($showHistorical) { $menu = @($historical); $title = 'Historical' }
+        Write-Host ''
+        Write-Host "$title SBE releases for $Model" -ForegroundColor Cyan
+        Write-Host ''
+        if (-not $menu.Count) { Write-Host '  No releases available in this menu.' }
+        for ($i = 0; $i -lt $menu.Count; $i++) {
+            $entry = $menu[$i]
+            Write-Host ("  {0}. SBE {1}" -f ($i + 1), $entry.Version) -ForegroundColor White
+            Write-Host ("     Release: {0}" -f $entry.Release)
+            Write-Host ("     HCI OS: {0}" -f $entry.OS)
+            if ($entry.Historical) { Write-Host '     Historical bundle: model-family match; verify deployment compatibility.' -ForegroundColor Yellow }
+            Write-Host ("     Target solution: {0}" -f ($entry.SolutionPatterns -join ', '))
+            Write-Host ''
+        }
+        if ($showHistorical) { Write-Host '  B. Back to current releases' }
+        elseif ($historical.Count) { Write-Host ("  H. Historical ({0} older releases)" -f $historical.Count) }
+        Write-Host '  L. Local SBE ZIP (provide path)'
+        Write-Host '  Q. Cancel'
+        Write-Host ''
+        $answer = ([string](Read-Host 'Select an option')).Trim()
+        if ($answer -eq 'Q') { return }
+        if ($answer -eq 'L') {
+            $local = Select-DartLocalSbe -Choices $Choices -Model $Model
+            if ($null -ne $local) { return $local }
+            continue
+        }
+        if ($answer -eq 'B' -and $showHistorical) { $showHistorical = $false; continue }
+        if ($answer -eq 'H' -and -not $showHistorical -and $historical.Count) { $showHistorical = $true; continue }
+        $number = 0
+        if ([int]::TryParse($answer, [ref]$number) -and $number -ge 1 -and $number -le $menu.Count) {
+            return $menu[$number - 1]
+        }
+        Write-Host 'Invalid selection. Choose one of the displayed options.' -ForegroundColor Yellow
+    }
+}
+
 function Invoke-DartSbe {
     [CmdletBinding()]
     param()
     $localSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
     if ($localSystem.Manufacturer -notmatch 'Dell') { throw 'This server is not a Dell system.' }
     $model = ([string]$localSystem.Model).Trim()
-    $choices = @(Get-DartSbePreset | Where-Object { $_.Models -contains $model })
+    $choices = @(Get-DartSbePreset | Where-Object { $_.Models -contains $model } | Sort-Object { [version]$_.Version } -Descending -Unique)
     if (-not $choices.Count) { throw "No preset SBE lists server model '$model'." }
     Write-Host "Predeployment preparation - LOCAL SERVER ONLY: $env:COMPUTERNAME ($model)" -ForegroundColor Cyan
-    Write-Host ''
-    Write-Host "Available SBE releases for $model" -ForegroundColor Cyan
-    Write-Host ''
-    for ($i=0; $i -lt $choices.Count; $i++) {
-        $entry = $choices[$i]
-        Write-Host ("  {0}. SBE {1}" -f ($i+1),$entry.Version) -ForegroundColor White
-        Write-Host ("     Release: {0}" -f $entry.Release)
-        Write-Host ("     Target solution: {0}" -f ($entry.SolutionPatterns -join ', '))
-        Write-Host ''
-    }
-    Write-Host '  Q. Cancel'
-    Write-Host '' 
-    do {
-        $answer = Read-Host 'Select SBE number, or Q to cancel'
-        if ($answer -eq 'q') { return }
-        $number = 0
-        $valid = [int]::TryParse($answer,[ref]$number) -and $number -ge 1 -and $number -le $choices.Count
-    } until ($valid)
-    $selected = $choices[$number-1]
+    $selected = Select-DartSbeRelease -Choices $choices -Model $model
+    if ($null -eq $selected) { return }
     Write-Host "Selected SBE $($selected.Version). Release notes: $($selected.Notes)"
-    Write-Host 'Choose a release suitable for your intended Azure Local deployment version. All presets target HCI OS 24H2.'
+    Write-Host 'Choose a release suitable for your intended Azure Local deployment version. Historical bundles are not automatically certified for your intended OS/solution version.'
     $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
-    if ([int]$os.BuildNumber -lt 26100) { throw 'These SBE presets require HCI OS 24H2 or later. Install the appropriate OS image first.' }
+    if ([int]$os.BuildNumber -lt 26100) { throw 'This standalone installation workflow requires HCI OS 24H2 or later. Install the appropriate OS image first.' }
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     if (-not ([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run DART in elevated Windows PowerShell.' }
     # A configured cluster has this registry key even if ClusSvc is stopped.
@@ -509,16 +565,22 @@ function Invoke-DartSbe {
         $results | Format-Table Type,Package,ExitCode,Status -AutoSize | Out-Host
         Write-Host "Results and logs: $run"
 
-        # Dell firmware updates can temporarily mount the SECUPD service partition.
-        # Remove any drive-letter access path before reboot so the temporary mapping is not left behind.
-        $secupdVolumes = @(Get-CimInstance Win32_LogicalDisk -ErrorAction SilentlyContinue | Where-Object { $_.VolumeName -imatch 'SECUPD' })
-        foreach ($secupdVolume in $secupdVolumes) {
-            $accessPath = "$($secupdVolume.DeviceID)\"
-            try {
-                Write-Host "Removing temporary SECUPD access path: $accessPath" -ForegroundColor Yellow
-                Remove-PartitionAccessPath -AccessPath $accessPath -ErrorAction Stop
-            } catch {
-                Write-Warning "Unable to remove SECUPD access path $accessPath : $($_.Exception.Message)"
+        # Dell firmware updates can temporarily expose a USB-backed SECUPD service partition.
+        # Remove the SECUPD access path only from partitions whose DiskPath identifies them as USB-backed.
+        $secupdDeviceIds = @(
+            Get-CimInstance Win32_LogicalDisk -ErrorAction SilentlyContinue |
+                Where-Object { $_.VolumeName -imatch 'SECUPD' } |
+                Select-Object -ExpandProperty DeviceID
+        )
+        if ($secupdDeviceIds.Count) {
+            $usbPartitions = @(Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DiskPath -imatch 'usb' })
+            foreach ($secupdDeviceId in $secupdDeviceIds) {
+                try {
+                    Write-Host "Removing temporary USB-backed SECUPD access path: $secupdDeviceId" -ForegroundColor Yellow
+                    $usbPartitions | Remove-PartitionAccessPath -AccessPath $secupdDeviceId -ErrorAction Stop
+                } catch {
+                    Write-Warning "Unable to remove USB-backed SECUPD access path $secupdDeviceId : $($_.Exception.Message)"
+                }
             }
         }
 
@@ -537,7 +599,7 @@ Function Invoke-DART {
     [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False,
     $param)
 
-    $ver="1.9"
+    $ver="1.10"
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 New-Item -Path "C:\ProgramData\Dell\DART" -ItemType Directory -Force | Out-Null
