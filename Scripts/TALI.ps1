@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.72"
+    $ver="0.73"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1242,6 +1242,264 @@ param(
         }
         return $nonCompliantNodes
     }
+    Function Test-MocArbDnsSettings {
+        Write-Host "Checking Moc Arb DNS settings vs Client DNS server settings..."
+        $nonCompliant=@()
+        
+        try {
+            $mocDNS=@((Get-MocNetworkInterface -group "management" ).properties.dnssettings.dnsServers)
+            $clientDNS=@((Get-DnsClientServerAddress -AddressFamily ipv4).ServerAddresses)
+            
+            if ($mocDNS -and $clientDNS) {
+                $missingDNS=@()
+                foreach ($dnsServer in $mocDNS) {
+                    if ($dnsServer -notin $clientDNS) {
+                        $missingDNS += $dnsServer
+                    }
+                }
+                
+                if ($missingDNS) {
+                    Write-ToHost "Moc Arb DNS server(s) $($missingDNS -join ',') are not configured in Client DNS settings" -Checkmark 3 -Level 3
+                    $nonCompliant = [PSCustomObject]@{
+                        MissingDNSServers = $missingDNS
+                        MocDNSServers = $mocDNS
+                        ClientDNSServers = $clientDNS
+                    }
+                } else {
+                    Write-ToHost "All Moc Arb DNS servers are configured in Client DNS settings" -Level 1 -Checkmark 1
+                }
+            } else {
+                Write-ToHost "Could not retrieve Moc Arb or Client DNS settings" -Checkmark 2 -Level 2
+                $nonCompliant = [PSCustomObject]@{
+                    MissingDNSServers = "Unable to retrieve DNS settings"
+                    MocDNSServers = $mocDNS
+                    ClientDNSServers = $clientDNS
+                }
+            }
+        }
+        catch {
+            Write-ToHost "Error checking Moc Arb DNS settings: $($_.Exception.Message)" -Checkmark 2 -Level 2
+            $nonCompliant = [PSCustomObject]@{
+                MissingDNSServers = "Error retrieving DNS settings"
+                Error = $_.Exception.Message
+            }
+        }
+        
+        return $nonCompliant
+    }
+    Function Test-SBEContentIntegrity {
+        Write-Host "Checking SBE content integrity and path resolution..."
+        $nonCompliant=@()
+        
+        try {
+            # Disable module auto-loading and explicitly import modules needed
+            $originalPSModuleAutoLoadingPreference = $PSModuleAutoLoadingPreference
+            $PSModuleAutoLoadingPreference = [System.Management.Automation.PSModuleAutoLoadingPreference]::None
+            Import-Module Microsoft.PowerShell.Utility -DisableNameChecking -Verbose:$false -Global | Out-Null
+            Import-Module Microsoft.PowerShell.Management -DisableNameChecking -Verbose:$false -Global | Out-Null
+            
+            # Helper function to get artifact path
+            function Get-ASArtifactPathLite {
+                [CmdletBinding()]
+                PARAM
+                (
+                    [Parameter(Position=0, Mandatory=$true)]
+                    [ValidateNotNullOrEmpty()]
+                    [System.String]
+                    $NugetName,
+                    
+                    [Parameter(Mandatory=$false)]
+                    [System.String]
+                    $Version = $null
+                )
+                PROCESS {
+                    $VerbosePreference = [System.Management.Automation.ActionPreference]::Continue
+                    Import-Module PackageManagement -DisableNameChecking -Verbose:$false -Global | Out-Null
+                    
+                    $nugetProvider = Get-PackageProvider | Where-Object { $_.Name -eq "Nuget" }
+                    
+                    if ($nugetProvider -eq $null) {
+                        Write-Host "Attempting to install nuget package provider." -ForegroundColor Yellow
+                        Install-PackageProvider nuget -Force -ForceBootstrap
+                    }
+                    
+                    $drivePath = "$env:SystemDrive\NugetStore"
+                    
+                    if (Test-Path -Path $drivePath) {
+                        if ($Version) {
+                            $package = Get-Package -Name $NugetName -Destination $drivePath -ErrorAction Stop -RequiredVersion $Version -ProviderName Nuget
+                        } else {
+                            $package = Get-Package -Name $NugetName -Destination $drivePath -ErrorAction Stop -ProviderName Nuget
+                        }
+                    }
+                    
+                    if ($package -eq $null) {
+                        throw "Could not find package $NugetName on source $drivePath."
+                    }
+                    
+                    return [System.IO.Path]::GetDirectoryName($package.Source);
+                }
+            }
+            
+            # Test 1: Environment Variables
+            $sbeStageRootPath = [System.Environment]::GetEnvironmentVariable("SBEStageRootPath", "Machine")
+            $sbeStagedMetadata = [System.Environment]::GetEnvironmentVariable("SBEStagedMetadata", "Machine")
+            
+            $pathIssues=@()
+            
+            if (-not $sbeStageRootPath) {
+                Write-ToHost "SBEStageRootPath environment variable not set" -Checkmark 3 -Level 3
+                $pathIssues += "SBEStageRootPath environment variable not set"
+            } elseif (-not (Test-Path -Path $sbeStageRootPath)) {
+                Write-ToHost "SBEStageRootPath path does not exist: $sbeStageRootPath" -Checkmark 3 -Level 3
+                $pathIssues += "SBEStageRootPath path does not exist"
+            }
+            
+            if (-not $sbeStagedMetadata) {
+                Write-ToHost "SBEStagedMetadata environment variable not set" -Checkmark 3 -Level 3
+                $pathIssues += "SBEStagedMetadata environment variable not set"
+            } elseif (-not (Test-Path -Path $sbeStagedMetadata)) {
+                Write-ToHost "SBEStagedMetadata path does not exist: $sbeStagedMetadata" -Checkmark 3 -Level 3
+                $pathIssues += "SBEStagedMetadata path does not exist"
+            }
+            
+            # Test 2: NuGet Package Resolution
+            $sbeRoleNuget = $null
+            try {
+                $sbeRoleNuget = Get-ASArtifactPathLite -NugetName "Microsoft.AzureStack.Role.SBE"
+                
+                if (-not (Test-Path -Path $sbeRoleNuget)) {
+                    Write-ToHost "SBE Role Nuget path does not exist: $sbeRoleNuget" -Checkmark 3 -Level 3
+                    $pathIssues += "SBE Role Nuget path does not exist"
+                }
+            }
+            catch {
+                Write-ToHost "Failed to resolve SBE Role Nuget: $($_.Exception.Message)" -Checkmark 3 -Level 3
+                $pathIssues += "Failed to resolve SBE Role Nuget"
+            }
+            
+            # Test 3: Helper Module Paths
+            if ($sbeRoleNuget -and (Test-Path -Path $sbeRoleNuget)) {
+                $sbeMetadataHelper = "$sbeRoleNuget\content\Helpers\SBEMetadataHelper.psm1"
+                $sbeSolutionExtHelper = "$sbeRoleNuget\content\Helpers\SBESolutionExtensionHelper.psm1"
+                $helpersDir = "$sbeRoleNuget\content\Helpers"
+                
+                if (-not (Test-Path -Path $helpersDir)) {
+                    Write-ToHost "Helpers directory does not exist: $helpersDir" -Checkmark 3 -Level 3
+                    $pathIssues += "Helpers directory does not exist"
+                }
+                
+                if (-not (Test-Path -Path $sbeMetadataHelper) -and -not (Test-Path -Path $sbeSolutionExtHelper)) {
+                    Write-ToHost "Neither SBEMetadataHelper.psm1 nor SBESolutionExtensionHelper.psm1 found" -Checkmark 3 -Level 3
+                    $pathIssues += "SBE helper modules not found"
+                }
+            }
+            
+            # Test 4: SolutionExtension Module Path
+            if ($sbeStageRootPath -and (Test-Path -Path $sbeStageRootPath)) {
+                $solExtModule = Join-Path -Path $sbeStageRootPath -ChildPath "Configuration\SolutionExtension\SolutionExtension.psd1"
+                if (-not (Test-Path -Path $solExtModule)) {
+                    Write-ToHost "SolutionExtension.psd1 does not exist: $solExtModule" -Checkmark 2 -Level 2
+                    $pathIssues += "SolutionExtension.psd1 does not exist"
+                }
+            }
+            
+            # Test 5: NuGet Store
+            $nugetStore = "$env:SystemDrive\NugetStore"
+            if (-not (Test-Path -Path $nugetStore)) {
+                Write-ToHost "NuGet store does not exist: $nugetStore" -Checkmark 2 -Level 2
+                $pathIssues += "NuGet store does not exist"
+            }
+            
+            # Restore original module auto-loading preference
+            $PSModuleAutoLoadingPreference = $originalPSModuleAutoLoadingPreference
+            
+            # If path issues exist, return them
+            if ($pathIssues) {
+                $nonCompliant = [PSCustomObject]@{
+                    PathIssues = $pathIssues
+                    SBEStageRootPath = $sbeStageRootPath
+                    SBEStagedMetadata = $sbeStagedMetadata
+                    SBERoleNugetPath = $sbeRoleNuget
+                }
+                return $nonCompliant
+            }
+            
+            # If all path tests passed, run content integrity test
+            Write-ToHost "All path resolution tests passed, running SBE content integrity test..." -Level 1 -Checkmark 1
+            
+            # Content integrity test
+            $sbIntegrity = {
+                param (
+                    [String]
+                    [parameter(Mandatory=$true)]
+                    $SBEMetadataPath,
+                    
+                    [String]
+                    [parameter(Mandatory=$true)]
+                    $SBEContentPath,
+                    
+                    [String]
+                    [parameter(Mandatory=$true)]
+                    $SbeRoleNuget
+                )
+                
+                try {
+                    if (-not(Get-Command -Name Test-SBEContentIntegrity -ErrorAction SilentlyContinue)) {
+                        if (Test-Path -Path "$($SbeRoleNuget)\content\Helpers\SBEMetadataHelper.psm1") {
+                            Import-Module "$($SbeRoleNuget)\content\Helpers\SBEMetadataHelper.psm1" -Force -ErrorAction Stop -Verbose:$false -DisableNameChecking -Global | Out-Null
+                        }
+                        else {
+                            Import-Module "$($SbeRoleNuget)\content\Helpers\SBESolutionExtensionHelper.psm1" -Force -ErrorAction Stop -Verbose:$false -DisableNameChecking -Global | Out-Null
+                        }
+                    }
+                    $skipDir = @("IntegratedContent")
+                    Test-SBEContentIntegrity -SBEMetadataDirPath $SBEMetadataPath -SBEContentPath $SBEContentPath -IgnoreTopLevelFolder $skipDir
+                }
+                catch {
+                    throw $PSItem
+                }
+            }
+            
+            try {
+                $integrityResult = Invoke-Command -ScriptBlock $sbIntegrity -ArgumentList @($sbeStagedMetadata, $sbeStageRootPath, $sbeRoleNuget)
+                
+                if ($integrityResult) {
+                    Write-ToHost "SBE Content Integrity Test: PASSED" -Level 1 -Checkmark 1
+                    return $null
+                }
+                else {
+                    Write-ToHost "SBE Content Integrity Test: FAILED - SBE content files do not match metadata" -Checkmark 3 -Level 3
+                    $nonCompliant = [PSCustomObject]@{
+                        IntegrityTestFailed = $true
+                        Message = "SBE content files do not match metadata. This may indicate corrupted or modified files."
+                    }
+                    return $nonCompliant
+                }
+            }
+            catch {
+                Write-ToHost "SBE Content Integrity Test: ERROR - $($_.Exception.Message)" -Checkmark 3 -Level 3
+                $nonCompliant = [PSCustomObject]@{
+                    IntegrityTestError = $true
+                    Message = $_.Exception.Message
+                    StackTrace = $_.ScriptStackTrace
+                }
+                return $nonCompliant
+            }
+        }
+        catch {
+            Write-ToHost "Error during SBE content integrity test: $($_.Exception.Message)" -Checkmark 3 -Level 3
+            $nonCompliant = [PSCustomObject]@{
+                TestError = $true
+                Message = $_.Exception.Message
+            }
+            return $nonCompliant
+        }
+        finally {
+            # Ensure we restore the original module auto-loading preference
+            $PSModuleAutoLoadingPreference = $originalPSModuleAutoLoadingPreference
+        }
+    }
     Function Test-CpuFrequencyConsistency {
         Write-Host "Checking CPU frequency consistency across cluster nodes..."
         $nonCompliant=@()
@@ -2430,6 +2688,28 @@ function Send-ToolTelemetry {
         }
     }
     $testReport+= [PSCustomObject] @{TestName="Test-WIMMountFilterDriver";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
+    Write-Host ""
+    $nonCompliantMocDns=Test-MocArbDnsSettings
+    If ($nonCompliantMocDns) {
+        $testPass=2
+        Write-Host "Recommendation: Make sure Moc Arb is using valid DNS servers."
+    }
+    $testReport+= [PSCustomObject] @{TestName="Test-MocArbDnsSettings";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
+    Write-Host ""
+    $nonCompliantSBE=Test-SBEContentIntegrity
+    If ($nonCompliantSBE) {
+        $testPass=2
+        if ($nonCompliantSBE.PathIssues) {
+            Write-Host "Recommendation: Review and fix SBE path issues: $($nonCompliantSBE.PathIssues -join ', ')"
+        } elseif ($nonCompliantSBE.IntegrityTestFailed) {
+            Write-Host "Recommendation: SBE content files do not match metadata. This may indicate corrupted or modified files."
+        } elseif ($nonCompliantSBE.IntegrityTestError) {
+            Write-Host "Recommendation: SBE content integrity test encountered an error: $($nonCompliantSBE.Message)"
+        } else {
+            Write-Host "Recommendation: Review SBE content integrity test results"
+        }
+    }
+    $testReport+= [PSCustomObject] @{TestName="Test-SBEContentIntegrity";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $nonCompliantCpuFreq=Test-CpuFrequencyConsistency
     If ($nonCompliantCpuFreq) {
