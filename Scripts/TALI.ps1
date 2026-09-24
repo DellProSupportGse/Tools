@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.731"
+    $ver="0.732"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1287,7 +1287,7 @@ param(
         
         return $nonCompliant
     }
-    Function Test-SBEContentIntegrity {
+    Function Test-SBEContentIntegrityCheck {
         Write-Host "Checking SBE content integrity and path resolution..."
         $nonCompliant=@()
         
@@ -1428,7 +1428,7 @@ param(
             # If all path tests passed, run content integrity test
             Write-ToHost "All path resolution tests passed, running SBE content integrity test..." -Level 1 -Checkmark 1
             
-            # Content integrity test - use a different function name to avoid conflict with imported module
+            # Content integrity test
             $sbIntegrity = {
                 param (
                     [String]
@@ -1453,9 +1453,9 @@ param(
                         Import-Module "$($SbeRoleNuget)\content\Helpers\SBESolutionExtensionHelper.psm1" -Force -ErrorAction Stop -Verbose:$false -DisableNameChecking -Global | Out-Null
                     }
                     
-                    # Call the SBE module's Test-SBEContentIntegrity function using module-qualified name
+                    # Call the SBE module's Test-SBEContentIntegrity function
                     $skipDir = @("IntegratedContent")
-                    & (Get-Command Test-SBEContentIntegrity -Module SBEMetadataHelper -ErrorAction SilentlyContinue) -SBEMetadataDirPath $SBEMetadataPath -SBEContentPath $SBEContentPath -IgnoreTopLevelFolder $skipDir
+                    Test-SBEContentIntegrity -SBEMetadataDirPath $SBEMetadataPath -SBEContentPath $SBEContentPath -IgnoreTopLevelFolder $skipDir
                 }
                 catch {
                     throw $PSItem
@@ -2697,7 +2697,7 @@ function Send-ToolTelemetry {
     }
     $testReport+= [PSCustomObject] @{TestName="Test-MocArbDnsSettings";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
-    $nonCompliantSBE=Test-SBEContentIntegrity
+    $nonCompliantSBE=Test-SBEContentIntegrityCheck
     If ($nonCompliantSBE) {
         $testPass=2
         if ($nonCompliantSBE.PathIssues) {
@@ -2710,7 +2710,7 @@ function Send-ToolTelemetry {
             Write-Host "Recommendation: Review SBE content integrity test results"
         }
     }
-    $testReport+= [PSCustomObject] @{TestName="Test-SBEContentIntegrity";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
+    $testReport+= [PSCustomObject] @{TestName="Test-SBEContentIntegrityCheck";TestResult=@("Passed","Warning","Error","Fix Failed")[$testPass]};$testPass=0
     Write-Host ""
     $nonCompliantCpuFreq=Test-CpuFrequencyConsistency
     If ($nonCompliantCpuFreq) {
