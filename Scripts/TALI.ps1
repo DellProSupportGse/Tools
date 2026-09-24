@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.73"
+    $ver="0.731"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1428,7 +1428,7 @@ param(
             # If all path tests passed, run content integrity test
             Write-ToHost "All path resolution tests passed, running SBE content integrity test..." -Level 1 -Checkmark 1
             
-            # Content integrity test
+            # Content integrity test - use a different function name to avoid conflict with imported module
             $sbIntegrity = {
                 param (
                     [String]
@@ -1445,16 +1445,17 @@ param(
                 )
                 
                 try {
-                    if (-not(Get-Command -Name Test-SBEContentIntegrity -ErrorAction SilentlyContinue)) {
-                        if (Test-Path -Path "$($SbeRoleNuget)\content\Helpers\SBEMetadataHelper.psm1") {
-                            Import-Module "$($SbeRoleNuget)\content\Helpers\SBEMetadataHelper.psm1" -Force -ErrorAction Stop -Verbose:$false -DisableNameChecking -Global | Out-Null
-                        }
-                        else {
-                            Import-Module "$($SbeRoleNuget)\content\Helpers\SBESolutionExtensionHelper.psm1" -Force -ErrorAction Stop -Verbose:$false -DisableNameChecking -Global | Out-Null
-                        }
+                    # Import the helper module
+                    if (Test-Path -Path "$($SbeRoleNuget)\content\Helpers\SBEMetadataHelper.psm1") {
+                        Import-Module "$($SbeRoleNuget)\content\Helpers\SBEMetadataHelper.psm1" -Force -ErrorAction Stop -Verbose:$false -DisableNameChecking -Global | Out-Null
                     }
+                    else {
+                        Import-Module "$($SbeRoleNuget)\content\Helpers\SBESolutionExtensionHelper.psm1" -Force -ErrorAction Stop -Verbose:$false -DisableNameChecking -Global | Out-Null
+                    }
+                    
+                    # Call the SBE module's Test-SBEContentIntegrity function using module-qualified name
                     $skipDir = @("IntegratedContent")
-                    Test-SBEContentIntegrity -SBEMetadataDirPath $SBEMetadataPath -SBEContentPath $SBEContentPath -IgnoreTopLevelFolder $skipDir
+                    & (Get-Command Test-SBEContentIntegrity -Module SBEMetadataHelper -ErrorAction SilentlyContinue) -SBEMetadataDirPath $SBEMetadataPath -SBEContentPath $SBEContentPath -IgnoreTopLevelFolder $skipDir
                 }
                 catch {
                     throw $PSItem
