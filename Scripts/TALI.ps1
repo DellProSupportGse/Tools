@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.732"
+    $ver="0.733"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -1956,7 +1956,7 @@ function Send-ToolTelemetry {
     if (Test-SolutionUpdateCommand) {
         If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Fixing Get Solution Update command. Est Time is less than five minutes" -ForegroundColor Cyan
-            Get-ClusterGroup "Azure Stack HCI Download Service Cluster Group","Azure Stack HCI Health Service Cluster Group","Azure Stack HCI Orchestrator Service Cluster Group","Azure Stack HCI Update Service Cluster Group" | Stop-ClusterGroup | Start-ClusterGroup
+            Get-ClusterGroup "Azure Stack HCI Download Service Cluster Group","Azure Stack HCI Health Service Cluster Group","Azure Stack HCI Orchestrator Service Cluster Group","Azure Stack HCI Update Service Cluster Group" | Stop-ClusterGroup | Move-ClusterGroup | Start-ClusterGroup
             Write-Host "Restarting cluster groups finished."
 	        Write-Host "Waiting for Get Solution Update command to time out"
             While ((Get-Job "SUJob").State -eq "Running") {Write-Host "." -NoNewline;sleep 5}
