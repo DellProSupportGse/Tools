@@ -599,7 +599,7 @@ Function Invoke-DART {
     [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False,
     $param)
 
-    $ver="1.10"
+    $ver="1.11"
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 New-Item -Path "C:\ProgramData\Dell\DART" -ItemType Directory -Force | Out-Null
@@ -953,12 +953,24 @@ Function ShowMenu{
 
 
 # Route Azure Local to standalone SBE preparation before legacy DSU/cluster handling.
-$IsAzureLocal = $OSInfo.Caption -match 'Azure (Stack HCI|Local)' -or [bool]$Global:SolutionUpdates
+$IsAzureLocal = $OSInfo.Caption -match 'Azure (Stack HCI|Local)' -and ($Global:SolutionUpdates -eq 0 -or $Global:IgnoreVersion -eq $True)
 if ($IsAzureLocal) {
     try { Invoke-DartSbe }
     catch { Write-Error "SBE workflow stopped: $($_.Exception.Message)" }
     finally { Stop-Transcript }
     return
+}
+
+IF(!($Global:IgnoreChecks -eq $True) -and !($Global:IgnoreVersion -eq $True)){
+    #Added for SBE Update of HCI 23H2 so we do no harm
+    IF($Global:SolutionUpdates){
+        Write-Host ""
+        Write-Host "WARNING: At this time DART does not support updating $($OSInfo.caption) 23H2+ with MS Solution Updates." -ForegroundColor Yellow
+        Write-Host "    For more information and detailed instructions for updating $($OSInfo.caption) 23H2+, please refer to the release notes available here:"  -ForegroundColor Yellow
+        Write-Host "        'https://www.dell.com/support/kbdoc/en-us/000224407/dell-for-microsoft-azure-stack-hci-ax-hardware-updates-release-notes'" -ForegroundColor Yellow
+        Write-Host ""
+        EndScript
+    }
 }
 
 ShowMenu
