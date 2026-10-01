@@ -21,7 +21,7 @@ Function Invoke-RunSDDC {
     CLS
     CLS
 $text=@"
-v1.42
+v1.5
   ___           ___ ___  ___   ___ 
  | _ \_  _ _ _ / __|   \|   \ / __|
  |   / || | ' \\__ \ |) | |) | (__ 
@@ -110,12 +110,13 @@ Invoke-Command -ComputerName $CNames -ScriptBlock {
         }
 }
 
+
 # Fresh import of PrivateCloud.DiagnosticInfo
 # Allow Tls12 and Tls11 -- GitHub now requires Tls12
 # If this is not set, the Invoke-WebRequest fails with "The request was aborted: Could not create SSL/TLS secure channel."
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls11
 $module = 'PrivateCloud.DiagnosticInfo'; $branch = 'master'
-
+<#
 try {
     (new-object net.webclient).DownloadFile('https://github.com/DellProSupportGse/PrivateCloud.DiagnosticInfo/archive/master.zip',"$MyTemp\$branch.zip")
 } catch {
@@ -128,12 +129,13 @@ cp -Recurse $MyTemp\$module-$branch\$module $md -Force -ErrorAction Stop
 rm -Recurse $MyTemp\$module-$branch,$MyTemp\$branch.zip
 $ModulePath=$md+"\"+$module
 Import-Module $ModulePath -Force -Verbose
-
+#>
  
 # Clean up old SDDC's
     IF(Test-Path "$env:USERPROFILE\HealthTest-*.zip"){Remove-Item $env:USERPROFILE\HealthTest-*.zip -Force}    
     IF(Test-Path "$Logs\HealthTest-*.zip"){Remove-Item $Logs\HealthTest-*.zip -Force}
 # Run SDDC
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetDellSDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/source/refs/heads/main/GetDellSDDC.ps1'))
 
 Add-Type @"
 using System;
@@ -162,7 +164,7 @@ public class Win32 {
 }
 "@
 
-if (-not (gcm Get-SddcDiagnosticInfo)) {
+if (-not (gcm Invoke-GetDellSDDC)) {
 
     $minBlankWindows = [Win32+EnumWindowsProc]{
         param($hWnd, $lParam)
@@ -257,7 +259,7 @@ if (-not (gcm Get-SddcDiagnosticInfo)) {
 
     # Run SDDC if cluster service found on node
     IF(Get-Service clussvc -ErrorAction SilentlyContinue){
-        Get-SddcDiagnosticInfo -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -IncludeReliabilityCounters -RunCluChk
+        Invoke-GetDellSDDC -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -IncludeReliabilityCounters -RunCluChk
     }Else{
         $ClusterToCollectLogsFrom=Read-Host "Please enter the name of the cluster to collect logs from"
         # Check if we can connect to the cluster
@@ -274,13 +276,13 @@ if (-not (gcm Get-SddcDiagnosticInfo)) {
             }
             Write-Host "    SUCCESS: Able to ping $ClusterToCollectLogsFrom" -ForegroundColor Green
               If ($ClusterToCollectLogsFrom -ieq 'local') {
-                Get-SDDCDiagnosticInfo -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -RunCluChk
+                Invoke-GetDellSDDC -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -RunCluChk
               } else {
                 IF((Invoke-Command -ComputerName $ClusterToCollectLogsFrom -ErrorAction SilentlyContinue -ScriptBlock{(Get-cluster).name}) -imatch $ClusterToCollectLogsFrom){
                     Write-Host "    SUCCESS: Able to connect to cluster" -ForegroundColor Green
                     $CheckRSATClusteringPowerShell=IF((Get-WindowsFeature RSAT-Clustering-PowerShell).InstallState -eq 'Installed'){ 
                         Write-Host "Execute: Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom..."
-                        Get-SDDCDiagnosticInfo -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -RunCluChk
+                        Invoke-GetDellSDDC -ClusterName $ClusterToCollectLogsFrom -IncludeReliabilityCounters -HoursOfEvents $HoursOfEvents -PerfSamples $PerfSamples -RunCluChk
                     }Else{
                         Write-Host "Remote SDDC requires RSAT-Clustering-PowerShell which requires a rebooted." -ForegroundColor Yellow
                         IF((Read-Host "Would you like to install RSAT-Clustering-PowerShell [y/n]") -imatch 'y'){
@@ -297,6 +299,7 @@ if (-not (gcm Get-SddcDiagnosticInfo)) {
                 }
               }
             }
+#>
 # Move to Logs 
 IF(Test-Path -Path "$MyTemp\logs"){
         Copy-Item -Path "$env:USERPROFILE\HealthTest-*.zip" -Destination "$MyTemp\logs\"
