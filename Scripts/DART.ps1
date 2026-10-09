@@ -21,7 +21,9 @@
     
     param(
     [Parameter(Mandatory=$False, Position=1)]
-    [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False)
+    [bool]$IgnoreChecks=$False,
+    [bool]$IgnoreVersion=$False,
+    $param)
 
 # SBE release metadata is discovered live from Dell's public Azure Local SupportMatrix
 # repository on every run. Download URL/SHA256 are resolved from Dell's live SBE
@@ -373,6 +375,21 @@ function Invoke-DartSbe {
     $localSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
     if ($localSystem.Manufacturer -notmatch 'Dell') { throw 'This server is not a Dell system.' }
     $model = ([string]$localSystem.Model).Trim()
+    # A configured cluster has this registry key even if ClusSvc is stopped.
+    # Normal mode remains predeployment-only. -IgnoreChecks may be used for a
+    # previously clustered node, but only after the Cluster Service is stopped.
+    if (Test-Path 'HKLM:\Cluster') {
+        if ($Global:IgnoreVersion -ne $True) {
+            throw 'This SBE path is for standalone predeployment servers. Cluster membership was detected; use -IgnoreVersion only after stopping the cluster for intentional maintenance.'
+        }
+
+        $clusSvc = Get-Service -Name ClusSvc -ErrorAction SilentlyContinue
+        if ($clusSvc -and $clusSvc.Status -ne 'Stopped') {
+            throw '-IgnoreVersion was specified on a cluster member, but the Cluster Service is still running. Stop the cluster/service before starting SBE firmware updates.'
+        }
+
+        Write-Warning 'Cluster membership is present, but -IgnoreVersion is enabled and ClusSvc is stopped. Continuing with local SBE maintenance.'
+    }
     $choices = @(Get-DartSbePreset | Where-Object { $_.Models -contains $model } | Sort-Object { [version]$_.Version } -Descending -Unique)
     if (-not $choices.Count) { throw "No preset SBE lists server model '$model'." }
     Write-Host "Predeployment preparation - LOCAL SERVER ONLY: $env:COMPUTERNAME ($model)" -ForegroundColor Cyan
@@ -384,21 +401,7 @@ function Invoke-DartSbe {
     if ([int]$os.BuildNumber -lt 26100) { throw 'This standalone installation workflow requires HCI OS 24H2 or later. Install the appropriate OS image first.' }
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     if (-not ([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run DART in elevated Windows PowerShell.' }
-    # A configured cluster has this registry key even if ClusSvc is stopped.
-    # Normal mode remains predeployment-only. -IgnoreChecks may be used for a
-    # previously clustered node, but only after the Cluster Service is stopped.
-    if (Test-Path 'HKLM:\Cluster') {
-        if ($Global:IgnoreChecks -ne $True) {
-            throw 'This SBE path is for standalone predeployment servers. Cluster membership was detected; use -IgnoreChecks only after stopping the cluster for intentional maintenance.'
-        }
 
-        $clusSvc = Get-Service -Name ClusSvc -ErrorAction SilentlyContinue
-        if ($clusSvc -and $clusSvc.Status -ne 'Stopped') {
-            throw '-IgnoreChecks was specified on a cluster member, but the Cluster Service is still running. Stop the cluster/service before starting SBE firmware updates.'
-        }
-
-        Write-Warning 'Cluster membership is present, but -IgnoreChecks is enabled and ClusSvc is stopped. Continuing with local SBE maintenance.'
-    }
     $versionRoot = Join-Path $env:ProgramData ("Dell\DART\SBE\{0}" -f $selected.Version)
     $run = Join-Path $versionRoot (Get-Date -Format 'yyyyMMdd_HHmmss_fff')
     $outer = Join-Path $run 'Bundle'
@@ -596,10 +599,11 @@ Function Invoke-DART {
 
     param(
     [Parameter(Mandatory=$False, Position=1)]
-    [bool] $IgnoreChecks=$False,[bool] $IgnoreVersion=$False,
+    [bool]$IgnoreChecks=$False,
+    [bool]$IgnoreVersion=$False,
     $param)
 
-    $ver="1.11"
+    $ver="1.12"
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 New-Item -Path "C:\ProgramData\Dell\DART" -ItemType Directory -Force | Out-Null
@@ -953,7 +957,7 @@ Function ShowMenu{
 
 
 # Route Azure Local to standalone SBE preparation before legacy DSU/cluster handling.
-$IsAzureLocal = $OSInfo.Caption -match 'Azure (Stack HCI|Local)' -and ($Global:SolutionUpdates -eq 0 -or $Global:IgnoreVersion -eq $True)
+$IsAzureLocal = $OSInfo.Caption -match 'Azure (Stack HCI|Local)' -and ($Global:SolutionUpdates -eq 0 -or $Global:IgnoreVersion -eq $True -or $Global:IgnoreChecks -eq $True)
 if ($IsAzureLocal) {
     try { Invoke-DartSbe }
     catch { Write-Error "SBE workflow stopped: $($_.Exception.Message)" }
@@ -1321,4 +1325,4 @@ If ($DSUReboot -eq $True -or $WinReboot -eq $True) {
 }Else{Write-Host "ERROR: Non-Dell Server Detected!" -ForegroundColor Red}# Dell Server Check
 Stop-Transcript
 }               
-               Invoke-DART -IgnoreChecks $IgnoreChecks -IgnoreVersion $IgnoreVersion
+               #Invoke-DART -IgnoreChecks $IgnoreChecks -IgnoreVersion $IgnoreVersion
