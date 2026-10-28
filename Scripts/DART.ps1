@@ -38,6 +38,18 @@ function ConvertFrom-DartHtmlCell {
     return $text.Trim()
 }
 
+function Write-HostWithDate {
+    param(
+        [string]$Message,
+        [string]$ForegroundColor
+    )
+    If ($ForegroundColor) {
+        Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm')] $Message" -ForegroundColor $ForegroundColor
+    } else {
+        Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm')] $Message"
+    }
+}
+
 function Resolve-DartSbeCatalogItem {
     param(
         [Parameter(Mandatory=$true)][xml]$Catalog,
@@ -70,7 +82,7 @@ function Get-DartSbePreset {
     $headers = @{ 'User-Agent' = 'Dell-DART-SBE' }
 
     try {
-        Write-Host 'Checking all Dell SupportMatrix release notes and historical SBE download entries...'
+        Write-HostWithDate 'Checking all Dell SupportMatrix release notes and historical SBE download entries...'
         $tree = Invoke-RestMethod -Uri 'https://api.github.com/repos/dell/azurestack-docs/git/trees/main?recursive=1' -Headers $headers -ErrorAction Stop
         if ($tree.truncated) { throw 'GitHub returned an incomplete SupportMatrix tree.' }
         $notePaths = @($tree.tree | Where-Object { $_.path -match '^content/en/docs/hci/SupportMatrix/(?:Archive/)?[0-9]{4}/SBEReleaseNotes/_index\.md$' } | ForEach-Object { $_.path })
@@ -181,7 +193,7 @@ function Get-DartSbePreset {
 
         New-Item -Path $cacheRoot -ItemType Directory -Force -ErrorAction Stop | Out-Null
         $presets | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $cacheFile -Encoding UTF8 -Force
-        Write-Host ("Live SupportMatrix: {0} SBE release entries discovered." -f $presets.Count) -ForegroundColor Green
+        Write-HostWithDate ("Live SupportMatrix: {0} SBE release entries discovered." -f $presets.Count) -ForegroundColor Green
         foreach ($preset in $presets) { $preset }
         return
     }
@@ -229,7 +241,9 @@ function Invoke-DartDup {
     if ($CheckOnly) { $arguments += ' /c' }
     # Never use /f (force downgrade) or /r (automatic reboot).
     $process = Start-Process -FilePath $Path -ArgumentList $arguments -Wait -PassThru -ErrorAction Stop
-    return [int]$process.ExitCode
+    $logContent = Get-Content -Raw $log 
+    $Versions=[pscustomobject]@{ Package = [regex]::Match($logContent, '(?m)^\s*Package version:\s*(\S+)').Groups[1].Value; Installed = [regex]::Match($logContent, '(?m)^\s*Installed version:\s*(\S+)').Groups[1].Value; ExitCode = [int]$process.ExitCode }
+    return $Versions
 }
 
 function Get-DartDriverResult {
@@ -277,11 +291,11 @@ function Get-DartSbeArchive {
             if (Test-Path -LiteralPath $previous -PathType Leaf) { Get-Item -LiteralPath $previous }
         })
     foreach ($candidate in $candidates) {
-        Write-Host "Verifying existing SBE bundle: $($candidate.FullName)"
+        Write-HostWithDate "Verifying existing SBE bundle: $($candidate.FullName)"
         try { $hash = (Get-FileHash -LiteralPath $candidate.FullName -Algorithm SHA256 -ErrorAction Stop).Hash }
         catch { Write-Warning "Cannot verify $($candidate.FullName); checking other copies."; continue }
         if ($hash -eq $Selected.SHA256) {
-            Write-Host 'Using existing verified SBE bundle; download skipped.' -ForegroundColor Green
+            Write-HostWithDate 'Using existing verified SBE bundle; download skipped.' -ForegroundColor Green
             return $candidate.FullName
         }
         Write-Warning "Hash mismatch: $($candidate.FullName). This copy will not be used."
@@ -289,7 +303,7 @@ function Get-DartSbeArchive {
     $partial = Join-Path $cache ("Bundle.{0}.partial" -f [guid]::NewGuid().ToString('N'))
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     try {
-        Write-Host "Downloading $($Selected.Url)"
+        Write-HostWithDate "Downloading $($Selected.Url)"
         try { Start-BitsTransfer -Source $Selected.Url -Destination $partial -ErrorAction Stop }
         catch { Invoke-WebRequest -Uri $Selected.Url -OutFile $partial -UseBasicParsing -ErrorAction Stop }
         if ((Get-FileHash -LiteralPath $partial -Algorithm SHA256 -ErrorAction Stop).Hash -ne $Selected.SHA256) {
@@ -388,7 +402,7 @@ function Invoke-DartSbe {
             throw '-IgnoreVersion was specified on a cluster member, but the Cluster Service is still running. Stop the cluster/service before starting SBE firmware updates.'
         }
 
-        Write-Warning 'Cluster membership is present, but -IgnoreVersion is enabled and ClusSvc is stopped. Continuing with local SBE maintenance.'
+        Write-HostWithDate 'WARNING: Cluster membership is present, but -IgnoreVersion is enabled and ClusSvc is stopped. Continuing with local SBE maintenance.' -ForegroundColor YELLOW
     }
     $choices = @(Get-DartSbePreset | Where-Object { $_.Models -contains $model } | Sort-Object { [version]$_.Version } -Descending -Unique)
     if (-not $choices.Count) { throw "No preset SBE lists server model '$model'." }
@@ -489,7 +503,7 @@ function Invoke-DartSbe {
     }
     try {
         for ($i=0; $i -lt $drivers.Count; $i++) {
-            Write-Host "Driver: $($drivers[$i].FriendlyName)"
+            Write-HostWithDate "Driver: $($drivers[$i].FriendlyName)"
             $log = Join-Path $logs "Driver-$i.log"
             $driverOutput = @(& "$env:windir\System32\pnputil.exe" /add-driver $driverPaths[$i] /install 2>&1)
             $code = $LASTEXITCODE
@@ -502,18 +516,21 @@ function Invoke-DartSbe {
             if (-not $driverResult.Continue) { throw "Driver installation failed or needs review (exit $code). See $log" }
         }
         foreach ($dup in $dups) {
-            Write-Host "Checking firmware: $($dup.Name)"
+            Write-HostWithDate "Checking firmware: $($dup.Name)"
             if ($dup.Name -like 'BIOS_*' -and -not $biosReady) {
                 $results.Add([pscustomobject]@{Type='Firmware';Package=$dup.Name;ExitCode='';Status='Blocked: Secure Boot 2023 certificate prerequisite not verified';Log=$logs})
                 continue
             }
-            $code = Invoke-DartDup -Path $dup.FullName -LogDirectory $logs -CheckOnly
+            $Versions = Invoke-DartDup -Path $dup.FullName -LogDirectory $logs -CheckOnly
+            $code = $Versions.ExitCode
             if ($code -eq 0) {
-                Write-Host "Installing firmware: $($dup.Name)"
-                $code = Invoke-DartDup -Path $dup.FullName -LogDirectory $logs
+                Write-HostWithDate "    Installed Version: $($Versions.Installed) - Package Version: $($Versions.Package)"
+                Write-HostWithDate "Installing firmware: $($dup.Name)"
+                $code = (Invoke-DartDup -Path $dup.FullName -LogDirectory $logs).ExitCode
                 $status = switch ($code) {
                     0 { 'Installed' }
                     2 { $needsReboot = $true; 'Installed; reboot required' }
+                    15 { $needsReboot = $true; 'Installed; reboot required; Container power cycle is required for update to be applied.' }
                     default { 'Failed: inspect DUP log' }
                 }
             } else {
@@ -527,10 +544,10 @@ function Invoke-DartSbe {
             $results.Add([pscustomobject]@{Type='Firmware';Package=$dup.Name;ExitCode=$code;Status=$status;Log=$logs})
             $results | Export-Csv $report -NoTypeInformation
             if ($status -like 'Failed*') {
-                Write-Host "    FAILED: $($dup.Name) (exit $code). Continuing with remaining firmware packages." -ForegroundColor Red
-                Write-Host "    Review DUP logs in: $logs" -ForegroundColor Yellow
+                Write-HostWithDate "    FAILED: $($dup.Name) (exit $code). Continuing with remaining firmware packages." -ForegroundColor Red
+                Write-HostWithDate "    Review DUP logs in: $logs" -ForegroundColor Yellow
             } else {
-                Write-Host "    $status"
+                Write-HostWithDate "    $status"
             }
         }
         # Audit raw drive firmware using the SBE's exact server/drive mapping.
@@ -566,7 +583,7 @@ function Invoke-DartSbe {
     } finally {
         $results | Export-Csv $report -NoTypeInformation
         $results | Format-Table Type,Package,ExitCode,Status -AutoSize | Out-Host
-        Write-Host "Results and logs: $run"
+        Write-HostWithDate "Results and logs: $run"
 
         # Dell firmware updates can temporarily expose a USB-backed SECUPD service partition.
         # Remove the SECUPD access path only from partitions whose DiskPath identifies them as USB-backed.
@@ -579,7 +596,7 @@ function Invoke-DartSbe {
             $usbPartitions = @(Get-Partition -ErrorAction SilentlyContinue | Where-Object { $_.DiskPath -imatch 'usb' })
             foreach ($secupdDeviceId in $secupdDeviceIds) {
                 try {
-                    Write-Host "Removing temporary USB-backed SECUPD access path: $secupdDeviceId" -ForegroundColor Yellow
+                    Write-HostWithDate "Removing temporary USB-backed SECUPD access path: $secupdDeviceId" -ForegroundColor Yellow
                     $usbPartitions | Remove-PartitionAccessPath -AccessPath $secupdDeviceId -ErrorAction Stop
                 } catch {
                     Write-Warning "Unable to remove USB-backed SECUPD access path $secupdDeviceId : $($_.Exception.Message)"
@@ -587,10 +604,18 @@ function Invoke-DartSbe {
             }
         }
 
-        if ($needsReboot) { Write-Host 'A reboot is required. Reboot this server, then rerun to check remaining updates.' -ForegroundColor Yellow }
+        if ($needsReboot) { Write-HostWithDate 'A reboot is required. Reboot this server, then rerun to check remaining updates.' -ForegroundColor Yellow }
     }
-    Write-Host 'Payload processing finished. Review all skipped/blocked packages and DriveFirmwareReview.csv before deployment.' -ForegroundColor Yellow
-    Write-Host 'This does not register an installed SBE version or certify full support-matrix compliance.'
+    If ((Get-BitLockerVolume -MountPoint "C:" -ErrorAction SilentlyContinue).ProtectionStatus -eq 'On') {
+        Write-HostWithDate "Suspending Bitlocker for one reboot on C volume..."
+        if ((Suspend-BitLocker -MountPoint "C:" -RebootCount 1).ProtectionStatus -ne 'Off') {
+            Write-HostWithDate "WARNING: Bitlocker could not be suspended. Please have bitlocker recovery key available if needed." -ForegroundColor Yellow
+        } else {
+            Write-HostWithDate "Bitlocker successfully suspended for one reboot on C volume" -ForegroundColor Green
+        }
+    }
+    Write-HostWithDate 'Payload processing finished. Review all skipped/blocked packages and DriveFirmwareReview.csv before deployment.' -ForegroundColor Yellow
+    Write-HostWithDate 'This does not register an installed SBE version or certify full support-matrix compliance.'
     if ((Read-Host 'Reboot this standalone server now? [y/N]') -eq 'y') { Restart-Computer -Force }
 }
 
@@ -603,7 +628,7 @@ Function Invoke-DART {
     [bool]$IgnoreVersion=$False,
     $param)
 
-    $ver="1.12"
+    $ver="1.13"
 
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
 New-Item -Path "C:\ProgramData\Dell\DART" -ItemType Directory -Force | Out-Null
