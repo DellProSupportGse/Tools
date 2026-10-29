@@ -151,7 +151,7 @@ function Invoke-ToolBox {
         [switch]$DebugTelemetry
     )
     Clear-Host
-    $Ver = '1.96'
+    $Ver = '1.97'
     $text = @"
 v$Ver
   _____         _   ___
@@ -217,6 +217,15 @@ v$Ver
             Command     = 'Invoke-AzHCIUrlChecker'
             Encoding    = 'UTF8'
         }
+        [pscustomobject]@{
+            Name        = 'ECHO'
+            Description = 'Event Corrilation & History Observer'
+            Internal    = $false
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/run-echo.ps1'
+            Module      = 'AzHCIUrlChkr'
+            Command     = 'Invoke-run-echo'
+            Encoding    = 'UTF8'
+        }        
         [pscustomobject]@{
             Name        = 'iDRACMan'
             Description = 'simplified iDRAC access'
