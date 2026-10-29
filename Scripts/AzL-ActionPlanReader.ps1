@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Azure Local Action Plan Monitor (v31)
+    Azure Local Action Plan Reader (v33)
 
 .DESCRIPTION
     Read-only Windows Forms dashboard for running and historical Azure
@@ -9,7 +9,7 @@
     displays Action, Step, and Task progress in a refreshable grid.
 
 .FEATURES
-    - Automatically monitors running plans; offers historical plan selection when idle
+    - Automatically reads running plans; offers historical plan selection when idle
     - Auto-refresh with configurable interval
     - Tracks selected steps between refreshes
     - Reorder, resize, show, and hide grid columns
@@ -20,7 +20,7 @@
     Get-ActionPlanInstances cmdlet.
 
 .NOTES
-    Script:  AzL-ActionPlanMonitor-v31.ps1
+    Script:  AzL-ActionPlanReader-v33.ps1
     Version: 31
     Mode:    Read-only; does not modify action plans
 #>
@@ -30,7 +30,7 @@ Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $form = New-Object Windows.Forms.Form
-$form.Text = 'Azure Local | Action Plan Monitor v32 - Fast Details'
+$form.Text = 'Azure Local | Action Plan Reader v33'
 $form.Size = New-Object Drawing.Size(1250,780)
 $form.StartPosition = 'CenterScreen'
 $form.MinimumSize = New-Object Drawing.Size(980,560)
@@ -47,7 +47,7 @@ $header = New-Object Windows.Forms.Panel
 $header.BackColor = $navy
 $header.Margin = New-Object Windows.Forms.Padding(0)
 $title = New-Object Windows.Forms.Label
-$title.Text = 'ACTION PLAN MONITOR'
+$title.Text = 'ACTION PLAN READER'
 $title.ForeColor = [Drawing.Color]::White
 $title.Font = New-Object Drawing.Font('Segoe UI Semibold',15,[Drawing.FontStyle]::Bold)
 $title.SetBounds(20,12,400,32)
@@ -783,7 +783,7 @@ $pickButton.BackColor = [Drawing.Color]::White; $pickButton.ForeColor = $navy
 $top.Controls.Add($pickButton)
 $pickButton.Add_Click({
     if ($script:snapshots.Count -gt 0) { Show-PlanPicker }
-    else { [Windows.Forms.MessageBox]::Show('No action plan instances are available.','Action Plan Monitor') | Out-Null }
+    else { [Windows.Forms.MessageBox]::Show('No action plan instances are available.','Action Plan Reader') | Out-Null }
 })
 $save.Add_Click({
     if (!$script:chosen -or !$script:snapshots.ContainsKey($script:chosen)) { return }
