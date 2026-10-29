@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  ECHO v2.1.8 - Event Correlation & History Observer (WPF Edition)
+  ECHO v2.1.9 - Event Correlation & History Observer (WPF Edition)
 .DESCRIPTION
   Read-only, dark-themed event explorer for Windows, Azure Local and offline SDDC EVTX.
   Live nodes, optional cluster discovery, SDDC node tabs, correlation, filters and CSV export.
@@ -14,7 +14,7 @@
 #Requires -Version 5.1
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
 
-$script:Version='2.1.8'
+$script:Version='2.1.9'
 $script:Items=New-Object 'System.Collections.ObjectModel.ObservableCollection[object]'
 $script:VisibleItems=New-Object 'System.Collections.ObjectModel.ObservableCollection[object]'
 $script:Sessions=@{}
@@ -217,7 +217,7 @@ $script:SDDCGroupColorByRoot=@{}
    <DockPanel Margin="9,5" LastChildFill="True">
     <Button x:Name="BtnRefresh" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="&#x27F3;" FontSize="20" Padding="12,0" ToolTip="Refresh selected log"/>
     <Button x:Name="BtnStop" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="&#x25A0; Stop"/>
-    <Button x:Name="BtnOpenSDDC" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Open SDDC"/>
+    <Button x:Name="BtnOpenSDDC" DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Content="Open EVTX Folder"/>
     <ComboBox x:Name="TimeFilter" DockPanel.Dock="Right" Width="140" Margin="5,0" SelectedIndex="1" Foreground="#000000" Background="#E1F3FF" ToolTip="Timeline / time range">
      <ComboBoxItem Content="All Time" Foreground="Black"/><ComboBoxItem Content="Last 1 hour" Foreground="Black"/><ComboBoxItem Content="Last 6 hours" Foreground="Black"/>
      <ComboBoxItem Content="Last 24 hours" Foreground="Black"/><ComboBoxItem Content="Last 7 days" Foreground="Black"/><ComboBoxItem Content="Last 30 days" Foreground="Black"/>
@@ -861,7 +861,7 @@ function Show-EchoFolderBrowser([string]$initialPath=''){
 }
 function Ask-SDDCPath {
  $dlg=New-Object Windows.Window
- $dlg.Title='ECHO - Open SDDC Collection'
+ $dlg.Title='ECHO - Open EVTX Folder'
  $dlg.Width=640;$dlg.Height=235;$dlg.ResizeMode='NoResize'
  $dlg.WindowStartupLocation='CenterOwner';$dlg.Owner=$script:Window
  $dlg.Background=[Windows.Media.BrushConverter]::new().ConvertFromString('#091E30')
@@ -888,7 +888,7 @@ function Ask-SDDCPath {
  $browse.Margin='0,0,8,0';[void]$buttons.Children.Add($browse)
  $cancel=New-Object Windows.Controls.Button;$cancel.Content='Cancel';$cancel.Width=90;$cancel.Padding='6'
  $cancel.Margin='0,0,8,0';[void]$buttons.Children.Add($cancel)
- $ok=New-Object Windows.Controls.Button;$ok.Content='Open SDDC';$ok.Width=115;$ok.Padding='6'
+ $ok=New-Object Windows.Controls.Button;$ok.Content='Open EVTX Folder';$ok.Width=115;$ok.Padding='6'
  $ok.Background=[Windows.Media.BrushConverter]::new().ConvertFromString('#0879C9')
  $ok.Foreground=[Windows.Media.Brushes]::White;[void]$buttons.Children.Add($ok)
  $browse.Add_Click({
