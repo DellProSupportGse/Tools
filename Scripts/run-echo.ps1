@@ -670,7 +670,12 @@ function Populate-Tree {
     $available=@('Application','System','Setup','Microsoft-Windows-FailoverClustering/Operational','Microsoft-Windows-StorageSpaces-Driver/Operational' | ForEach-Object {[pscustomobject]@{Name=$_;Path=$_}})
    }
   }
-  # Detect feature event sources from the channels actually present, even when
+   # ASEvents are observability traces, NOT Windows Event Log channels.
+   # Expose them only for live Azure Local targets; retrieval happens on demand.
+   if($s.Kind -in @('live','correlate')){
+    $available+=,[pscustomobject]@{Name='ASEvents (ECE Observability)';Path='ECHO:ASEvents'}
+   }
+   # Detect feature event sources from the channels actually present, even when
   # ServerManager/Get-WindowsFeature is unavailable or the source is offline.
   # This restores Installed Features for SDDC collections and remote hosts.
   $featurePatterns=@(
@@ -702,7 +707,10 @@ function Populate-Tree {
   foreach($log in @($available | Sort-Object Name)){
    $name=[string]$log.Name;$path=[string]$log.Path
    $item=New-TreeNode $name $path ([string][char]0x25A3)
-   if($name -in @('Application','Security','System','Setup','ForwardedEvents')){
+    if($path -eq 'ECHO:ASEvents'){
+     if(-not $aseRoot){$aseRoot=New-TreeNode 'Azure Local Observability' '' ([string][char]0x25A3)}
+     [void]$aseRoot.Items.Add($item)
+    }elseif($name -in @('Application','Security','System','Setup','ForwardedEvents')){
     [void]$windows.Items.Add($item)
    } else {
     $matched=$false
@@ -737,7 +745,8 @@ function Populate-Tree {
    }
 
   }
-  if($installedRoot.Items.Count){[void]$LogTree.Items.Add($installedRoot)}
+   if($aseRoot -and $aseRoot.Items.Count){[void]$LogTree.Items.Add($aseRoot)}
+   if($installedRoot.Items.Count){[void]$LogTree.Items.Add($installedRoot)}
   [void]$LogTree.Items.Add($windows)
   if($services.Items.Count){[void]$LogTree.Items.Add($services)}
   if($installedRoot.Items.Count){$installedRoot.IsExpanded=$true}
@@ -848,6 +857,56 @@ function Start-Query {
     Message=$record.Message;LogName=$record.LogName;XML=try{$record.ToXml()}catch{''}
    }
   }
+   function Read-ASEvents([string]$computer,$startTime){
+    # All Time passes $null from Get-Since; a mandatory [datetime] parameter
+    # rejects it before Get-ASEvent ever runs. Normalize the optional value.
+    $cutoff=[datetime]::MinValue
+    if($null -ne $startTime -and "$startTime" -ne ''){
+     $cutoff=[datetime]$startTime
+    }
+    # The cmdlet is available on Azure Local nodes, not necessarily on the GUI host.
+    $readScript={
+     param([datetime]$cutoff,[string]$computerName)
+     if(-not (Get-Command Get-ASEvent -ErrorAction SilentlyContinue)){
+      throw 'Get-ASEvent is unavailable on this node. Check its Azure Local environment/modules.'
+     }
+     $ece='C:\Observability\ECE'
+     if(-not (Test-Path -LiteralPath $ece)){throw "Observability folder not found: $ece"}
+     # Select the latest ETL file; ECE stores files, not subdirectories.
+     $latest=Get-ChildItem -LiteralPath $ece -File -Filter '*.etl' -ErrorAction Stop | Select-Object -Last 1
+     if(-not $latest){throw "No ECE ETL files found in $ece"}
+     $limit=20000
+     $count=0
+     Get-ASEvent -Path $latest.FullName -ErrorAction Stop | ForEach-Object {
+      $a=$_
+      $timestamp=$null
+      try{$timestamp=[datetime]$a.TimeStamp}catch{return}
+      if($cutoff -ne [datetime]::MinValue -and $timestamp -lt $cutoff){return}
+      if($count -ge $limit){return}
+      $count++
+      $eventType=[string]$a.EventType
+      $message=[string]$a.message
+      if(-not $message){$message=[string]$a.FormattedMessage}
+      if(-not $message){$message=($a | Out-String).Trim()}
+      $severity='Information'
+      if($message -match '(?i)(?:^|[\s:\]])(critical|error|warning|verbose|debug|information)(?:\b|\s)'){
+       $severity=switch($Matches[1].ToLowerInvariant()){'critical'{'Critical'} 'error'{'Error'} 'warning'{'Warning'} 'verbose'{'Verbose'} 'debug'{'Verbose'} default {'Information'}}
+      }
+      [pscustomobject]@{
+       TimeCreated=$timestamp;LevelDisplayName=$severity;Id=0
+       ProviderName=$eventType;MachineName=$computerName
+       Message=$message;LogName='ASEvents (ECE Observability)'
+       XML=($a | Format-List * -Force | Out-String)
+      }
+     }
+    }
+    if($computer -eq $env:COMPUTERNAME -or $computer -eq 'localhost' -or $computer -eq '.'){
+     & $readScript $cutoff $computer
+    }else{
+     # WinRM/PowerShell Remoting is required for non-Windows-Event-Log data.
+     Invoke-Command -ComputerName $computer -ScriptBlock $readScript -ArgumentList $cutoff,$computer -ErrorAction Stop
+    }
+   }
   if($kind -eq 'offline'){
    $f=@{Path=$log}
    try{
@@ -876,7 +935,11 @@ function Start-Query {
      }
      continue
     }
-    $f=@{LogName=$log}
+     if($log -eq 'ECHO:ASEvents'){
+      try{Read-ASEvents $node $from}catch{Write-Error "${node} / ASEvents: $($_.Exception.Message)"}
+      continue
+     }
+     $f=@{LogName=$log}
     if($from){$f.StartTime=$from}
     try{
      if($node -eq $env:COMPUTERNAME){Get-WinEvent -FilterHashtable $f -ErrorAction Stop | ForEach-Object {Convert-Record $_}}
