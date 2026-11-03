@@ -2,9 +2,7 @@
 
 .SYNOPSIS
 
-    Azure Local Action Plan Reader (v37)
-
-
+    Azure Local Action Plan Reader (v41)
 
 .DESCRIPTION
 
@@ -14,11 +12,9 @@
 
     displays Action, Step, and Task progress in a refreshable grid.
 
-
-
 .FEATURES
 
-    - Automatically reads running plans; offers historical plan selection when idle
+    - Opens Select Plan at startup; never automatically switches plans
 
     - Auto-refresh with configurable interval
 
@@ -26,9 +22,11 @@
 
     - Reorder, resize, show, and hide grid columns
 
+    - Search plans by name, status, dates, or Instance ID
+
+    - Find Next in loaded steps, tasks, descriptions, and XML attributes
+
     - Filter to active/failed entries and export progress XML
-
-
 
 .REQUIREMENTS
 
@@ -36,19 +34,141 @@
 
     Get-ActionPlanInstances cmdlet.
 
-
-
 .NOTES
 
-    Script:  AzL-ActionPlanReader-v37.ps1
+    Script:  AzL-ActionPlanReader-v40.ps1
 
-    Version: 36
+    Version: 39
 
     Mode:    Read-only; does not modify action plans
 
 #>
+$Ver = "39"
+# =====================================================
+#region Telemetry Information
+# =====================================================
+$script:TelemetryReportID    = [guid]::NewGuid().Guid
+$script:TelemetryGeoResolved = $false
+$script:TelemetryGeoData     = @{}
+$script:TelemetryStartupSent = $false
+$script:uploadToAzure        = $true
 
+function Write-Indent {
+    param([string]$Message, [int]$Level = 1, [string]$Color = 'Gray')
+    try { Write-Host (('  ' * $Level) + $Message) -ForegroundColor $Color } catch {}
+}
 
+function Get-TelemetryMachineHash {
+    try {
+        $raw = "$env:USERDOMAIN\$env:USERNAME@$env:COMPUTERNAME"
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($raw)
+            $hash = $sha.ComputeHash($bytes)
+            return ([BitConverter]::ToString($hash)).Replace('-', '').Substring(0,24)
+        }
+        finally { if ($sha) { $sha.Dispose() } }
+    }
+    catch { return '' }
+}
+
+function Resolve-TelemetryGeo {
+    if ($script:TelemetryGeoResolved) { return }
+    try {
+        try {
+            # Prefer local Windows region; no external call needed.
+            $r = [System.Globalization.RegionInfo]::CurrentRegion
+            if (-not $r.TwoLetterISORegionName -or $r.TwoLetterISORegionName -eq 'IV') {
+                throw 'Local region unavailable.'
+            }
+            $script:TelemetryGeoData = @{
+                country     = [string]$r.EnglishName
+                countryCode = [string]$r.TwoLetterISORegionName
+                timezone    = [string](Get-TimeZone).Id
+            }
+        }
+        catch {
+            # Fallback to ipwho.is only if local region resolution fails.
+            if (-not $script:GeoCache) {
+                $script:GeoCache = Invoke-RestMethod -Uri 'https://ipwho.is/' -TimeoutSec 5 -ErrorAction Stop
+            }
+            $r = $script:GeoCache
+            if ($r.success -ne $true) { throw 'Geolocation service returned no result.' }
+            $script:TelemetryGeoData = @{
+                country     = [string]$r.country
+                countryCode = [string]$r.country_code
+                timezone    = [string]$r.timezone.id
+            }
+        }
+    }
+    catch {
+        $tz = $null
+        try { $tz = [string](Get-TimeZone).Id } catch {}
+        $script:TelemetryGeoData = @{ country=$null; countryCode=$null; timezone=$tz }
+    }
+    finally { $script:TelemetryGeoResolved = $true }
+}
+
+function Send-ToolTelemetry {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][string]$TelemetryName,
+        [Parameter(Mandatory=$true)][string]$EventName,
+        [Parameter(Mandatory=$true)][string]$Version,
+        [Parameter(Mandatory=$true)][string]$Endpoint,
+        [int]$ServerCount = 0,
+        [int]$GroupCount = 0,
+        [switch]$NoGeo,
+        [switch]$DebugTelemetry
+    )
+    if (-not $script:uploadToAzure) { return }
+    if ($EventName -match '^(Startup|Launch|AppStart|ToolStart|TelemetryStartup)$') {
+        if ($script:TelemetryStartupSent) { return }
+        $script:TelemetryStartupSent = $true
+    }
+    try {
+        if (-not $NoGeo) { Resolve-TelemetryGeo }
+        $data = [ordered]@{
+            PartitionKey = ($TelemetryName -replace 'TelemetryData$','')
+            RowKey       = [guid]::NewGuid().Guid
+            PSVersion    = $PSVersionTable.PSVersion.ToString()
+            countryCode  = $script:TelemetryGeoData.countryCode
+            MachineHash  = Get-TelemetryMachineHash
+            Version      = $Version
+            timezone     = $script:TelemetryGeoData.timezone
+            ReportID     = $script:TelemetryReportID
+            country      = $script:TelemetryGeoData.country
+        }
+        # The Azure Function writes only Data into the telemetry table.
+        $payload = @{ TelemetryName=$TelemetryName; TableName=$TelemetryName; Data=$data }
+        $body = $payload | ConvertTo-Json -Depth 10
+        if ($DebugTelemetry) { Write-Host "Telemetry Request: $body" -ForegroundColor Cyan }
+        $response = Invoke-RestMethod -Method Post -Uri $Endpoint `
+            -ContentType 'application/json' -Body $body -TimeoutSec 15 -ErrorAction Stop
+        if ($DebugTelemetry) {
+            Write-Host 'Telemetry Response:' -ForegroundColor Green
+            $response | ConvertTo-Json -Depth 10 | Write-Host
+        }
+    }
+    catch {
+        # Never interrupt the primary tool because telemetry failed.
+        if ($DebugTelemetry) {
+            Write-Warning "Telemetry failed: $($_.Exception.Message)"
+            if ($_.ErrorDetails.Message) { Write-Warning $_.ErrorDetails.Message }
+        }
+    }
+}
+
+# Place this invocation after your application's version has been initialized.
+$telemetryParams = @{
+    TelemetryName  = 'AzLActionPlanReaderTelemetryData'
+    EventName      = 'Startup'
+    Version        = $Ver
+    Endpoint       = 'https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData'
+    DebugTelemetry = $false
+}
+Send-ToolTelemetry @telemetryParams
+#endregion Telemetry Information
 
 Add-Type -AssemblyName System.Windows.Forms
 
@@ -56,11 +176,9 @@ Add-Type -AssemblyName System.Drawing
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
-
-
 $form = New-Object Windows.Forms.Form
 
-$form.Text = 'Azure Local | Action Plan Reader v37'
+$form.Text = 'Azure Local | Action Plan Reader v41'
 
 $form.Size = New-Object Drawing.Size(1250,780)
 
@@ -79,10 +197,6 @@ $blue = [Drawing.Color]::FromArgb(35,102,218)
 $muted = [Drawing.Color]::FromArgb(95,108,126)
 
 $lineColor = [Drawing.Color]::FromArgb(222,229,238)
-
-
-
-
 
 # Dedicated title and toolbar rows, with no overlap over the grid headers.
 
@@ -136,7 +250,7 @@ $top.Controls.Add($refresh)
 
 $auto = New-Object Windows.Forms.CheckBox
 
-$auto.Text = 'Auto refresh'; $auto.Checked = $true; $auto.SetBounds(147,18,112,23)
+$auto.Text = 'Auto refresh'; $auto.Checked = $false; $auto.SetBounds(147,18,112,23)
 
 $top.Controls.Add($auto)
 
@@ -192,7 +306,7 @@ $statusPanel.Margin = New-Object Windows.Forms.Padding(0)
 
 $label = New-Object Windows.Forms.Label
 
-$label.AutoSize = $false; $label.Text = 'Ready - waiting for running action plan'
+$label.AutoSize = $false; $label.Text = 'Ready - select an action plan'
 
 $label.ForeColor = $muted; $label.Font = New-Object Drawing.Font('Segoe UI',9)
 
@@ -316,8 +430,6 @@ $detail.CellBorderStyle = 'SingleHorizontal'
 
 $detail.ColumnHeadersBorderStyle = 'Single'
 
-
-
 $detail.Columns.Add('Index','Step') | Out-Null
 
 $detail.Columns.Add('Type','Type') | Out-Null
@@ -364,8 +476,6 @@ $detail.Add_ColumnHeaderMouseDoubleClick({
 
 $detail.Columns['Name'].DefaultCellStyle.WrapMode = 'False'
 
-
-
 # Drag column headers to reorder; right-click a header or use Columns to show/hide.
 
 # Column objects are never recreated during refresh, so order/visibility/width persist.
@@ -394,7 +504,7 @@ function Update-ColumnMenu {
 
             $targetColumn = $detail.Columns[[string]$sender.Tag]
 
-            if ($targetColumn.Visible -and @($detail.Columns | Where-Object { $\_.Visible }).Count -le 1) { return }
+            if ($targetColumn.Visible -and @($detail.Columns | Where-Object { $_.Visible }).Count -le 1) { return }
 
             $targetColumn.Visible = -not $targetColumn.Visible
 
@@ -455,8 +565,6 @@ $detail.Add_ColumnHeaderMouseClick({
     }
 
 })
-
-
 
 # Four dedicated layout rows guarantee the grid header remains visible.
 
@@ -541,6 +649,8 @@ $errorText = New-Object Windows.Forms.TextBox
 $errorText.Multiline = $true
 
 $errorText.ReadOnly = $true
+# Keep the highlighted search result visible when focus remains on Find Next.
+$errorText.HideSelection = $false
 
 $errorText.ScrollBars = [Windows.Forms.ScrollBars]::Both
 
@@ -559,39 +669,73 @@ $errorText.Text = 'Select a failed step, task, or action to inspect its XML deta
 $errorPanel.Controls.Add($errorText)
 
 # Copy button sits on the right side of the DETAILS header.
+
 $copyDetails = New-Object Windows.Forms.Button
+
 $copyDetails.Text = 'Copy Details'
+
 $copyDetails.Size = New-Object Drawing.Size(112,24)
+
 $copyDetails.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+
 $copyDetails.FlatStyle = 'Flat'
+
 $copyDetails.FlatAppearance.BorderColor = $lineColor
+
 $copyDetails.BackColor = [Drawing.Color]::White
+
 $copyDetails.ForeColor = $navy
+
 $copyDetails.Font = New-Object Drawing.Font('Segoe UI',8)
+
 $copyDetails.Enabled = $false
+
 $copyDetails.Cursor = [Windows.Forms.Cursors]::Hand
+
 $copyDetailsTimer = New-Object Windows.Forms.Timer
+
 $copyDetailsTimer.Interval = 1800
+
 $copyDetailsTimer.Add_Tick({
+
     $copyDetailsTimer.Stop()
+
     $copyDetails.Text = 'Copy Details'
+
 })
+
 $copyDetails.Add_Click({
+
     if ([string]::IsNullOrWhiteSpace($errorText.Text) -or !$copyDetails.Enabled) { return }
+
     try {
+
         $copyText = "Action Plan: $($planNameLabel.Text -replace '^ACTION PLAN: ', '')`r`nInstance ID: $($script:selectedInstanceId)`r`n`r`n$($errorText.Text)"
+
         [Windows.Forms.Clipboard]::SetText($copyText)
+
         $copyDetails.Text = 'Copied!'
+
         $copyDetailsTimer.Stop()
+
         $copyDetailsTimer.Start()
+
     } catch {
+
         [Windows.Forms.MessageBox]::Show("Unable to copy details: $($_.Exception.Message)", 'Action Plan Reader') | Out-Null
+
     }
+
 })
+
 $errorPanel.Controls.Add($errorHeader)
+
 $errorHeader.Controls.Add($copyDetails)
+
 $copyDetails.Location = New-Object Drawing.Point(0,2)
+
 $errorHeader.Add_Resize({ $copyDetails.Left = [math]::Max(0,$errorHeader.ClientSize.Width - $copyDetails.Width - 12) })
+
 $copyDetails.Left = [math]::Max(0,$errorHeader.ClientSize.Width - $copyDetails.Width - 12)
 
 $split.Panel2.Controls.Add($errorPanel)
@@ -613,8 +757,6 @@ $layout.Controls.Add($split,0,2)
 $layout.Controls.Add($statusPanel,0,3)
 
 $form.Controls.Add($layout)
-
-
 
 # One background runspace is used for discovery; no UI thread is blocked by AzL commands.
 
@@ -647,8 +789,6 @@ $script:lastRenderedId = ''
 $script:lastRenderedXml = ''
 
 $script:statusFont = New-Object Drawing.Font('Segoe UI Semibold',9,[Drawing.FontStyle]::Bold)
-
-
 
 function Get-XmlText($value) {
 
@@ -744,8 +884,6 @@ function Start-Poll {
 
 }
 
-
-
 # Centered loading overlay for opening a selected action plan.
 
 $loadOverlay = New-Object Windows.Forms.Panel
@@ -818,8 +956,6 @@ function Hide-LoadOverlay {
 
 }
 
-
-
 function Show-PlanPicker {
 
     if ($script:pickerOpen) { return }
@@ -874,11 +1010,58 @@ function Show-PlanPicker {
 
         }
 
-        foreach ($entry in @($script:snapshots.Values | Sort-Object Start -Descending)) {
+        # Search the cached plan list without another Azure Local query.
+        $pickerEntries = @($script:snapshots.Values | Sort-Object Start -Descending)
+        $searchPanel = New-Object Windows.Forms.Panel
+        $searchPanel.Dock = 'Top'
+        $searchPanel.Height = 48
+        $searchPanel.BackColor = [Drawing.Color]::White
+        $searchLabel = New-Object Windows.Forms.Label
+        $searchLabel.Text = 'Search plans:'
+        $searchLabel.SetBounds(14,15,92,22)
+        $searchBox = New-Object Windows.Forms.TextBox
+        $searchBox.SetBounds(110,10,650,27)
+        $searchBox.Anchor = 'Top,Left,Right'
+        $searchBox.Font = New-Object Drawing.Font('Segoe UI',10)
+        $searchCount = New-Object Windows.Forms.Label
+        $searchCount.SetBounds(775,14,160,22)
+        $searchCount.Anchor = 'Top,Right'
+        $searchCount.TextAlign = 'MiddleRight'
+        $searchPanel.Controls.AddRange(@($searchLabel,$searchBox,$searchCount))
 
-            [void]$pickerGrid.Rows.Add($entry.Name,$entry.Status,$entry.Start,$entry.End,$entry.Id)
-
+        $populatePicker = {
+            $query = $searchBox.Text.Trim()
+            $previousId = ''
+            if ($pickerGrid.SelectedRows.Count -gt 0) {
+                $previousId = [string]$pickerGrid.SelectedRows[0].Cells['Id'].Value
+            }
+            $pickerGrid.SuspendLayout()
+            try {
+                $pickerGrid.Rows.Clear()
+                foreach ($entry in $pickerEntries) {
+                    $fields = @([string]$entry.Name,[string]$entry.Status,[string]$entry.Start,[string]$entry.End,[string]$entry.Id)
+                    $matched = !$query
+                    if (!$matched) {
+                        foreach ($field in $fields) {
+                            if ($field.IndexOf($query,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $matched = $true; break }
+                        }
+                    }
+                    if ($matched) { [void]$pickerGrid.Rows.Add($fields) }
+                }
+                $searchCount.Text = "$($pickerGrid.Rows.Count) of $($pickerEntries.Count) plans"
+                $pickerGrid.ClearSelection()
+                if ($pickerGrid.Rows.Count -gt 0) {
+                    $selectedIndex = 0
+                    for ($i=0; $i -lt $pickerGrid.Rows.Count; $i++) {
+                        if ([string]$pickerGrid.Rows[$i].Cells['Id'].Value -eq $previousId) { $selectedIndex=$i; break }
+                    }
+                    $pickerGrid.Rows[$selectedIndex].Selected = $true
+                    $pickerGrid.CurrentCell = $pickerGrid.Rows[$selectedIndex].Cells[0]
+                }
+            } finally { $pickerGrid.ResumeLayout() }
         }
+        $searchBox.Add_TextChanged($populatePicker)
+        & $populatePicker
 
         $buttons = New-Object Windows.Forms.Panel
 
@@ -912,20 +1095,21 @@ function Show-PlanPicker {
 
         $buttons.Controls.AddRange(@($load,$cancel))
 
-        $picker.Controls.Add($pickerGrid); $picker.Controls.Add($buttons)
+        $picker.Controls.Add($pickerGrid); $picker.Controls.Add($searchPanel); $picker.Controls.Add($buttons)
 
         $picker.AcceptButton = $load
 
         $pickerGrid.Add_CellDoubleClick({ if ($pickerGrid.SelectedRows.Count -gt 0) { $load.PerformClick() } })
 
-        if ($pickerGrid.Rows.Count -gt 0) { $pickerGrid.Rows[0].Selected = $true }
+        $picker.Add_Shown({ $searchBox.Focus() })
 
         if ($picker.ShowDialog($form) -eq [Windows.Forms.DialogResult]::OK) {
 
             $script:chosen = [string]$picker.Tag
+
             Update-PlanIdentity
 
-            $script:historical = $true
+            $script:historical = ($script:snapshots[$script:chosen].Status -ne 'Running')
 
             $script:pickerDismissed = $false
 
@@ -935,9 +1119,9 @@ function Show-PlanPicker {
 
             try { Show-Selected } finally { Hide-LoadOverlay }
 
-            Set-RefreshMode $true
+            Set-RefreshMode $script:historical
 
-            $label.Text = "Historical plan | Rows: $($detail.Rows.Count) | $($script:lastLoadTiming)"
+            $label.Text = "Selected plan | Rows: $($detail.Rows.Count) | $($script:lastLoadTiming)"
 
         } else { $script:pickerDismissed = $true }
 
@@ -946,8 +1130,6 @@ function Show-PlanPicker {
     } finally { $script:pickerOpen = $false }
 
 }
-
-
 
 function Get-Attribute($element,[string]$name) {
 
@@ -991,7 +1173,7 @@ function Get-RowKey($element) {
 
     $node = Get-Attribute $element 'RemoteNodeName'
 
-    $counterKey = "$parentKey/$kind\`:$identity\`:$node"
+    $counterKey = "$parentKey/$kind`:$identity`:$node"
 
     $ordinal = 0
 
@@ -999,7 +1181,7 @@ function Get-RowKey($element) {
 
     $script:keyCounters[$counterKey] = $ordinal + 1
 
-    $key = "$counterKey\`:$ordinal"
+    $key = "$counterKey`:$ordinal"
 
     $script:nodeKeys[$element] = $key
 
@@ -1205,8 +1387,6 @@ public static class AzlFastProgress {
 
 '@ -ErrorAction Stop
 
-
-
 function Show-Selected {
 
     $oldKey = $script:selectionKey
@@ -1228,11 +1408,14 @@ function Show-Selected {
         $detail.RowCount = 0
 
         $script:virtualRows.Clear()
+        $script:lastFindIndex = -1
 
         $errorText.Text = "Select a row to view its XML details."
+
         $copyDetails.Enabled = $false
 
         Update-PlanIdentity
+
         if (!$script:chosen -or !$script:snapshots.ContainsKey($script:chosen)) { return }
 
         $data = $script:snapshots[$script:chosen]
@@ -1323,90 +1506,50 @@ function Show-Selected {
 
         try { $detail.HorizontalScrollingOffset = $oldHorizontal } catch {}
 
-    } catch { $label.Text = "XML parse error: $($\_.Exception.Message)" }
+    } catch { $label.Text = "XML parse error: $($_.Exception.Message)" }
 
     finally { $detail.ResumeLayout(); $script:rendering = $false }
 
 }
 
 function Finish-Poll {
-
     if (!$script:pending -or !$script:pending.Handle.IsCompleted) { return }
-
-    $p=$script:pending; $script:pending=$null
-
+    $p = $script:pending
+    $script:pending = $null
     try {
-
         $result = @($p.PowerShell.EndInvoke($p.Handle))
-
         $script:snapshots = @{}
-
         foreach ($entry in $result) {
-
             $id = [string]$entry.Id
-
             if ($id) { $script:snapshots[$id] = $entry }
-
         }
-
-        $running = @($result | Where-Object { $\_.Status -eq 'Running' })
-
-        if ($running.Count -gt 0) {
-
-            $script:pickerDismissed = $false
-
-            if (!$script:chosen -or !$script:snapshots.ContainsKey($script:chosen) -or $script:historical -or $script:snapshots[$script:chosen].Status -ne 'Running') {
-
-                $script:chosen = [string]$running[0].Id
-
-                $script:selectionKey = ''; $script:selectionStatus = ''
-
-            }
-
-            $script:historical = $false
-
-            Set-RefreshMode $false
-
+        if ($script:chosen -and $script:snapshots.ContainsKey($script:chosen)) {
+            $script:historical = ($script:snapshots[$script:chosen].Status -ne 'Running')
+            Set-RefreshMode $script:historical
             if ($script:lastRenderedId -ne $script:chosen -or $script:lastRenderedXml -cne $script:snapshots[$script:chosen].Xml) { Show-Selected }
-
-            $label.Text = "Running action plans: $($running.Count) | Rows: $($detail.Rows.Count) | Updated: $((Get-Date).ToString('HH:mm:ss'))"
-
+            Update-PlanIdentity
+            $label.Text = "Selected plan | Rows: $($detail.Rows.Count) | Updated: $((Get-Date).ToString('HH:mm:ss'))"
         } else {
-
-            if ($script:historical -and $script:chosen -and $script:snapshots.ContainsKey($script:chosen)) {
-
-                if ($script:lastRenderedId -ne $script:chosen -or $script:lastRenderedXml -cne $script:snapshots[$script:chosen].Xml) { Show-Selected }
-
-                $label.Text = "Historical action plan: $($script:chosen) | Rows: $($detail.Rows.Count) | Updated: $((Get-Date).ToString('HH:mm:ss'))"
-
-            } else {
-
-                $script:chosen = ''; $script:historical = $false
-
-                Set-RefreshMode $true
-
-                $detail.RowCount = 0
-
-                $script:virtualRows.Clear()
-
-                $label.Text = "No running action plans | Available instances: $($script:snapshots.Count)"
-
-                if ($script:snapshots.Count -gt 0 -and !$script:pickerDismissed) {
-
-                    # Defer the modal dialog until after the poll finishes.
-
-                    $form.BeginInvoke([Action]{ Show-PlanPicker }) | Out-Null
-
-                }
-
-            }
-
+            if ($script:chosen) { $label.Text = 'Selected plan is no longer available. Use Select Plan.' }
+            else { $label.Text = "Available action plans: $($script:snapshots.Count) | Select Plan to view" }
+            Set-RefreshMode $true
+            Update-PlanIdentity
         }
-
-    } catch { $label.Text="Discovery error: $($\_.Exception.Message)" }
-
-    finally { Set-Loading $false; $p.PowerShell.Dispose() }
-
+        if ($script:startupPickerPending) {
+            $script:startupPickerPending = $false
+            if ($script:snapshots.Count -gt 0) {
+                $form.BeginInvoke([Action]{ Show-PlanPicker }) | Out-Null
+            } else {
+                $label.Text = 'No action plan instances found. Click Refresh now to retry.'
+            }
+        }
+    } catch {
+        $script:startupPickerPending = $false
+        $label.Text = "Discovery error: $($_.Exception.Message)"
+    } finally {
+        Set-Loading $false
+        $p.PowerShell.Dispose()
+    }
 }
 
 # Extract detail only for the clicked row; retain original XML elements in RAM.
@@ -1544,6 +1687,7 @@ function Show-RowDetails([int]$index) {
         }
 
         $errorText.Text = [string]::Join([Environment]::NewLine,$lines)
+
         $copyDetails.Enabled = $true
 
         $errorText.SelectionStart = 0
@@ -1554,7 +1698,7 @@ function Show-RowDetails([int]$index) {
 
     } catch {
 
-        $errorText.Text = "Unable to display selected row details: $($\_.Exception.Message)"
+        $errorText.Text = "Unable to display selected row details: $($_.Exception.Message)"
 
     }
 
@@ -1588,7 +1732,7 @@ $onlyActive.Add_CheckedChanged({ Show-Selected })
 
 $auto.Add_CheckedChanged({ $interval.Enabled = $auto.Enabled -and $auto.Checked })
 
-$refresh.Add_Click({ $script:pickerDismissed = $false; Start-Poll })
+$refresh.Add_Click({ Start-Poll })
 
 $pickButton = New-Object Windows.Forms.Button
 
@@ -1600,57 +1744,198 @@ $pickButton.BackColor = [Drawing.Color]::White; $pickButton.ForeColor = $navy
 
 $top.Controls.Add($pickButton)
 
+# Find text in the currently loaded action plan without rebuilding the virtual grid.
+$findBox = New-Object Windows.Forms.TextBox
+$findBox.SetBounds(945,16,188,27)
+$findBox.Anchor = 'Top,Right'
+$findBox.Font = New-Object Drawing.Font('Segoe UI',9)
+$top.Controls.Add($findBox)
+
+$findNext = New-Object Windows.Forms.Button
+$findNext.Text = 'Find Next'
+$findNext.SetBounds(1140,13,94,32)
+$findNext.Anchor = 'Top,Right'
+$findNext.FlatStyle = 'Flat'
+$findNext.FlatAppearance.BorderColor = $lineColor
+$findNext.BackColor = [Drawing.Color]::White
+$findNext.ForeColor = $navy
+$top.Controls.Add($findNext)
+
+$script:lastFindTerm = ''
+$script:lastFindIndex = -1
+function Find-NextRow {
+    $term = $findBox.Text.Trim()
+    if (!$term) { $findBox.Focus(); return }
+    $count = $script:virtualRows.Count
+    if ($count -eq 0) { $label.Text = 'No rows loaded to search'; return }
+    if ($script:lastFindTerm -ne $term) {
+        $script:lastFindIndex = -1
+        $script:lastFindTerm = $term
+    }
+    $start = ($script:lastFindIndex + 1) % $count
+    for ($offset=0; $offset -lt $count; $offset++) {
+        $index = ($start + $offset) % $count
+        $row = $script:virtualRows[$index]
+        $matched = $false
+        foreach ($value in $row.Values) {
+            if ([string]$value -and ([string]$value).IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                $matched = $true; break
+            }
+        }
+        if (!$matched -and $row.Description -and $row.Description.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $matched = $true }
+        if (!$matched -and $row.Element) {
+            foreach ($attribute in $row.Element.Attributes) {
+                if ($attribute.Value.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $matched = $true; break }
+            }
+        }
+        # Error messages, stack traces and Raw values are stored in child XML
+        # nodes, not in the grid columns or element attributes. Search the
+        # same exception nodes that the Details pane displays.
+        if (!$matched -and $row.Element) {
+            $exceptions = $row.Element.SelectNodes('./Exception | ./Error/Exception | ./Task/Exception | ./Task/Error/Exception')
+            foreach ($exception in $exceptions) {
+                if ($exception.InnerText.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                    $matched = $true
+                    break
+                }
+                foreach ($attribute in $exception.Attributes) {
+                    if ($attribute.Value.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                        $matched = $true
+                        break
+                    }
+                }
+                if ($matched) { break }
+            }
+        }
+        if ($matched) {
+            $script:lastFindIndex = $index
+            $detail.ClearSelection()
+            $column = $detail.Columns['Name']
+            if (!$column.Visible) { $column = @($detail.Columns | Where-Object Visible | Sort-Object DisplayIndex)[0] }
+            if ($column) { $detail.CurrentCell = $detail.Rows[$index].Cells[$column.Index] }
+            $detail.Rows[$index].Selected = $true
+            try { $detail.FirstDisplayedScrollingRowIndex = [Math]::Max(0,$index-4) } catch {}
+            Show-RowDetails $index
+            # Highlight the exact occurrence in the Details pane, including
+            # stack traces, error messages and raw exception text.
+            $detailsMatch = $errorText.Text.IndexOf($term,[StringComparison]::OrdinalIgnoreCase)
+            if ($detailsMatch -ge 0) {
+                $errorText.Select($detailsMatch,$term.Length)
+                $errorText.ScrollToCaret()
+            } else {
+                # The match may only exist in a grid cell, not the details.
+                # Select the matching cell and make it visible horizontally.
+                for ($cellIndex=0; $cellIndex -lt $row.Values.Count; $cellIndex++) {
+                    $cellText = [string]$row.Values[$cellIndex]
+                    if ($cellText.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0 -and $detail.Columns[$cellIndex].Visible) {
+                        $detail.CurrentCell = $detail.Rows[$index].Cells[$cellIndex]
+                        break
+                    }
+                }
+            }
+            $label.Text = "Found '$term' at row $($index+1) of $count"
+            return
+        }
+    }
+    $label.Text = "No matches for '$term' in $count rows"
+}
+$findNext.Add_Click({ Find-NextRow })
+$findBox.Add_KeyDown({ param($sender,$e); if ($e.KeyCode -eq [Windows.Forms.Keys]::Enter) { Find-NextRow; $e.SuppressKeyPress=$true } })
+$form.KeyPreview = $true
+$form.Add_KeyDown({ param($sender,$e); if ($e.Control -and $e.KeyCode -eq [Windows.Forms.Keys]::F) { $findBox.Focus(); $findBox.SelectAll(); $e.SuppressKeyPress=$true } })
+
+
 # Always-visible selected plan identity. The ID field can be selected/copied.
+
 $planIdentity = New-Object Windows.Forms.Panel
+
 $planIdentity.Dock = 'Bottom'
+
 $planIdentity.Height = 34
+
 $planIdentity.BackColor = [Drawing.Color]::FromArgb(234,240,248)
 
 $planNameLabel = New-Object Windows.Forms.Label
+
 $planNameLabel.Text = 'ACTION PLAN: None selected'
+
 $planNameLabel.AutoEllipsis = $true
+
 $planNameLabel.ForeColor = $navy
+
 $planNameLabel.Font = New-Object Drawing.Font('Segoe UI Semibold',9)
+
 $planNameLabel.SetBounds(14,7,1095,22)
+
 $planNameLabel.Anchor = 'Top,Left,Right'
+
 $planIdentity.Controls.Add($planNameLabel)
 
 # The full Instance ID is displayed inline next to the action plan name.
+
 # Keep the ID separately in memory for clipboard operations.
+
 $script:selectedInstanceId = ''
 
 $copyId = New-Object Windows.Forms.Button
+
 $copyId.Text = 'Copy ID'
+
 $copyId.SetBounds(1125,5,90,25)
+
 $copyId.Anchor = 'Top,Right'
+
 $copyId.Enabled = $false
+
 $copyId.FlatStyle = 'Flat'
+
 $copyId.FlatAppearance.BorderColor = $lineColor
+
 $copyId.Add_Click({
+
     if ($script:selectedInstanceId) {
+
         try { [Windows.Forms.Clipboard]::SetText($script:selectedInstanceId) }
+
         catch { [Windows.Forms.MessageBox]::Show($_.Exception.Message,'Copy ID failed') | Out-Null }
+
     }
+
 })
+
 $planIdentity.Controls.Add($copyId)
+
 $top.Controls.Add($planIdentity)
 
 function Update-PlanIdentity {
-    if ($script:chosen -and $script:snapshots.ContainsKey($script:chosen)) {
-        $entry = $script:snapshots[$script:chosen]
-        $name = [string]$entry.Name
-        if ([string]::IsNullOrWhiteSpace($name)) { $name = '(Unnamed action plan)' }
-        $script:selectedInstanceId = [string]$entry.Id
-        $planNameLabel.Text = "ACTION PLAN: $name  [$($entry.Status)]    |    INSTANCE ID: $($script:selectedInstanceId)"
-        $planNameLabel.AccessibleDescription = $planNameLabel.Text
-        $copyId.Enabled = $true
-    } else {
-        $planNameLabel.Text = 'ACTION PLAN: None selected'
-        $script:selectedInstanceId = ''
-        $copyId.Enabled = $false
-    }
-}
 
+    if ($script:chosen -and $script:snapshots.ContainsKey($script:chosen)) {
+
+        $entry = $script:snapshots[$script:chosen]
+
+        $name = [string]$entry.Name
+
+        if ([string]::IsNullOrWhiteSpace($name)) { $name = '(Unnamed action plan)' }
+
+        $script:selectedInstanceId = [string]$entry.Id
+
+        $planNameLabel.Text = "ACTION PLAN: $name  [$($entry.Status)]    |    INSTANCE ID: $($script:selectedInstanceId)"
+
+        $planNameLabel.AccessibleDescription = $planNameLabel.Text
+
+        $copyId.Enabled = $true
+
+    } else {
+
+        $planNameLabel.Text = 'ACTION PLAN: None selected'
+
+        $script:selectedInstanceId = ''
+
+        $copyId.Enabled = $false
+
+    }
+
+}
 
 $pickButton.Add_Click({
 
@@ -1682,7 +1967,7 @@ $timer.Interval=500
 
 $timer.Add_Tick({
 
-    Finish-Poll
+    try { Finish-Poll } catch { $label.Text = "Timer error: $($_.Exception.Message)" }
 
     if ($auto.Enabled -and $auto.Checked -and !$script:historical -and !$script:pickerOpen -and !$script:pending -and ((Get-Date)-$script:lastPoll).TotalSeconds -ge [double]$interval.Value) { Start-Poll }
 
@@ -1693,7 +1978,9 @@ $form.Add_Shown({ $timer.Start(); Start-Poll })
 $form.Add_FormClosing({
 
     $timer.Stop()
+
     $copyDetailsTimer.Stop()
+
     $copyDetailsTimer.Dispose()
 
     if ($script:pending) { try { $script:pending.PowerShell.Stop() } catch {}; $script:pending.PowerShell.Dispose() }
