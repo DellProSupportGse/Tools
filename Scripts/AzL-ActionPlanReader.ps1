@@ -2,7 +2,7 @@
 
 .SYNOPSIS
 
-    Azure Local Action Plan Reader (v41)
+    Azure Local Action Plan Reader (v42)
 
 .DESCRIPTION
 
@@ -36,138 +36,254 @@
 
 .NOTES
 
-    Script:  AzL-ActionPlanReader-v40.ps1
+    Script:  AzL-ActionPlanReader-v42.ps1
 
-    Version: 39
+    Version: 42
 
     Mode:    Read-only; does not modify action plans
 
 #>
-$Ver = "39"
+
+$Ver = "42"
+
 # =====================================================
+
 #region Telemetry Information
+
 # =====================================================
+
 $script:TelemetryReportID    = [guid]::NewGuid().Guid
+
 $script:TelemetryGeoResolved = $false
+
 $script:TelemetryGeoData     = @{}
+
 $script:TelemetryStartupSent = $false
+
 $script:uploadToAzure        = $true
 
 function Write-Indent {
+
     param([string]$Message, [int]$Level = 1, [string]$Color = 'Gray')
+
     try { Write-Host (('  ' * $Level) + $Message) -ForegroundColor $Color } catch {}
+
 }
 
 function Get-TelemetryMachineHash {
+
     try {
-        $raw = "$env:USERDOMAIN\$env:USERNAME@$env:COMPUTERNAME"
+
+        $raw = "$env:USERDOMAIN\\$env:USERNAME@$env:COMPUTERNAME"
+
         $sha = [System.Security.Cryptography.SHA256]::Create()
+
         try {
+
             $bytes = [System.Text.Encoding]::UTF8.GetBytes($raw)
+
             $hash = $sha.ComputeHash($bytes)
+
             return ([BitConverter]::ToString($hash)).Replace('-', '').Substring(0,24)
+
         }
+
         finally { if ($sha) { $sha.Dispose() } }
+
     }
+
     catch { return '' }
+
 }
 
 function Resolve-TelemetryGeo {
+
     if ($script:TelemetryGeoResolved) { return }
+
     try {
+
         try {
+
             # Prefer local Windows region; no external call needed.
+
             $r = [System.Globalization.RegionInfo]::CurrentRegion
+
             if (-not $r.TwoLetterISORegionName -or $r.TwoLetterISORegionName -eq 'IV') {
+
                 throw 'Local region unavailable.'
+
             }
+
             $script:TelemetryGeoData = @{
+
                 country     = [string]$r.EnglishName
+
                 countryCode = [string]$r.TwoLetterISORegionName
+
                 timezone    = [string](Get-TimeZone).Id
+
             }
+
         }
+
         catch {
+
             # Fallback to ipwho.is only if local region resolution fails.
+
             if (-not $script:GeoCache) {
+
                 $script:GeoCache = Invoke-RestMethod -Uri 'https://ipwho.is/' -TimeoutSec 5 -ErrorAction Stop
+
             }
+
             $r = $script:GeoCache
+
             if ($r.success -ne $true) { throw 'Geolocation service returned no result.' }
+
             $script:TelemetryGeoData = @{
+
                 country     = [string]$r.country
+
                 countryCode = [string]$r.country_code
+
                 timezone    = [string]$r.timezone.id
+
             }
+
         }
+
     }
+
     catch {
+
         $tz = $null
+
         try { $tz = [string](Get-TimeZone).Id } catch {}
+
         $script:TelemetryGeoData = @{ country=$null; countryCode=$null; timezone=$tz }
+
     }
+
     finally { $script:TelemetryGeoResolved = $true }
+
 }
 
 function Send-ToolTelemetry {
+
     [CmdletBinding()]
+
     param(
+
         [Parameter(Mandatory=$true)][string]$TelemetryName,
+
         [Parameter(Mandatory=$true)][string]$EventName,
+
         [Parameter(Mandatory=$true)][string]$Version,
+
         [Parameter(Mandatory=$true)][string]$Endpoint,
+
         [int]$ServerCount = 0,
+
         [int]$GroupCount = 0,
+
         [switch]$NoGeo,
+
         [switch]$DebugTelemetry
+
     )
+
     if (-not $script:uploadToAzure) { return }
+
     if ($EventName -match '^(Startup|Launch|AppStart|ToolStart|TelemetryStartup)$') {
+
         if ($script:TelemetryStartupSent) { return }
+
         $script:TelemetryStartupSent = $true
+
     }
+
     try {
+
         if (-not $NoGeo) { Resolve-TelemetryGeo }
+
         $data = [ordered]@{
+
             PartitionKey = ($TelemetryName -replace 'TelemetryData$','')
+
             RowKey       = [guid]::NewGuid().Guid
+
             PSVersion    = $PSVersionTable.PSVersion.ToString()
+
             countryCode  = $script:TelemetryGeoData.countryCode
+
             MachineHash  = Get-TelemetryMachineHash
+
             Version      = $Version
+
             timezone     = $script:TelemetryGeoData.timezone
+
             ReportID     = $script:TelemetryReportID
+
             country      = $script:TelemetryGeoData.country
+
         }
+
         # The Azure Function writes only Data into the telemetry table.
+
         $payload = @{ TelemetryName=$TelemetryName; TableName=$TelemetryName; Data=$data }
+
         $body = $payload | ConvertTo-Json -Depth 10
+
         if ($DebugTelemetry) { Write-Host "Telemetry Request: $body" -ForegroundColor Cyan }
+
         $response = Invoke-RestMethod -Method Post -Uri $Endpoint `
+
             -ContentType 'application/json' -Body $body -TimeoutSec 15 -ErrorAction Stop
+
         if ($DebugTelemetry) {
+
             Write-Host 'Telemetry Response:' -ForegroundColor Green
+
             $response | ConvertTo-Json -Depth 10 | Write-Host
+
         }
+
     }
+
     catch {
+
         # Never interrupt the primary tool because telemetry failed.
+
         if ($DebugTelemetry) {
+
             Write-Warning "Telemetry failed: $($_.Exception.Message)"
+
             if ($_.ErrorDetails.Message) { Write-Warning $_.ErrorDetails.Message }
+
         }
+
     }
+
 }
 
 # Place this invocation after your application's version has been initialized.
+
 $telemetryParams = @{
+
     TelemetryName  = 'AzLActionPlanReaderTelemetryData'
+
     EventName      = 'Startup'
+
     Version        = $Ver
+
     Endpoint       = 'https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData'
+
     DebugTelemetry = $false
+
 }
+
 Send-ToolTelemetry @telemetryParams
+
 #endregion Telemetry Information
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -178,7 +294,7 @@ Add-Type -AssemblyName System.Drawing
 
 $form = New-Object Windows.Forms.Form
 
-$form.Text = 'Azure Local | Action Plan Reader v41'
+$form.Text = "Azure Local | Action Plan Reader v$Ver"
 
 $form.Size = New-Object Drawing.Size(1250,780)
 
@@ -229,6 +345,18 @@ $subtitle.Font = New-Object Drawing.Font('Segoe UI',8)
 $subtitle.SetBounds(22,44,350,18)
 
 $header.Controls.Add($subtitle)
+
+$versionLabel = New-Object Windows.Forms.Label
+$versionLabel.Text = "VERSION $Ver"
+$versionLabel.ForeColor = [Drawing.Color]::FromArgb(169,194,230)
+$versionLabel.Font = New-Object Drawing.Font('Segoe UI Semibold',10,[Drawing.FontStyle]::Bold)
+$versionLabel.AutoSize = $false
+$versionLabel.Size = New-Object Drawing.Size(160,28)
+$versionLabel.TextAlign = 'MiddleRight'
+$versionLabel.Anchor = [Windows.Forms.AnchorStyles]::Top -bor [Windows.Forms.AnchorStyles]::Right
+$versionLabel.Location = New-Object Drawing.Point(1050,18)
+$header.Controls.Add($versionLabel)
+$header.Add_Resize({ $versionLabel.Left = [math]::Max(0,$header.ClientSize.Width - $versionLabel.Width - 22) })
 
 $top = New-Object Windows.Forms.Panel
 
@@ -649,7 +777,9 @@ $errorText = New-Object Windows.Forms.TextBox
 $errorText.Multiline = $true
 
 $errorText.ReadOnly = $true
+
 # Keep the highlighted search result visible when focus remains on Find Next.
+
 $errorText.HideSelection = $false
 
 $errorText.ScrollBars = [Windows.Forms.ScrollBars]::Both
@@ -1011,56 +1141,105 @@ function Show-PlanPicker {
         }
 
         # Search the cached plan list without another Azure Local query.
+
         $pickerEntries = @($script:snapshots.Values | Sort-Object Start -Descending)
+
         $searchPanel = New-Object Windows.Forms.Panel
+
         $searchPanel.Dock = 'Top'
+
         $searchPanel.Height = 48
+
         $searchPanel.BackColor = [Drawing.Color]::White
+
         $searchLabel = New-Object Windows.Forms.Label
+
         $searchLabel.Text = 'Search plans:'
+
         $searchLabel.SetBounds(14,15,92,22)
+
         $searchBox = New-Object Windows.Forms.TextBox
+
         $searchBox.SetBounds(110,10,650,27)
+
         $searchBox.Anchor = 'Top,Left,Right'
+
         $searchBox.Font = New-Object Drawing.Font('Segoe UI',10)
+
         $searchCount = New-Object Windows.Forms.Label
+
         $searchCount.SetBounds(775,14,160,22)
+
         $searchCount.Anchor = 'Top,Right'
+
         $searchCount.TextAlign = 'MiddleRight'
+
         $searchPanel.Controls.AddRange(@($searchLabel,$searchBox,$searchCount))
 
         $populatePicker = {
+
             $query = $searchBox.Text.Trim()
+
             $previousId = ''
+
             if ($pickerGrid.SelectedRows.Count -gt 0) {
+
                 $previousId = [string]$pickerGrid.SelectedRows[0].Cells['Id'].Value
+
             }
+
             $pickerGrid.SuspendLayout()
+
             try {
+
                 $pickerGrid.Rows.Clear()
+
                 foreach ($entry in $pickerEntries) {
+
                     $fields = @([string]$entry.Name,[string]$entry.Status,[string]$entry.Start,[string]$entry.End,[string]$entry.Id)
+
                     $matched = !$query
+
                     if (!$matched) {
+
                         foreach ($field in $fields) {
+
                             if ($field.IndexOf($query,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $matched = $true; break }
+
                         }
+
                     }
+
                     if ($matched) { [void]$pickerGrid.Rows.Add($fields) }
+
                 }
+
                 $searchCount.Text = "$($pickerGrid.Rows.Count) of $($pickerEntries.Count) plans"
+
                 $pickerGrid.ClearSelection()
+
                 if ($pickerGrid.Rows.Count -gt 0) {
+
                     $selectedIndex = 0
+
                     for ($i=0; $i -lt $pickerGrid.Rows.Count; $i++) {
+
                         if ([string]$pickerGrid.Rows[$i].Cells['Id'].Value -eq $previousId) { $selectedIndex=$i; break }
+
                     }
+
                     $pickerGrid.Rows[$selectedIndex].Selected = $true
+
                     $pickerGrid.CurrentCell = $pickerGrid.Rows[$selectedIndex].Cells[0]
+
                 }
+
             } finally { $pickerGrid.ResumeLayout() }
+
         }
+
         $searchBox.Add_TextChanged($populatePicker)
+
         & $populatePicker
 
         $buttons = New-Object Windows.Forms.Panel
@@ -1408,6 +1587,7 @@ function Show-Selected {
         $detail.RowCount = 0
 
         $script:virtualRows.Clear()
+
         $script:lastFindIndex = -1
 
         $errorText.Text = "Select a row to view its XML details."
@@ -1513,43 +1693,81 @@ function Show-Selected {
 }
 
 function Finish-Poll {
+
     if (!$script:pending -or !$script:pending.Handle.IsCompleted) { return }
+
     $p = $script:pending
+
     $script:pending = $null
+
     try {
+
         $result = @($p.PowerShell.EndInvoke($p.Handle))
+
         $script:snapshots = @{}
+
         foreach ($entry in $result) {
+
             $id = [string]$entry.Id
+
             if ($id) { $script:snapshots[$id] = $entry }
+
         }
+
         if ($script:chosen -and $script:snapshots.ContainsKey($script:chosen)) {
+
             $script:historical = ($script:snapshots[$script:chosen].Status -ne 'Running')
+
             Set-RefreshMode $script:historical
+
             if ($script:lastRenderedId -ne $script:chosen -or $script:lastRenderedXml -cne $script:snapshots[$script:chosen].Xml) { Show-Selected }
+
             Update-PlanIdentity
+
             $label.Text = "Selected plan | Rows: $($detail.Rows.Count) | Updated: $((Get-Date).ToString('HH:mm:ss'))"
+
         } else {
+
             if ($script:chosen) { $label.Text = 'Selected plan is no longer available. Use Select Plan.' }
+
             else { $label.Text = "Available action plans: $($script:snapshots.Count) | Select Plan to view" }
+
             Set-RefreshMode $true
+
             Update-PlanIdentity
+
         }
+
         if ($script:startupPickerPending) {
+
             $script:startupPickerPending = $false
+
             if ($script:snapshots.Count -gt 0) {
+
                 $form.BeginInvoke([Action]{ Show-PlanPicker }) | Out-Null
+
             } else {
+
                 $label.Text = 'No action plan instances found. Click Refresh now to retry.'
+
             }
+
         }
+
     } catch {
+
         $script:startupPickerPending = $false
+
         $label.Text = "Discovery error: $($_.Exception.Message)"
+
     } finally {
+
         Set-Loading $false
+
         $p.PowerShell.Dispose()
+
     }
+
 }
 
 # Extract detail only for the clicked row; retain original XML elements in RAM.
@@ -1745,105 +1963,198 @@ $pickButton.BackColor = [Drawing.Color]::White; $pickButton.ForeColor = $navy
 $top.Controls.Add($pickButton)
 
 # Find text in the currently loaded action plan without rebuilding the virtual grid.
+
 $findBox = New-Object Windows.Forms.TextBox
+
 $findBox.SetBounds(945,16,188,27)
+
 $findBox.Anchor = 'Top,Right'
+
 $findBox.Font = New-Object Drawing.Font('Segoe UI',9)
+
 $top.Controls.Add($findBox)
 
 $findNext = New-Object Windows.Forms.Button
+
 $findNext.Text = 'Find Next'
+
 $findNext.SetBounds(1140,13,94,32)
+
 $findNext.Anchor = 'Top,Right'
+
 $findNext.FlatStyle = 'Flat'
+
 $findNext.FlatAppearance.BorderColor = $lineColor
+
 $findNext.BackColor = [Drawing.Color]::White
+
 $findNext.ForeColor = $navy
+
 $top.Controls.Add($findNext)
 
 $script:lastFindTerm = ''
-$script:lastFindIndex = -1
-function Find-NextRow {
-    $term = $findBox.Text.Trim()
-    if (!$term) { $findBox.Focus(); return }
-    $count = $script:virtualRows.Count
-    if ($count -eq 0) { $label.Text = 'No rows loaded to search'; return }
-    if ($script:lastFindTerm -ne $term) {
-        $script:lastFindIndex = -1
-        $script:lastFindTerm = $term
-    }
-    $start = ($script:lastFindIndex + 1) % $count
-    for ($offset=0; $offset -lt $count; $offset++) {
-        $index = ($start + $offset) % $count
-        $row = $script:virtualRows[$index]
-        $matched = $false
-        foreach ($value in $row.Values) {
-            if ([string]$value -and ([string]$value).IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                $matched = $true; break
-            }
-        }
-        if (!$matched -and $row.Description -and $row.Description.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $matched = $true }
-        if (!$matched -and $row.Element) {
-            foreach ($attribute in $row.Element.Attributes) {
-                if ($attribute.Value.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $matched = $true; break }
-            }
-        }
-        # Error messages, stack traces and Raw values are stored in child XML
-        # nodes, not in the grid columns or element attributes. Search the
-        # same exception nodes that the Details pane displays.
-        if (!$matched -and $row.Element) {
-            $exceptions = $row.Element.SelectNodes('./Exception | ./Error/Exception | ./Task/Exception | ./Task/Error/Exception')
-            foreach ($exception in $exceptions) {
-                if ($exception.InnerText.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                    $matched = $true
-                    break
-                }
-                foreach ($attribute in $exception.Attributes) {
-                    if ($attribute.Value.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                        $matched = $true
-                        break
-                    }
-                }
-                if ($matched) { break }
-            }
-        }
-        if ($matched) {
-            $script:lastFindIndex = $index
-            $detail.ClearSelection()
-            $column = $detail.Columns['Name']
-            if (!$column.Visible) { $column = @($detail.Columns | Where-Object Visible | Sort-Object DisplayIndex)[0] }
-            if ($column) { $detail.CurrentCell = $detail.Rows[$index].Cells[$column.Index] }
-            $detail.Rows[$index].Selected = $true
-            try { $detail.FirstDisplayedScrollingRowIndex = [Math]::Max(0,$index-4) } catch {}
-            Show-RowDetails $index
-            # Highlight the exact occurrence in the Details pane, including
-            # stack traces, error messages and raw exception text.
-            $detailsMatch = $errorText.Text.IndexOf($term,[StringComparison]::OrdinalIgnoreCase)
-            if ($detailsMatch -ge 0) {
-                $errorText.Select($detailsMatch,$term.Length)
-                $errorText.ScrollToCaret()
-            } else {
-                # The match may only exist in a grid cell, not the details.
-                # Select the matching cell and make it visible horizontally.
-                for ($cellIndex=0; $cellIndex -lt $row.Values.Count; $cellIndex++) {
-                    $cellText = [string]$row.Values[$cellIndex]
-                    if ($cellText.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0 -and $detail.Columns[$cellIndex].Visible) {
-                        $detail.CurrentCell = $detail.Rows[$index].Cells[$cellIndex]
-                        break
-                    }
-                }
-            }
-            $label.Text = "Found '$term' at row $($index+1) of $count"
-            return
-        }
-    }
-    $label.Text = "No matches for '$term' in $count rows"
-}
-$findNext.Add_Click({ Find-NextRow })
-$findBox.Add_KeyDown({ param($sender,$e); if ($e.KeyCode -eq [Windows.Forms.Keys]::Enter) { Find-NextRow; $e.SuppressKeyPress=$true } })
-$form.KeyPreview = $true
-$form.Add_KeyDown({ param($sender,$e); if ($e.Control -and $e.KeyCode -eq [Windows.Forms.Keys]::F) { $findBox.Focus(); $findBox.SelectAll(); $e.SuppressKeyPress=$true } })
 
+$script:lastFindIndex = -1
+
+function Find-NextRow {
+
+    $term = $findBox.Text.Trim()
+
+    if (!$term) { $findBox.Focus(); return }
+
+    $count = $script:virtualRows.Count
+
+    if ($count -eq 0) { $label.Text = 'No rows loaded to search'; return }
+
+    if ($script:lastFindTerm -ne $term) {
+
+        $script:lastFindIndex = -1
+
+        $script:lastFindTerm = $term
+
+    }
+
+    $start = ($script:lastFindIndex + 1) % $count
+
+    for ($offset=0; $offset -lt $count; $offset++) {
+
+        $index = ($start + $offset) % $count
+
+        $row = $script:virtualRows[$index]
+
+        $matched = $false
+
+        foreach ($value in $row.Values) {
+
+            if ([string]$value -and ([string]$value).IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+
+                $matched = $true; break
+
+            }
+
+        }
+
+        if (!$matched -and $row.Description -and $row.Description.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $matched = $true }
+
+        if (!$matched -and $row.Element) {
+
+            foreach ($attribute in $row.Element.Attributes) {
+
+                if ($attribute.Value.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $matched = $true; break }
+
+            }
+
+        }
+
+        # Error messages, stack traces and Raw values are stored in child XML
+
+        # nodes, not in the grid columns or element attributes. Search the
+
+        # same exception nodes that the Details pane displays.
+
+        if (!$matched -and $row.Element) {
+
+            $exceptions = $row.Element.SelectNodes('./Exception | ./Error/Exception | ./Task/Exception | ./Task/Error/Exception')
+
+            foreach ($exception in $exceptions) {
+
+                if ($exception.InnerText.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+
+                    $matched = $true
+
+                    break
+
+                }
+
+                foreach ($attribute in $exception.Attributes) {
+
+                    if ($attribute.Value.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+
+                        $matched = $true
+
+                        break
+
+                    }
+
+                }
+
+                if ($matched) { break }
+
+            }
+
+        }
+
+        if ($matched) {
+
+            $script:lastFindIndex = $index
+
+            $detail.ClearSelection()
+
+            $column = $detail.Columns['Name']
+
+            if (!$column.Visible) { $column = @($detail.Columns | Where-Object Visible | Sort-Object DisplayIndex)[0] }
+
+            if ($column) { $detail.CurrentCell = $detail.Rows[$index].Cells[$column.Index] }
+
+            $detail.Rows[$index].Selected = $true
+
+            try { $detail.FirstDisplayedScrollingRowIndex = [Math]::Max(0,$index-4) } catch {}
+
+            Show-RowDetails $index
+
+            # Highlight the exact occurrence in the Details pane, including
+
+            # stack traces, error messages and raw exception text.
+
+            $detailsMatch = $errorText.Text.IndexOf($term,[StringComparison]::OrdinalIgnoreCase)
+
+            if ($detailsMatch -ge 0) {
+
+                $errorText.Select($detailsMatch,$term.Length)
+
+                $errorText.ScrollToCaret()
+
+            } else {
+
+                # The match may only exist in a grid cell, not the details.
+
+                # Select the matching cell and make it visible horizontally.
+
+                for ($cellIndex=0; $cellIndex -lt $row.Values.Count; $cellIndex++) {
+
+                    $cellText = [string]$row.Values[$cellIndex]
+
+                    if ($cellText.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0 -and $detail.Columns[$cellIndex].Visible) {
+
+                        $detail.CurrentCell = $detail.Rows[$index].Cells[$cellIndex]
+
+                        break
+
+                    }
+
+                }
+
+            }
+
+            $label.Text = "Found '$term' at row $($index+1) of $count"
+
+            return
+
+        }
+
+    }
+
+    $label.Text = "No matches for '$term' in $count rows"
+
+}
+
+$findNext.Add_Click({ Find-NextRow })
+
+$findBox.Add_KeyDown({ param($sender,$e); if ($e.KeyCode -eq [Windows.Forms.Keys]::Enter) { Find-NextRow; $e.SuppressKeyPress=$true } })
+
+$form.KeyPreview = $true
+
+$form.Add_KeyDown({ param($sender,$e); if ($e.Control -and $e.KeyCode -eq [Windows.Forms.Keys]::F) { $findBox.Focus(); $findBox.SelectAll(); $e.SuppressKeyPress=$true } })
 
 # Always-visible selected plan identity. The ID field can be selected/copied.
 
