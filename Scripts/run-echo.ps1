@@ -14,6 +14,134 @@
 #Requires -Version 5.1
 # ECHO portable Log Parser payload: GZip + Base64, extracts only; no MSI install or registry changes.
 # Embedded Microsoft Log Parser binaries supplied by the user.
+
+$script:Version              = '2.3.23'
+
+# =====================================================
+#region Telemetry Information
+# =====================================================
+$script:TelemetryReportID    = [guid]::NewGuid().Guid
+$script:TelemetryGeoResolved = $false
+$script:TelemetryGeoData     = @{}
+$script:TelemetryStartupSent = $false
+$script:uploadToAzure        = $true
+
+function Write-Indent {
+    param([string]$Message, [int]$Level = 1, [string]$Color = 'Gray')
+    try { Write-Host (('  ' * $Level) + $Message) -ForegroundColor $Color } catch {}
+}
+
+function Get-TelemetryMachineHash {
+    try {
+        $raw = "$env:USERDOMAIN\$env:USERNAME@$env:COMPUTERNAME"
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($raw)
+            $hash = $sha.ComputeHash($bytes)
+            return ([BitConverter]::ToString($hash)).Replace('-', '').Substring(0,24)
+        }
+        finally { if ($sha) { $sha.Dispose() } }
+    }
+    catch { return '' }
+}
+
+function Resolve-TelemetryGeo {
+    if ($script:TelemetryGeoResolved) { return }
+    try {
+        try {
+            # Prefer local Windows region; no external call needed.
+            $r = [System.Globalization.RegionInfo]::CurrentRegion
+            if (-not $r.TwoLetterISORegionName -or $r.TwoLetterISORegionName -eq 'IV') {
+                throw 'Local region unavailable.'
+            }
+            $script:TelemetryGeoData = @{
+                country     = [string]$r.EnglishName
+                countryCode = [string]$r.TwoLetterISORegionName
+                timezone    = [string](Get-TimeZone).Id
+            }
+        }
+        catch {
+            # Fallback to ipwho.is only if local region resolution fails.
+            if (-not $script:GeoCache) {
+                $script:GeoCache = Invoke-RestMethod -Uri 'https://ipwho.is/' -TimeoutSec 5 -ErrorAction Stop
+            }
+            $r = $script:GeoCache
+            if ($r.success -ne $true) { throw 'Geolocation service returned no result.' }
+            $script:TelemetryGeoData = @{
+                country     = [string]$r.country
+                countryCode = [string]$r.country_code
+                timezone    = [string]$r.timezone.id
+            }
+        }
+    }
+    catch {
+        $tz = $null
+        try { $tz = [string](Get-TimeZone).Id } catch {}
+        $script:TelemetryGeoData = @{ country=$null; countryCode=$null; timezone=$tz }
+    }
+    finally { $script:TelemetryGeoResolved = $true }
+}
+
+function Send-ToolTelemetry {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][string]$TelemetryName,
+        [Parameter(Mandatory=$true)][string]$EventName,
+        [Parameter(Mandatory=$true)][string]$Version,
+        [Parameter(Mandatory=$true)][string]$Endpoint,
+        [int]$ServerCount = 0,
+        [int]$GroupCount = 0,
+        [switch]$NoGeo,
+        [switch]$DebugTelemetry
+    )
+    if (-not $script:uploadToAzure) { return }
+    if ($EventName -match '^(Startup|Launch|AppStart|ToolStart|TelemetryStartup)$') {
+        if ($script:TelemetryStartupSent) { return }
+        $script:TelemetryStartupSent = $true
+    }
+    try {
+        if (-not $NoGeo) { Resolve-TelemetryGeo }
+        $data = [ordered]@{
+            PartitionKey = ($TelemetryName -replace 'TelemetryData$','')
+            RowKey       = [guid]::NewGuid().Guid
+            PSVersion    = $PSVersionTable.PSVersion.ToString()
+            countryCode  = $script:TelemetryGeoData.countryCode
+            MachineHash  = Get-TelemetryMachineHash
+            Version      = $Version
+            timezone     = $script:TelemetryGeoData.timezone
+            ReportID     = $script:TelemetryReportID
+            country      = $script:TelemetryGeoData.country
+        }
+        # The Azure Function writes only Data into the telemetry table.
+        $payload = @{ TelemetryName=$TelemetryName; TableName=$TelemetryName; Data=$data }
+        $body = $payload | ConvertTo-Json -Depth 10
+        if ($DebugTelemetry) { Write-Host "Telemetry Request: $body" -ForegroundColor Cyan }
+        $response = Invoke-RestMethod -Method Post -Uri $Endpoint `
+            -ContentType 'application/json' -Body $body -TimeoutSec 15 -ErrorAction Stop
+        if ($DebugTelemetry) {
+            Write-Host 'Telemetry Response:' -ForegroundColor Green
+            $response | ConvertTo-Json -Depth 10 | Write-Host
+        }
+    }
+    catch {
+        # Never interrupt the primary tool because telemetry failed.
+        if ($DebugTelemetry) {
+            Write-Warning "Telemetry failed: $($_.Exception.Message)"
+            if ($_.ErrorDetails.Message) { Write-Warning $_.ErrorDetails.Message }
+        }
+    }
+}
+
+# Place this invocation after your application's version has been initialized.
+$telemetryParams = @{
+    TelemetryName  = 'ECHOTelemetryData'
+    EventName      = 'Startup'
+    Version        = $script:Version
+    Endpoint       = 'https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData'
+    DebugTelemetry = $false
+}
+Send-ToolTelemetry @telemetryParams
+#endregion Telemetry Information
 function Initialize-EchoLogParser {
  $cache=Join-Path $env:LOCALAPPDATA 'ECHO\Engines\LogParser-2.2'
  if(-not (Test-Path -LiteralPath $cache)){[void](New-Item -Path $cache -ItemType Directory -Force)}
@@ -56,7 +184,6 @@ try{$script:EchoLogParserExe=Initialize-EchoLogParser}catch{
 
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
 
-$script:Version='2.3.23'
 $script:Items=New-Object 'System.Collections.ObjectModel.ObservableCollection[object]'
 $script:VisibleItems=New-Object 'System.Collections.ObjectModel.ObservableCollection[object]'
 $script:Sessions=@{}
