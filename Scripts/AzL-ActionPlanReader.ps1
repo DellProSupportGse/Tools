@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-    Azure Local Action Plan Reader (v42)
+    Azure Local Action Plan Reader (v46)
 .DESCRIPTION
     Read-only Windows Forms dashboard for running and historical Azure
     Local action plans. Reads ProgressAsXml from Get-ActionPlanInstances and
     displays Action, Step, and Task progress in a refreshable grid.
 .FEATURES
-    - Opens Select Plan at startup; never automatically switches plans
+    - Starts with no plan selected unless -InstanceId is supplied
     - Auto-refresh with configurable interval
     - Tracks selected steps between refreshes
     - Reorder, resize, show, and hide grid columns
@@ -17,11 +17,34 @@
     Windows PowerShell 5.1, Windows Forms, and access to the Azure Local
     Get-ActionPlanInstances cmdlet.
 .NOTES
-    Script:  AzL-ActionPlanReader-v42.ps1
-    Version: 42
+    Script:  AzL-ActionPlanReader-v46.ps1
+    Version: 46
     Mode:    Read-only; does not modify action plans
 #>
-$Ver = "42"
+param(
+    [Parameter(HelpMessage='Action plan Instance ID to open at startup')]
+    [ValidateNotNullOrEmpty()]
+    [string]$InstanceId,
+    [switch]$IsolatedChild
+)
+# Always run the WinForms application in its own PowerShell process. This prevents
+# unrelated WinForms timers and script-scoped variables in the calling session
+# from interfering with modal dialogs or action-plan discovery.
+if (-not $IsolatedChild) {
+    $exe = (Get-Process -Id $PID).Path
+    if (-not $exe -or -not (Test-Path -LiteralPath $exe)) {
+        $exe = Join-Path $PSHOME 'powershell.exe'
+    }
+    $quotedScript = '"' + $PSCommandPath.Replace('"', '\"') + '"'
+    $arguments = @('-STA', '-File', $quotedScript, '-IsolatedChild')
+    if (-not [string]::IsNullOrWhiteSpace($InstanceId)) {
+        $arguments += '-InstanceId'
+        $arguments += ('"' + $InstanceId.Replace('"', '\"') + '"')
+    }
+    $child = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru -Wait
+    return
+}
+$Ver = "46"
 # =====================================================
 #region Telemetry Information
 # =====================================================
@@ -466,6 +489,8 @@ $pool.Open()
 $script:pending = $null
 $script:snapshots = @{}
 $script:chosen = ''
+$script:startupInstanceId = $InstanceId
+$script:startupInstancePending = -not [string]::IsNullOrWhiteSpace($InstanceId)
 $script:lastPoll = [datetime]::MinValue
 $script:selectionKey = ''
 $script:selectionStatus = ''
@@ -484,11 +509,40 @@ function Get-XmlText($value) {
 }
 function Start-Poll {
     if ($script:pending) { return }
+    $requestedId = if ($script:chosen) { [string]$script:chosen } elseif ($script:startupInstancePending) { [string]$script:startupInstanceId } else { "" }
+    $listAll = [bool]$script:loadAllForPicker
     $ps = [powershell]::Create()
     $ps.RunspacePool = $pool
     [void]$ps.AddScript({
+        param($targetId, $enumerateAll)
         $ErrorActionPreference = 'Stop'
-        foreach ($item in @(Get-ActionPlanInstances)) {
+        if ($enumerateAll) {
+            $instances = @(Get-ActionPlanInstances)
+        } elseif (-not [string]::IsNullOrWhiteSpace($targetId)) {
+            # Use the singular cmdlet for a direct lookup. Never enumerate all plans.
+            $command = Get-Command Get-ActionPlanInstance -ErrorAction SilentlyContinue
+            if (-not $command) {
+                throw 'Direct lookup unavailable: Get-ActionPlanInstance was not found. Run Get-Command *ActionPlanInstance* to identify the supported command.'
+            }
+            $parameter = @('ActionPlanInstanceID','InstanceId','ActionPlanInstanceId','Id') |
+                Where-Object { $command.Parameters.ContainsKey($_) } | Select-Object -First 1
+            if ($parameter) {
+                $lookup = @{ $parameter = $targetId }
+                $instances = @(Get-ActionPlanInstance @lookup)
+            } else {
+                # Some versions accept the ID as a positional argument.
+                $positional = @($command.Parameters.Values | Where-Object {
+                    $_.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] -and $_.Position -eq 0 }
+                })
+                if ($positional.Count -eq 0) {
+                    throw 'Get-ActionPlanInstance has no recognized ID parameter. Run Get-Command Get-ActionPlanInstance -Syntax.'
+                }
+                $instances = @(Get-ActionPlanInstance $targetId)
+            }
+        } else {
+            $instances = @()
+        }
+        foreach ($item in $instances) {
             # Different Azure Local builds expose timestamps under different properties.
             # Prefer instance-level metadata; fall back to the progress XML timeline.
             $startValue = ''
@@ -517,11 +571,11 @@ function Start-Poll {
                 Xml = $xmlText
             }
         }
-    })
+    }).AddArgument($requestedId).AddArgument($listAll)
     $handle = $ps.BeginInvoke()
     $script:pending = @{ PowerShell=$ps; Handle=$handle }
     $script:lastPoll = Get-Date
-    Set-Loading $true 'Loading action plan instances...'
+    Set-Loading $true $(if ($listAll) { 'Loading action plan list...' } else { 'Loading selected instance...' })
 }
 # Centered loading overlay for opening a selected action plan.
 $loadOverlay = New-Object Windows.Forms.Panel
@@ -868,7 +922,7 @@ function Finish-Poll {
     $script:pending = $null
     try {
         $result = @($p.PowerShell.EndInvoke($p.Handle))
-        $script:snapshots = @{}
+        if ($script:loadAllForPicker) { $script:snapshots = @{} }
         foreach ($entry in $result) {
             $id = [string]$entry.Id
             if ($id) { $script:snapshots[$id] = $entry }
@@ -885,16 +939,32 @@ function Finish-Poll {
             Set-RefreshMode $true
             Update-PlanIdentity
         }
-        if ($script:startupPickerPending) {
-            $script:startupPickerPending = $false
-            if ($script:snapshots.Count -gt 0) {
-                $form.BeginInvoke([Action]{ Show-PlanPicker }) | Out-Null
+        if ($script:loadAllForPicker) {
+            $script:loadAllForPicker = $false
+            if ($script:snapshots.Count -gt 0) { Show-PlanPicker }
+            else { $label.Text = "No action plan instances found." }
+        }
+        # Command-line startup: load only the explicitly requested instance.
+        # With no -InstanceId, leave the viewer empty and do not show the picker.
+        if ($script:startupInstancePending) {
+            $script:startupInstancePending = $false
+            $requestedId = $script:startupInstanceId.Trim()
+            if ($script:snapshots.ContainsKey($requestedId)) {
+                $script:chosen = $requestedId
+                $script:selectionKey = ''
+                $script:selectionStatus = ''
+                $script:historical = ($script:snapshots[$requestedId].Status -ne 'Running')
+                Update-PlanIdentity
+                Show-LoadOverlay
+                try { Show-Selected } finally { Hide-LoadOverlay }
+                Set-RefreshMode $script:historical
+                $label.Text = "Selected plan | Rows: $($detail.Rows.Count) | $($script:lastLoadTiming)"
             } else {
-                $label.Text = 'No action plan instances found. Click Refresh now to retry.'
+                $label.Text = "Instance ID not found: $requestedId. Use Select Plan to choose another."
             }
         }
     } catch {
-        $script:startupPickerPending = $false
+        $script:startupInstancePending = $false
         $label.Text = "Discovery error: $($_.Exception.Message)"
     } finally {
         Set-Loading $false
@@ -1141,8 +1211,8 @@ function Update-PlanIdentity {
     }
 }
 $pickButton.Add_Click({
-    if ($script:snapshots.Count -gt 0) { Show-PlanPicker }
-    else { [Windows.Forms.MessageBox]::Show('No action plan instances are available.','Action Plan Reader') | Out-Null }
+    $script:loadAllForPicker = $true
+    Start-Poll
 })
 $save.Add_Click({
     if (!$script:chosen -or !$script:snapshots.ContainsKey($script:chosen)) { return }
@@ -1158,7 +1228,11 @@ $timer.Add_Tick({
     try { Finish-Poll } catch { $label.Text = "Timer error: $($_.Exception.Message)" }
     if ($auto.Enabled -and $auto.Checked -and !$script:historical -and !$script:pickerOpen -and !$script:pending -and ((Get-Date)-$script:lastPoll).TotalSeconds -ge [double]$interval.Value) { Start-Poll }
 })
-$form.Add_Shown({ $timer.Start(); Start-Poll })
+$form.Add_Shown({
+    $timer.Start()
+    if ($script:startupInstancePending) { Start-Poll }
+    else { $label.Text = 'Ready - use Select Plan or specify -InstanceId' }
+})
 $form.Add_FormClosing({
     $timer.Stop()
     $copyDetailsTimer.Stop()
