@@ -151,7 +151,7 @@ function Invoke-ToolBox {
         [switch]$DebugTelemetry
     )
     Clear-Host
-    $Ver = '1.97'
+    $Ver = '1.98'
     $text = @"
 v$Ver
   _____         _   ___
@@ -311,7 +311,7 @@ v$Ver
             Name        = 'AzL Action Plan Reader'
             Description = 'Read Azure Local action plans GUI'
             Internal    = $false
-            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/Scripts/AzL-ActionPlanReader.ps1'
+            Url         = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/Scripts/run-AzLAPR.ps1'           
             Module      = 'AzLActionPlanReader'
             Command     = ''
             Encoding    = 'UTF8'
