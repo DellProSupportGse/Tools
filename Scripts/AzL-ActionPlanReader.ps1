@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Azure Local Action Plan Reader (v46)
+    Azure Local Action Plan Reader (v47)
 .DESCRIPTION
     Read-only Windows Forms dashboard for running and historical Azure
     Local action plans. Reads ProgressAsXml from Get-ActionPlanInstances and
@@ -17,8 +17,8 @@
     Windows PowerShell 5.1, Windows Forms, and access to the Azure Local
     Get-ActionPlanInstances cmdlet.
 .NOTES
-    Script:  AzL-ActionPlanReader-v46.ps1
-    Version: 46
+    Script:  AzL-ActionPlanReader-v47.ps1
+    Version: 47
     Mode:    Read-only; does not modify action plans
 #>
 param(
@@ -27,24 +27,7 @@ param(
     [string]$InstanceId,
     [switch]$IsolatedChild
 )
-# Always run the WinForms application in its own PowerShell process. This prevents
-# unrelated WinForms timers and script-scoped variables in the calling session
-# from interfering with modal dialogs or action-plan discovery.
-if (-not $IsolatedChild) {
-    $exe = (Get-Process -Id $PID).Path
-    if (-not $exe -or -not (Test-Path -LiteralPath $exe)) {
-        $exe = Join-Path $PSHOME 'powershell.exe'
-    }
-    $quotedScript = '"' + $PSCommandPath.Replace('"', '\"') + '"'
-    $arguments = @('-STA', '-File', $quotedScript, '-IsolatedChild')
-    if (-not [string]::IsNullOrWhiteSpace($InstanceId)) {
-        $arguments += '-InstanceId'
-        $arguments += ('"' + $InstanceId.Replace('"', '\"') + '"')
-    }
-    $child = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru -Wait
-    return
-}
-$Ver = "46"
+$Ver = "47"
 # =====================================================
 #region Telemetry Information
 # =====================================================
@@ -255,23 +238,23 @@ $top.Controls.Add($columnsButton)
 $statusPanel = New-Object Windows.Forms.Panel
 $statusPanel.BackColor = [Drawing.Color]::White
 $statusPanel.Margin = New-Object Windows.Forms.Padding(0)
-$label = New-Object Windows.Forms.Label
-$label.AutoSize = $false; $label.Text = 'Ready - select an action plan'
-$label.ForeColor = $muted; $label.Font = New-Object Drawing.Font('Segoe UI',9)
-$label.Dock = 'Fill'; $label.TextAlign = 'MiddleLeft'
-$label.Padding = New-Object Windows.Forms.Padding(20,0,0,0)
+$script:label = New-Object Windows.Forms.Label
+$script:label.AutoSize = $false; $script:label.Text = 'Ready - select an action plan'
+$script:label.ForeColor = $muted; $script:label.Font = New-Object Drawing.Font('Segoe UI',9)
+$script:label.Dock = 'Fill'; $script:label.TextAlign = 'MiddleLeft'
+$script:label.Padding = New-Object Windows.Forms.Padding(20,0,0,0)
 $progress = New-Object Windows.Forms.ProgressBar
 $progress.Dock = 'Right'
 $progress.Width = 210
 $progress.Style = [Windows.Forms.ProgressBarStyle]::Marquee
 $progress.MarqueeAnimationSpeed = 25
 $progress.Visible = $false
-$statusPanel.Controls.Add($label)
+$statusPanel.Controls.Add($script:label)
 $statusPanel.Controls.Add($progress)
 function Set-Loading([bool]$loading, [string]$message = '') {
     $progress.Visible = $loading
     $progress.MarqueeAnimationSpeed = if ($loading) { 25 } else { 0 }
-    if ($message) { $label.Text = $message }
+    if ($message) { $script:label.Text = $message }
 }
 function Set-RefreshMode([bool]$isHistorical) {
     if ($isHistorical) {
@@ -720,7 +703,7 @@ function Show-PlanPicker {
             Show-LoadOverlay
             try { Show-Selected } finally { Hide-LoadOverlay }
             Set-RefreshMode $script:historical
-            $label.Text = "Selected plan | Rows: $($detail.Rows.Count) | $($script:lastLoadTiming)"
+            $script:label.Text = "Selected plan | Rows: $($detail.Rows.Count) | $($script:lastLoadTiming)"
         } else { $script:pickerDismissed = $true }
         $picker.Dispose()
     } finally { $script:pickerOpen = $false }
@@ -870,7 +853,7 @@ function Show-Selected {
         Update-PlanIdentity
         if (!$script:chosen -or !$script:snapshots.ContainsKey($script:chosen)) { return }
         $data = $script:snapshots[$script:chosen]
-        if (!$data.Xml) { $label.Text = 'No ProgressAsXml returned for the selected instance'; return }
+        if (!$data.Xml) { $script:label.Text = 'No ProgressAsXml returned for the selected instance'; return }
         $loadTitle.Text = 'Parsing action plan XML in memory...'
         $doc = New-Object System.Xml.XmlDocument
         $doc.XmlResolver = $null
@@ -913,7 +896,7 @@ function Show-Selected {
             if ($detail.RowCount -gt 0) { try { $detail.FirstDisplayedScrollingRowIndex = [math]::Min($oldFirst,$detail.RowCount-1) } catch {} }
         }
         try { $detail.HorizontalScrollingOffset = $oldHorizontal } catch {}
-    } catch { $label.Text = "XML parse error: $($_.Exception.Message)" }
+    } catch { $script:label.Text = "XML parse error: $($_.Exception.Message)" }
     finally { $detail.ResumeLayout(); $script:rendering = $false }
 }
 function Finish-Poll {
@@ -932,17 +915,17 @@ function Finish-Poll {
             Set-RefreshMode $script:historical
             if ($script:lastRenderedId -ne $script:chosen -or $script:lastRenderedXml -cne $script:snapshots[$script:chosen].Xml) { Show-Selected }
             Update-PlanIdentity
-            $label.Text = "Selected plan | Rows: $($detail.Rows.Count) | Updated: $((Get-Date).ToString('HH:mm:ss'))"
+            $script:label.Text = "Selected plan | Rows: $($detail.Rows.Count) | Updated: $((Get-Date).ToString('HH:mm:ss'))"
         } else {
-            if ($script:chosen) { $label.Text = 'Selected plan is no longer available. Use Select Plan.' }
-            else { $label.Text = "Available action plans: $($script:snapshots.Count) | Select Plan to view" }
+            if ($script:chosen) { $script:label.Text = 'Selected plan is no longer available. Use Select Plan.' }
+            else { $script:label.Text = "Available action plans: $($script:snapshots.Count) | Select Plan to view" }
             Set-RefreshMode $true
             Update-PlanIdentity
         }
         if ($script:loadAllForPicker) {
             $script:loadAllForPicker = $false
             if ($script:snapshots.Count -gt 0) { Show-PlanPicker }
-            else { $label.Text = "No action plan instances found." }
+            else { $script:label.Text = "No action plan instances found." }
         }
         # Command-line startup: load only the explicitly requested instance.
         # With no -InstanceId, leave the viewer empty and do not show the picker.
@@ -958,14 +941,14 @@ function Finish-Poll {
                 Show-LoadOverlay
                 try { Show-Selected } finally { Hide-LoadOverlay }
                 Set-RefreshMode $script:historical
-                $label.Text = "Selected plan | Rows: $($detail.Rows.Count) | $($script:lastLoadTiming)"
+                $script:label.Text = "Selected plan | Rows: $($detail.Rows.Count) | $($script:lastLoadTiming)"
             } else {
-                $label.Text = "Instance ID not found: $requestedId. Use Select Plan to choose another."
+                $script:label.Text = "Instance ID not found: $requestedId. Use Select Plan to choose another."
             }
         }
     } catch {
         $script:startupInstancePending = $false
-        $label.Text = "Discovery error: $($_.Exception.Message)"
+        $script:label.Text = "Discovery error: $($_.Exception.Message)"
     } finally {
         Set-Loading $false
         $p.PowerShell.Dispose()
@@ -1088,7 +1071,7 @@ function Find-NextRow {
     $term = $findBox.Text.Trim()
     if (!$term) { $findBox.Focus(); return }
     $count = $script:virtualRows.Count
-    if ($count -eq 0) { $label.Text = 'No rows loaded to search'; return }
+    if ($count -eq 0) { $script:label.Text = 'No rows loaded to search'; return }
     if ($script:lastFindTerm -ne $term) {
         $script:lastFindIndex = -1
         $script:lastFindTerm = $term
@@ -1154,11 +1137,11 @@ function Find-NextRow {
                     }
                 }
             }
-            $label.Text = "Found '$term' at row $($index+1) of $count"
+            $script:label.Text = "Found '$term' at row $($index+1) of $count"
             return
         }
     }
-    $label.Text = "No matches for '$term' in $count rows"
+    $script:label.Text = "No matches for '$term' in $count rows"
 }
 $findNext.Add_Click({ Find-NextRow })
 $findBox.Add_KeyDown({ param($sender,$e); if ($e.KeyCode -eq [Windows.Forms.Keys]::Enter) { Find-NextRow; $e.SuppressKeyPress=$true } })
@@ -1225,13 +1208,13 @@ $save.Add_Click({
 $timer=New-Object Windows.Forms.Timer
 $timer.Interval=500
 $timer.Add_Tick({
-    try { Finish-Poll } catch { $label.Text = "Timer error: $($_.Exception.Message)" }
+    try { Finish-Poll } catch { $script:label.Text = "Timer error: $($_.Exception.Message)" }
     if ($auto.Enabled -and $auto.Checked -and !$script:historical -and !$script:pickerOpen -and !$script:pending -and ((Get-Date)-$script:lastPoll).TotalSeconds -ge [double]$interval.Value) { Start-Poll }
 })
 $form.Add_Shown({
     $timer.Start()
     if ($script:startupInstancePending) { Start-Poll }
-    else { $label.Text = 'Ready - use Select Plan or specify -InstanceId' }
+    else { $script:label.Text = 'Ready - use Select Plan or specify -InstanceId' }
 })
 $form.Add_FormClosing({
     $timer.Stop()
