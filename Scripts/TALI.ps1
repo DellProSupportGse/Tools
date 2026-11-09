@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.733"
+    $ver="0.734"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -2422,6 +2422,7 @@ function Send-ToolTelemetry {
         "GCArcService", 
         "ExtensionService"
     )
+    If ((Get-Service hcisvc2 -ErrorAction SilentlyContinue)) {$AzureLocalServices+="hcisvc2"} else {$AzureLocalServices+="hcisvc"}
     $FailedServices=Test-AzureLocalNodeServices
     If ($FailedServices) {
         if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
