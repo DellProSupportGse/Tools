@@ -1,4 +1,4 @@
-#requires -version 5.1
+#requires -Version 5.1
 <#
 .SYNOPSIS
     Collect a Dell SupportAssist Collection (TSR) locally and add OS PCI drivers.
@@ -21,7 +21,7 @@
 .EXAMPLE
     .\Get-DellTSR-Local.ps1 -NoInstallIsm
 .NOTES
-    Version: 1.2.3
+    Version: 1.2.9
     Windows PowerShell 5.1+. Never installs without explicit approval.
 .CREATOR
     Jim Gandy
@@ -36,7 +36,7 @@ param(
     [string]$IsmInstallerUrl
 )
 $ErrorActionPreference = 'Stop'
-$Ver = "1.2.3"
+$Ver = "1.2.9"
 $Banner = @'
    ___     _       ___      _ _ _____ ___ ___     _                 _
   / __|___| |_ ___|   \ ___| | |_   _/ __| _ \___| |   ___  __ __ _| |
@@ -289,63 +289,75 @@ if (-not (Test-Path -LiteralPath $OutputDirectory -PathType Container)) {
 $destination = (Resolve-Path -LiteralPath $OutputDirectory).ProviderPath
 $started = Get-Date
 Write-Host "Starting Dell SupportAssist Collection; destination: $destination"
-# Capture native collector output in files so carriage-return progress updates
-# don't create a new console line for every percentage.
-$stdoutLog = Join-Path $env:TEMP ("DellTSR-stdout-" + [guid]::NewGuid().ToString('N') + ".log")
-$stderrLog = Join-Path $env:TEMP ("DellTSR-stderr-" + [guid]::NewGuid().ToString('N') + ".log")
-$progressId = 1
-$lastPercent = -1
-$exitCode = $null
-try {
-    $process = Start-Process -FilePath $collector `
-        -ArgumentList @('-f', ('"{0}"' -f $destination)) `
-        -RedirectStandardOutput $stdoutLog `
-        -RedirectStandardError $stderrLog `
-        -PassThru -WindowStyle Hidden
-    while (-not $process.HasExited) {
-        if (Test-Path -LiteralPath $stdoutLog) {
-            try {
-                $output = [IO.File]::ReadAllText($stdoutLog)
-                $percentMatches = [regex]::Matches($output, '(\d{1,3})\s*%')
-                if ($percentMatches.Count -gt 0) {
-                    $percent = [Math]::Min(100, [int]$percentMatches[$percentMatches.Count - 1].Groups[1].Value)
-                    if ($percent -ne $lastPercent) {
-                        Write-Progress -Id $progressId -Activity 'Dell SupportAssist TSR Collection' `
-                            -Status "$percent% Complete" -PercentComplete $percent
-                        $lastPercent = $percent
-                    }
+# Dell iSM allows only one active SupportAssist collection.
+# Ask whether to wait; never terminate an existing collection.
+$existingCollector = @(Get-CimInstance Win32_Process -Filter "Name='Invoke-SupportAssistCollection.exe'" -ErrorAction SilentlyContinue)
+if ($existingCollector.Count -gt 0) {
+    $details = ($existingCollector | ForEach-Object { "PID $($_.ProcessId) (started $($_.CreationDate))" }) -join '; '
+    Write-Warning "Another Dell SupportAssist collection is already running: $details"
+    # A missing response must not leave unattended LogCollector sessions waiting indefinitely.
+    # Timeout is 15 seconds; only an explicit Y/Yes authorizes waiting.
+    $answer = $null
+    $timeoutSeconds = 15
+    Write-Host "Wait for the existing collection to finish, then start a new collection? [y/N] (15 seconds): " -NoNewline
+    try {
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        while ($timer.Elapsed.TotalSeconds -lt $timeoutSeconds) {
+            if ([Console]::KeyAvailable) {
+                $key = [Console]::ReadKey($true)
+                if ($key.KeyChar -eq 'y' -or $key.KeyChar -eq 'Y') {
+                    Write-Host 'Y'
+                    $answer = 'Y'
+                    break
+                }
+                if ($key.Key -eq [ConsoleKey]::Enter -or
+                    $key.KeyChar -eq 'n' -or $key.KeyChar -eq 'N') {
+                    Write-Host 'N'
+                    $answer = 'N'
+                    break
                 }
             }
-            catch [System.IO.IOException] {
-                # The collector may briefly have its output file locked.
-            }
-        }
-        Start-Sleep -Milliseconds 500
-        $process.Refresh()
-    }
-    $process.WaitForExit()
-    $exitCode = $process.ExitCode
-    # Preserve diagnostics without replaying the collector's progress bars.
-    foreach ($log in @($stdoutLog, $stderrLog)) {
-        if (Test-Path -LiteralPath $log) {
-            $output = [IO.File]::ReadAllText($log)
-            foreach ($line in ($output -split '[\r\n]+')) {
-                $message = $line.Trim()
-                if ($message -and $message -notmatch '^\s*\[[\s|#=>-]*\]\s*\d{1,3}\s*%?\s*$' -and
-                    $message -notmatch '^\s*\d{1,3}\s*%\s*$') {
-                    Write-Host $message
-                }
-            }
+            Start-Sleep -Milliseconds 100
         }
     }
-}
-finally {
-    Write-Progress -Id $progressId -Activity 'Dell SupportAssist TSR Collection' -Completed
-    foreach ($log in @($stdoutLog, $stderrLog)) {
-        Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
+    catch {
+        Write-Warning "This PowerShell host does not support timed console key input: $($_.Exception.Message)"
     }
+    if ($null -eq $answer) {
+        Write-Host ''
+        Write-Host 'No valid response within 15 seconds (or console input unavailable). Existing collection left running.' -ForegroundColor Yellow
+        return
+    }
+    if ($answer -ne 'Y') {
+        Write-Host 'Wait declined. Existing collection left running; no new collection started.' -ForegroundColor Yellow
+        return
+    }
+    Write-Host 'Waiting for the existing Dell SupportAssist collection (Ctrl+C to cancel waiting)...' -ForegroundColor Cyan
+    while ($true) {
+        $existingCollector = @(Get-CimInstance Win32_Process -Filter "Name='Invoke-SupportAssistCollection.exe'" -ErrorAction SilentlyContinue)
+        if ($existingCollector.Count -eq 0) { break }
+        Write-Progress -Id 2 -Activity 'Waiting for existing Dell TSR collection' `
+            -Status ("Active PID(s): " + (($existingCollector | ForEach-Object { $_.ProcessId }) -join ', '))
+        Start-Sleep -Seconds 3
+    }
+    Write-Progress -Id 2 -Activity 'Waiting for existing Dell TSR collection' -Completed
+    Write-Host 'Existing collection finished. Starting a new local TSR collection.' -ForegroundColor Green
 }
-if ($exitCode -ne 0) { throw "Dell collector exited with code $exitCode. Check iSM service status and communication with iDRAC." }
+# Start time must be after the wait so previously generated ZIPs are not mistaken for this run.
+$started = Get-Date
+# Run the Dell collector attached to this console.
+# iSM renders its own live progress, which can be buffered or lost if redirected.
+# Do not pipe, redirect, or launch it in a hidden window.
+Write-Host 'Dell native collection progress follows:' -ForegroundColor Cyan
+$global:LASTEXITCODE = $null
+& $collector -f $destination
+$exitCode = $LASTEXITCODE
+if ($null -eq $exitCode) {
+    throw 'Dell collector did not return an exit code; treating collection as failed.'
+}
+if ($exitCode -ne 0) {
+    throw "Dell collector exited with code $exitCode. Check iSM service status and communication with iDRAC."
+}
 $files = @(Get-ChildItem -LiteralPath $destination -Filter '*.zip' -File -ErrorAction SilentlyContinue |
     Where-Object { $_.LastWriteTime -ge $started.AddSeconds(-5) } | Sort-Object LastWriteTime -Descending)
 if ($files.Count -eq 0) {
