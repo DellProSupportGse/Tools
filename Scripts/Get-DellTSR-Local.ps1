@@ -37,6 +37,17 @@ param(
     [string]$IsmInstallerUrl
 )
 $ErrorActionPreference = 'Stop'
+$Ver = "1.2.1"
+$Banner = @'
+   ___     _       ___      _ _ _____ ___ ___     _                 _
+  / __|___| |_ ___|   \ ___| | |_   _/ __| _ \___| |   ___  __ __ _| |
+ | (_ / -_)  _|___| |) / -_) | | | | \__ \   /___| |__/ _ \/ _/ _` | |
+  \___\___|\__|   |___/\___|_|_| |_| |___/_|_\   |____\___/\__\__,_|_|
+'@
+
+Write-Host $Banner -ForegroundColor Cyan
+Write-Host "Version: $Ver  |  Created by Jim Gandy" -ForegroundColor Gray
+Write-Host ""
 
 function Find-DellCollector {
     param([string]$Explicit)
