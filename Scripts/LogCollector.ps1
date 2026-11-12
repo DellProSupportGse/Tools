@@ -4,43 +4,42 @@
     .DESCRIPTION
        This tool is used to collect logs from nodes or all nodes in a cluster and bring them back to a single location
     .EXAMPLE
-       Invoke-GetLogs
+       Invoke-LogCollector -DellTSR
+    .EXAMPLE
+       Invoke-LogCollector
     #>
 Function Invoke-LogCollector{
     [CmdletBinding(
         SupportsShouldProcess = $true,
         ConfirmImpact = 'High')]
-        param($param)
-
+        param(
+            [switch]$DellTSR,
+            $param
+        )
 # Version
-$Ver="1.26"
-
+$Ver="1.27"
 #region Telemetry Information
 Write-Host "Logging Telemetry Information..."
 # =====================================================
 #region Telemetry Information
 # =====================================================
-
 $script:TelemetryReportID    = [guid]::NewGuid().Guid
 $script:TelemetryGeoResolved = $false
 $script:TelemetryGeoData     = @{}
 $script:TelemetryStartupSent = $false
 $script:uploadToAzure        = $true
-
 function Write-Indent {
     param(
         [string]$Message,
         [int]$Level = 1,
         [string]$Color = "Gray"
     )
-
     try {
         $prefix = "  " * $Level
         Write-Host "$prefix$Message" -ForegroundColor $Color
     }
     catch {}
 }
-
 function Get-TelemetryMachineHash {
     try {
         $raw = "$env:USERDOMAIN\$env:USERNAME@$env:COMPUTERNAME"
@@ -53,57 +52,45 @@ function Get-TelemetryMachineHash {
         return ""
     }
 }
-
 function Resolve-TelemetryGeo {
     try {
         if ($script:TelemetryGeoResolved) { return }
-
         Write-Indent "Resolving Geo Location..."
-
         try {
             # Prefer local Windows settings
             $LocalRegionInfo = [System.Globalization.RegionInfo]::CurrentRegion
-
             if (-not $LocalRegionInfo.TwoLetterISORegionName) {
                 throw "Unable to determine local region."
             }
-
             $script:TelemetryGeoData = @{
                 country     = [string]$LocalRegionInfo.EnglishName
                 countryCode = [string]$LocalRegionInfo.TwoLetterISORegionName
                 timezone    = [string](Get-TimeZone).Id
             }
-
             Write-Indent "Country: $($script:TelemetryGeoData.country)" 2
             Write-Indent "Source : Windows Regional Settings" 2
         }
         catch {
             # Fallback to external IP geolocation
             Write-Indent "WARN: Local region lookup failed - trying ipwho.is" 2 Yellow
-
             if (-not $script:GeoCache) {
                 $script:GeoCache = Invoke-RestMethod "https://ipwho.is/" -TimeoutSec 5
             }
-
             $response = $script:GeoCache
-
             if ($response.success -ne $true) {
                 throw "ipwho.is did not return a valid response."
             }
-
             $script:TelemetryGeoData = @{
                 country     = [string]$response.country
                 countryCode = [string]$response.country_code
                 timezone    = [string]$response.timezone.id
             }
-
             Write-Indent "Country: $($script:TelemetryGeoData.country)" 2
             Write-Indent "Source : ipwho.is fallback" 2
         }
     }
     catch {
         Write-Indent "WARN: Unable to determine geographic information" 2 Yellow
-
         # Always leave a valid object behind
         $script:TelemetryGeoData = @{
             country     = $null
@@ -115,46 +102,33 @@ function Resolve-TelemetryGeo {
         $script:TelemetryGeoResolved = $true
     }
 }
-
 function Send-ToolTelemetry {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)]
         [string]$TelemetryName,
-
         [Parameter(Mandatory=$true)]
         [string]$EventName,
-
         [Parameter(Mandatory=$true)]
         [string]$Version,
-
         [Parameter(Mandatory=$true)]
         [string]$Endpoint,
-
         [int]$ServerCount = 0,
-
         [int]$GroupCount = 0,
-
         [switch]$NoGeo,
-
         [switch]$DebugTelemetry
     )
-
     if (-not $script:uploadToAzure) { return }
-
     if ($EventName -match '^(Startup|Launch|AppStart|ToolStart|TelemetryStartup)$') {
         if ($script:TelemetryStartupSent) { return }
         $script:TelemetryStartupSent = $true
     }
-
     try {
         if (-not $NoGeo) {
             Resolve-TelemetryGeo
         }
-
         $rowKey = [guid]::NewGuid().Guid
         $partitionKey = $TelemetryName -replace 'TelemetryData$',''
-
         # ONLY requested table columns are placed in Data.
         $data = [ordered]@{
             PartitionKey = $partitionKey
@@ -167,28 +141,23 @@ function Send-ToolTelemetry {
             ReportID      = $script:TelemetryReportID
             country       = $script:TelemetryGeoData.country
         }
-
         # Envelope for the Function only. The Function should write Data only.
         $payload = @{
             TelemetryName = $TelemetryName
             TableName     = $TelemetryName
             Data          = $data
         }
-
         $body = $payload | ConvertTo-Json -Depth 10
-
         if ($DebugTelemetry) {
             Write-Host "Telemetry Request:" -ForegroundColor Cyan
             Write-Host $body
         }
-
         $response = Invoke-RestMethod `
             -Method Post `
             -Uri $Endpoint `
             -ContentType "application/json" `
             -Body $body `
             -TimeoutSec 15
-
         if ($DebugTelemetry) {
             Write-Host "Telemetry Response:" -ForegroundColor Green
             $response | ConvertTo-Json -Depth 10
@@ -196,7 +165,6 @@ function Send-ToolTelemetry {
         else {
             Write-Indent "Telemetry recorded successfully" 1 Green
         }
-
     }
     catch {
         if ($DebugTelemetry) {
@@ -208,7 +176,6 @@ function Send-ToolTelemetry {
         return
     }
 }
-
  $telemetryParams = @{
      TelemetryName  = "LogCollectorTelemetryData"
      EventName      = "Startup"
@@ -216,13 +183,9 @@ function Send-ToolTelemetry {
      Endpoint       = "https://gsetools-bufhdqefb8e6ecc6.centralus-01.azurewebsites.net/api/PostTelemetryData"
      DebugTelemetry = $false
  }
-
  Send-ToolTelemetry @telemetryParams
-
 #endregion
-
     
-
 Function EndScript{  
     break
 }
@@ -313,25 +276,23 @@ If ($response.uploadCompleted -eq $true) {
     return 1
 }
 }
-
 Clear-Host
 # Logs
 $DateTime=Get-Date -Format yyyyMMdd_HHmmss
-Start-Transcript -NoClobber -Path "C:\programdata\Dell\LogCollector\LogCollector_$DateTime.log"
+New-Item -ItemType Directory -Force -Path "C:\ProgramData\Dell\LogCollector" -ErrorAction SilentlyContinue | Out-Null
+Start-Transcript -NoClobber -Path "C:\ProgramData\Dell\LogCollector\LogCollector_$DateTime.log"
 $global:defaultOption=$null
 If ((Get-Command Get-StampInformation -ErrorAction SilentlyContinue)) {$global:defaultOption="15"} else {
 if ((Get-Service clussvc).StartUpType -ne 'Disabled') {$global:defaultOption="1"} else {
 $global:defaultOption="4"}
 }
-
 Write-Host "" 
 $MyTemp=(Get-Item $env:temp).fullname
 $Logs = $MyTemp + "\Logs\"
-New-Item -ItemType Directory -Force -Path $Logs -ErrorAction SilentlyContinue
-# Clean up
-IF(Test-Path -Path "$((Get-Item $env:temp).fullname)\logs"){ Remove-Item "$((Get-Item $env:temp).fullname)\logs" -Recurse -Confirm:$false -Force}
+# Clean up old temporary logs before making a fresh directory
+IF(Test-Path -Path $Logs){ Remove-Item $Logs -Recurse -Confirm:$false -Force -ErrorAction SilentlyContinue}
+New-Item -ItemType Directory -Force -Path $Logs -ErrorAction SilentlyContinue | Out-Null
 try {Start-Job -Name "Telemetry" -ScriptBlock {
-
 } | Out-Null} catch {}
 $text = @"
 v$Ver
@@ -343,7 +304,6 @@ v$Ver
 "@
 Write-Host $text
 Write-Host ""
-
 Write-Host "To assist with troubleshooting, this tool will collect environment"
 Write-Host "information (such as hostnames, IP addresses, and diagnostic logs)"
 Write-Host "and attach it to your support case."
@@ -392,6 +352,51 @@ $x=0
     Write-Host "    ERROR: Too many tries. Exiting..." -ForegroundColor Red
     EndScript
  }
+# Local collection uses Dell iSM and never asks for iDRAC credentials.
+# Uses the published Get-DellTSR-Local.ps1, with optional local override.
+Function Invoke-LocalDellTSR {
+    $script:TSRFiles = @()
+    $tsrOutput = Join-Path ([Environment]::GetFolderPath('CommonDocuments')) ("DellTSR\LogCollector_" + (Get-Date -Format 'yyyyMMdd_HHmmss') + "_" + [guid]::NewGuid().ToString('N').Substring(0,8))
+    New-Item -ItemType Directory -Path $tsrOutput -Force -ErrorAction Stop | Out-Null
+    $scriptNames = @('Get-DellTSR-Local.ps1')
+    $candidatePaths = @()
+    if ($PSScriptRoot) { $candidatePaths += (Join-Path $PSScriptRoot $scriptNames[0]) }
+    $candidatePaths += (Join-Path (Get-Location).Path $scriptNames[0])
+    $candidatePaths += (Join-Path 'C:\Dell' $scriptNames[0])
+    $tsrScript = $candidatePaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if (-not $tsrScript) {
+        # Same repository as LogCollector. HTTPS only, and downloaded code is not run when download fails.
+        $url = 'https://raw.githubusercontent.com/DellProSupportGse/Tools/refs/heads/main/Scripts/Get-DellTSR-Local.ps1'
+        $tsrScript = Join-Path $env:TEMP ("Get-DellTSR-Local_" + [guid]::NewGuid().ToString('N') + '.ps1')
+        try {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Invoke-WebRequest -Uri $url -OutFile $tsrScript -UseBasicParsing -ErrorAction Stop
+            if ((Get-Item -LiteralPath $tsrScript).Length -lt 100) { throw 'Downloaded script is unexpectedly small.' }
+        } catch {
+            Write-Warning "Unable to get Get-DellTSR-Local.ps1: $($_.Exception.Message)"
+            Write-Host 'Place Get-DellTSR-Local.ps1 next to LogCollector.ps1 or publish it to the Tools repository.' -ForegroundColor Yellow
+            Remove-Item -LiteralPath $tsrScript -Force -ErrorAction SilentlyContinue
+            return
+        }
+        $downloadedScript = $tsrScript
+    }
+    try {
+        Write-Host "Running $tsrScript" -ForegroundColor Cyan
+        Write-Host "TSR output: $tsrOutput" -ForegroundColor Cyan
+        # The standalone script checks / prompts / installs iSM as necessary.
+        & $tsrScript -OutputDirectory $tsrOutput
+        $script:TSRFiles = @(Get-ChildItem -LiteralPath $tsrOutput -File -Filter '*.zip' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+        if (-not $script:TSRFiles.Count) {
+            Write-Warning "No TSR ZIP was produced. Check the collection output above; directory: $tsrOutput"
+        } else {
+            Write-Host "Collected $($script:TSRFiles.Count) TSR ZIP file(s)." -ForegroundColor Green
+        }
+    } catch {
+        Write-Warning "Local TSR collection failed: $($_.Exception.Message)"
+    } finally {
+        if ($downloadedScript) { Remove-Item -LiteralPath $downloadedScript -Force -ErrorAction SilentlyContinue }
+    }
+}
 # Run Menu
 Function ShowMenu{
     do
@@ -459,20 +464,12 @@ Function ShowMenu{
         $Global:CollectSTS = "Y"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="GetShowTech";$repo="PowershellScripts"'+(new-object System.net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/GetShowTech.ps1'))
         Invoke-GetShowTech -confirm:$False -CaseNumber $Casenumber
-
     }
-    IF($selection -match 2){
-        Write-Host "Collecting PowerEdge logs (TSR)..."
-        $Global:CollectTSR  = "Y"
-        If(Get-Service clussvc -ErrorAction SilentlyContinue){
-            #$credential=Get-Credential -Message "Please enter the iDRAC Adminitrator credentials"
-            Do {
-                $credential=Get-Credential -Message "Please enter the iDRAC Administrator credentials" -UserName root;$cred2=Get-Credential -Message "Confirm iDRAC Password" -UserName $credential.GetNetworkCredential().UserName
-            } while (($credential.GetNetworkCredential().Password -ne $cred2.GetNetworkCredential().Password) -or ($credential.GetNetworkCredential().UserName -ne $cred2.GetNetworkCredential().UserName))
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSRCollector";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/TSRCollector.ps1'))
-            $iDRACIPs = @(Invoke-TSRCollector -confirm:$False -CaseNumber $CaseNumber -credential $credential)
-        }
-    }
+     IF($selection -match 2){
+         Write-Host "Collecting PowerEdge logs (TSR) locally (no iDRAC credentials)..." -ForegroundColor Cyan
+         $Global:CollectTSR = "Y"
+         Invoke-LocalDellTSR
+     }
     $SignalFile = $null
     IF($selection -match 5){
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
@@ -488,7 +485,6 @@ Function ShowMenu{
             if (Test-Path $SignalFile) { Remove-Item $SignalFile -Force }
             $Payload = '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression(''$module=''''TALI'''';$repo=''''PowershellScripts''''; ''+(new-object net.webclient).DownloadString(''http''+''s://raw.g''+''ithubusercontent.com/DellProSupportGse/Tools/main/Scripts/TALI.ps1''));Test-DellAzureLocalIssues'
             $CommandToRun = "$Payload; New-Item -Path '$SignalFile' -ItemType File -Force | Out-Null"
-
             Start-Process powershell -ArgumentList '-NoExit', '-Command', $CommandToRun
         }
     }
@@ -501,10 +497,8 @@ Function ShowMenu{
         [int]$HoursOfEvents = 168
         [string]$DefaultValue = "6"
         [string]$Prompt = "How many days to collect? [$DefaultValue]: "
-
         [int]$DaysOfLogs = $DefaultValue
         $finalInput=$null
-
         # Verify Console is available (fails in ISE, works in standard console/terminal/VS Code)
         if ($Host.Name -eq "Visual Studio Code Host" -or $null -eq [Console]::KeyAvailable) {
             # Fallback if Console API is unavailable
@@ -514,19 +508,15 @@ Function ShowMenu{
             $inputBuffer = New-Object System.Text.StringBuilder
             $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
             $timeoutMilliseconds = $TimeoutSeconds * 1000
-
             while ($stopwatch.ElapsedMilliseconds -lt $timeoutMilliseconds -and $finalInput -eq $null -and $HoursOfEvents -eq 168) {
                 if ([Console]::KeyAvailable) {
                     $key = [Console]::ReadKey($true)
-
                     # Case 1: User pressed Enter
                     if ($key.Key -eq [ConsoleKey]::Enter) {
                         Write-Host "" # Move to next line
                         $finalInput = $inputBuffer.ToString()
                         if (!([string]::IsNullOrEmpty($finalInput))) { $DaysOfLogs=$finalInput }
-
                     }
-
                     # Case 2: User pressed Backspace
                     elseif ($key.Key -eq [ConsoleKey]::Backspace) {
                         if ($inputBuffer.Length -gt 0) {
@@ -535,7 +525,6 @@ Function ShowMenu{
                             Write-Host "`b `b" -NoNewline
                         }
                     }
-
                     # Case 3: Enforce numeric input only
                     elseif ($key.KeyChar -match '[0-9]') {
                         $inputBuffer.Append($key.KeyChar) | Out-Null
@@ -546,7 +535,6 @@ Function ShowMenu{
                     Start-Sleep -Milliseconds 50 # Prevent high CPU utilization
                 }
             }
-
             Write-Host "" # Move to next line
             If ($finalInput -eq $null) { Write-Host "Timeout reached. Proceeding with default: $DefaultValue"}
         }
@@ -565,7 +553,6 @@ Function ShowMenu{
         $Global:CollectSDDC = "Y"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="SDDC";$repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/DellProSupportGse/Tools/main/Scripts/RunSDDC.ps1'))
         Invoke-RunSDDC -confirm:$False -CaseNumber $CaseNumber
-
     }
     IF($selection -match 4){
         if ($PSSenderInfo) {Write-Host -ForegroundColor Yellow "This module is not supported using a remote powershell session. Please run locally";EndScript}
@@ -573,73 +560,6 @@ Function ShowMenu{
         $Global:CollectTSS = "Y"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-Expression('$module="TSSCollect"; $repo="PowershellScripts"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/TommyPaulkDell/TSS/main/TSSCollect.ps1'))
         Invoke-TSSCollect -confirm:$False -CaseNumber $CaseNumber
-    }
-    IF($Global:CollectTSR -eq "Y") {
-    $i=0
-    #Write-Host "iDrac IPs $iDRACIPs and count is $($iDRACIPs.count)"
-    if (($iDRACIPs.iDracIP -match ".").count) {
-        New-Item "$MyTemp\logs\TSRCollector" -ItemType "directory" -ErrorAction SilentlyContinue | Out-Null
-        do {
-            $idracCount=$iDRACIPs.count
-            foreach ($IP in ($iDRACIPs | ?{$_.iDracIP -gt ""})) {
-               $idrac_ip=$IP.iDracIP
-               
-               if (!($idrac_ip.Contains("#"))) {
-                   $drac_Cred=$IP.Credential
-                   #if ($idrac_ip.contains("!") -and -not $idrac_ip.Contains("#")) {$drac_Cred=$draccreds[$idrac_ip]}
-                   $idrac_ip=$idrac_ip.replace("!","")
-                    $body = @{
-                        UserName = $drac_Cred.UserName
-                        Password = $drac_Cred.GetNetworkCredential().Password
-                    } | ConvertTo-Json
-                    $session=$null
-                    $RespErr=$null
-                    $loginUri = "https://$idrac_ip/redfish/v1/SessionService/Sessions"
-                    $session = Invoke-WebRequest -Uri $loginUri -Method Post -Body $body -ContentType "application/json" -UseBasicParsing -ErrorVariable RespErr 
- 
-                    # Token is returned in the X-Auth-Token response header
-                    $token = $session.Headers['X-Auth-Token'].Trim()
-                    $sessionUrl = $session.Headers['Location']
- 
-                    # Location is usually relative, e.g. /redfish/v1/SessionService/Sessions/1
-                    if ($sessionUrl -and -not $sessionUrl.StartsWith('http')) {
-                        $sessionUrl = "https://$idrac_ip$sessionUrl"
-                    }
-                    $headers = @{
-                      'Content-Type' = 'application/json'
-                      'X-Auth-Token' = $token
-                   }
-                   #Write-Host "Checking $idrac_ip with token $token"
-               }
-
-               $headers = @{
-                    'Content-Type' = 'application/json'
-                    'X-auth-token' = $token
-               }
-               if (!($idrac_ip.Contains("#"))) {
-                    $uri = "https://$idrac_ip/redfish/v1/Systems/System.Embedded.1"
-                    $result = Invoke-WebRequest -Uri $uri -Method Get -UseBasicParsing -ErrorVariable RespErr -Headers $headers
-                    $servicetag = ($result.Content | ConvertFrom-Json).Oem.Dell.DellSystem.ChassisServiceTag
-                    if (!(test-path "$MyTemp\logs\TSRCollector\TSR*_$($servicetag).zip")) {
-                        try {$result=Invoke-WebRequest -UseBasicParsing -Uri "https://$idrac_ip/redfish/v1/Dell/sacollect.zip" -Headers $headers -Method GET -OutFile "$MyTemp\logs\TSRCollector\TSR$(get-date -Format "yyyyMMddHHmmss")_$($servicetag).zip" -ErrorAction SilentlyContinue -ErrorVariable RespErr} catch {}
-                    } 
-               } else {$idracCount--}
-               if ($sessionUrl -and $token) {
-                  try {
-                      Invoke-WebRequest -Uri $sessionUrl -Method Delete -Headers @{'X-Auth-Token' = $token} -UseBasicParsing -ErrorAction SilentlyContinue | Out-Null
-                  } catch {}
-               }
-            }
-            $TSRsCollected = (Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse)
-            $totalTSRsCollected = $TSRsCollected.Count
-            $i++
-            Write-Host "$totalTSRsCollected / $($idracCount) TSR's collected so far, and waited $i / 20 minutes"
-            if ($totalTSRsCollected -lt $idracCount) {Sleep -Seconds 60}
-        }
-        while ($totalTSRsCollected -lt $idracCount -and $i -le 20)
-        Get-ChildItem -Path $MyTemp\logs -Filter "TSR??????????????_*.zip" -Recurse | Compress-Archive -DestinationPath "$MyTemp\logs\TSRReports_$(get-date -Format "yyyyMMdd-HHmm")_$($CaseNumber)"
-         foreach ($idrac_ip in $iDRACIPs.iDracIP) {if (($idrac_ip -match "#")) {Write-Host "ERROR: Failed to capture TSR from $idrac_ip" -ForegroundColor Red}}
-    }
     }
     IF($selection -imatch 'q'){
         Write-Host "Bye Bye..."
@@ -655,7 +575,6 @@ Function ShowMenu{
     }
     UploadLogs
 }#End of ShowMenu
-
 Function ZipNClean{
     # Zip up
         Write-Host "Compressing Logs..."
@@ -676,9 +595,7 @@ Function ZipNClean{
                 cd "$MyTemp\logs"
                 Invoke-Expression "explorer ."
             }
-
         }
-
 }
 Function UploadLogs {
     $MyTemp=(Get-Item $env:temp).fullname
@@ -693,7 +610,6 @@ Function UploadLogs {
                     else {Write-Host "ACP/ECE logs upload FAILED!!. Please upload $($ACPLogPath) using " -NoNewline -ForegroundColor DarkYellow;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
                 }
             }
-
     #Upload SDDC
     IF(Test-Path -Path "$($env:USERPROFILE)\Healthtest*$CaseNumber*"){
         $HealthZip = Get-ChildItem "$($env:USERPROFILE)\Healthtest*$CaseNumber*" | sort lastwritetime | select -last 1 
@@ -705,9 +621,7 @@ Function UploadLogs {
             #$resp=Invoke-RestMethod -Uri "$uri" -Method Put -Headers $headers -InFile $HealthZip -ErrorAction Continue -Verbose 4>&1
             if ($s -eq 0) {Write-Host "SDDC uploaded to case $CaseNumber" -ForegroundColor Green}
             else {Write-Host "SDDC upload FAILED!!. Please upload $($HealthZip.Fullname) using "-NoNewline -ForegroundColor DarkYellow;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
-
         }
-
     }
     #Upload ShowTech
     IF(Test-Path -Path "$MyTemp\logs\ShowTechs_$CaseNumber*"){
@@ -720,7 +634,6 @@ Function UploadLogs {
             $parsed=($content | Select-String -context 0,2 -SimpleMatch "Svc Tag").ToString()
             $servicetag=(($parsed.split("`r")[2]) -split "  ")[-2]
             $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
-
             #Upload File...
             #$resp2=Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -InFile $ZipPath -ErrorAction Continue -Verbose 4>&1
             if ($s -eq 0) {Write-Host "Showtech uploaded to case $CaseNumber" -ForegroundColor Green}
@@ -739,15 +652,23 @@ Function UploadLogs {
             else {Write-Host "TSS upload FAILED!!. Please upload $($ZipPath.Fullname) using " -NoNewline -ForegroundColor DarkYellow ;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
         }
     }
-    #Upload TSR
-    IF((Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse).count){
-        $ZipPath=Get-ChildItem -Path $MyTemp\logs -Filter TSRReports_*$CaseNumber* -Recurse | sort lastwritetime | select -last 1 
-        Write-Host "TSR log path $($ZipPath.Fullname)" -ForegroundColor Cyan
+    # Upload only the TSR ZIP files generated by this invocation (not old files).
+    foreach ($ZipPath in @($script:TSRFiles)) {
+        if (-not $ZipPath -or -not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) { continue }
+        Write-Host "TSR log path $ZipPath" -ForegroundColor Cyan
         if ($consent -eq "Y") {
-            #Upload File...
-            $s=Upload-FileToCase -FilePath $ZipPath.Fullname -CaseNumber $CaseNumber -Email $email.Address -PreferredName $email.User -ServiceTag "$(Get-WmiObject Win32_BIOS | Select-Object -ExpandProperty SerialNumber)"
-            if ($s -eq 0) {Write-Host "TSRs uploaded on case $CaseNumber" -ForegroundColor Green}
-            else {Write-Host "TSR upload FAILED!!. Please upload $($ZipPath.Fullname) using " -NoNewline -ForegroundColor DarkYellow ;Write-Host "https://tdm.dell.com/file-upload" -ForegroundColor Cyan}
+            try {
+                $s = Upload-FileToCase -FilePath $ZipPath -CaseNumber $CaseNumber `
+                    -Email $email.Address -PreferredName $email.User `
+                    -ServiceTag (Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue).SerialNumber
+                if ($s -eq 0) { Write-Host "TSR uploaded to case $CaseNumber" -ForegroundColor Green }
+                else { throw "Upload service returned failure code $s" }
+            } catch {
+                Write-Warning "TSR upload FAILED: $($_.Exception.Message)"
+                Write-Host "Manually upload $ZipPath at https://tdm.dell.com/file-upload" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "TSR saved locally: $ZipPath (upload not authorized)" -ForegroundColor Yellow
         }
     }
     IF($Global:CollectTALI -eq "Y" -and  (Get-ChildItem -Path "C:\ProgramData\Dell\Test-DellAzureLocalIssues-*").count){
@@ -761,6 +682,13 @@ Function UploadLogs {
         }
     }
 }
-ShowMenu
+if ($DellTSR) {
+    Write-Host "-DellTSR mode: collecting only the local PowerEdge TSR." -ForegroundColor Cyan
+    $Global:CollectTSR = "Y"
+    Invoke-LocalDellTSR
+    UploadLogs
+} else {
+    ShowMenu
+}
 Stop-Transcript
 }# End invoke-LogCollector
