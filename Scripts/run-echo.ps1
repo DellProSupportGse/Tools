@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  ECHO v2.3.28 - Event Correlation & History Observer (WPF Edition)
+  ECHO v2.3.36 - Event Correlation & History Observer (WPF Edition)
 .DESCRIPTION
   Read-only, dark-themed event explorer for Windows, Azure Local and offline SDDC EVTX.
   Live nodes, optional cluster discovery, SDDC node tabs, correlation, filters and CSV export.
@@ -15,7 +15,7 @@
 # ECHO portable Log Parser payload: GZip + Base64, extracts only; no MSI install or registry changes.
 # Embedded Microsoft Log Parser binaries supplied by the user.
 
-$script:Version              = '2.3.28'
+$script:Version              = '2.3.36'
 
 # =====================================================
 #region Telemetry Information
@@ -397,28 +397,8 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
      <ComboBoxItem Content="All Time"/><ComboBoxItem Content="Last 1 hour"/><ComboBoxItem Content="Last 6 hours"/>
      <ComboBoxItem Content="Last 24 hours"/><ComboBoxItem Content="Last 7 days"/><ComboBoxItem Content="Last 30 days"/><ComboBoxItem Content="Custom..."/>
     </ComboBox>
-    <Grid DockPanel.Dock="Right" Width="150" Margin="5,0">
-     <ToggleButton x:Name="LevelPicker" Style="{StaticResource LevelToggle}" Content="Levels: All" />
-     <Popup x:Name="LevelPopup" PlacementTarget="{Binding ElementName=LevelPicker}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked,ElementName=LevelPicker,Mode=TwoWay}">
-      <Border Background="#102B40" BorderBrush="#3988B5" BorderThickness="1" CornerRadius="5" Padding="12" MinWidth="175">
-       <StackPanel>
-        <TextBlock Text="Show event levels" Foreground="#8EDBFF" FontWeight="SemiBold" Margin="0,0,0,8"/>
-        <CheckBox x:Name="LevelCritical" Content="Critical" IsChecked="True" Margin="0,3"/>
-        <CheckBox x:Name="LevelError" Content="Error" IsChecked="True" Margin="0,3"/>
-        <CheckBox x:Name="LevelWarning" Content="Warning" IsChecked="True" Margin="0,3"/>
-        <CheckBox x:Name="LevelInformation" Content="Information" IsChecked="True" Margin="0,3"/>
-        <CheckBox x:Name="LevelVerbose" Content="Verbose" IsChecked="True" Margin="0,3"/>
-        <Separator Margin="0,8"/>
-        <StackPanel Orientation="Horizontal">
-         <Button x:Name="LevelAll" Content="All" Style="{StaticResource ActionButton}" Padding="12,4" Margin="0,0,7,0"/>
-         <Button x:Name="LevelNone" Content="None" Style="{StaticResource ActionButton}" Padding="12,4"/>
-        </StackPanel>
-       </StackPanel>
-      </Border>
-     </Popup>
-    </Grid>
+
     <TextBlock x:Name="EventCount" DockPanel.Dock="Left" Text="Events (0)" FontSize="14" FontWeight="SemiBold" Foreground="#E8F4FF" Width="125" VerticalAlignment="Center"/>
-    <TextBox x:Name="SearchBox" VerticalContentAlignment="Center" ToolTip="Filter by message, event ID, provider, computer or log"/>
    </DockPanel>
   </Border>
   <!-- Tabs for nodes -->
@@ -433,6 +413,7 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
    <Border Grid.Column="0" Background="#0A1D2E" BorderBrush="#27485F" BorderThickness="1" CornerRadius="5" Margin="1,1,0,1">
     <DockPanel>
      <TextBlock DockPanel.Dock="Top" Text="  &#x25C9;  EVENT SOURCES" FontWeight="SemiBold" Foreground="#8EDBFF" FontSize="12" Padding="7,12" Background="#112D43"/>
+     <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Margin="8,8,8,3" Padding="6,5" Background="#112D43" Foreground="#E8F4FF" BorderBrush="#31516A" ToolTip="Search the Event Sources tree by name or full channel path (for example Hyper)"/>
      <TreeView x:Name="LogTree" Background="#0A1D2E" BorderThickness="0" Margin="8" Foreground="#E8F4FF"/>
     </DockPanel>
    </Border>
@@ -452,32 +433,18 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
      <DataGrid x:Name="EventGrid" Grid.Row="1" ItemsSource="{x:Null}" AlternationCount="2" Margin="1">
       <DataGrid.Columns>
        <DataGridTextColumn Header="Time Created" Binding="{Binding Time}" Width="158" ElementStyle="{StaticResource EchoCellText}"/>
-       <DataGridTemplateColumn Header="Level" SortMemberPath="Level" Width="100"><DataGridTemplateColumn.CellTemplate><DataTemplate>
-        <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Symbol}" Foreground="{Binding LevelBrush}" FontWeight="Bold" Margin="0,0,6,0"/><TextBlock Text="{Binding Level}" Style="{StaticResource EchoCellText}"/></StackPanel>
-       </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-       <DataGridTextColumn Header="Event ID" Binding="{Binding ID}" Width="72" ElementStyle="{StaticResource EchoCellText}"/>
-       <DataGridTextColumn Binding="{Binding Source}" SortMemberPath="Source" Width="130" ElementStyle="{StaticResource EchoCellText}">
-       <DataGridTextColumn.Header>
-        <Border x:Name="SourceHeader" Background="Transparent" ToolTip="Right-click to filter event sources">
-         <Border.ContextMenu>
-          <ContextMenu x:Name="SourceMenu" Background="#102B40" BorderBrush="#3988B5" BorderThickness="1" StaysOpen="True">
-           <StackPanel MinWidth="290" Margin="10">
-            <TextBlock Text="Show event sources (uncheck to hide)" Foreground="#8EDBFF" FontWeight="SemiBold" Margin="0,0,0,8"/>
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-             <Button x:Name="SourceAll" Content="All" Style="{StaticResource ActionButton}" Padding="12,4" Margin="0,0,7,0"/>
-             <Button x:Name="SourceNone" Content="None" Style="{StaticResource ActionButton}" Padding="12,4"/>
-            </StackPanel>
-            <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-             <StackPanel x:Name="SourceChoices"/>
-            </ScrollViewer>
-           </StackPanel>
-          </ContextMenu>
-         </Border.ContextMenu>
-         <TextBlock x:Name="SourceHeaderLabel" Text="Source" VerticalAlignment="Center"/>
-        </Border>
-       </DataGridTextColumn.Header>
+<DataGridTextColumn Binding="{Binding Level}" SortMemberPath="Level" Width="100" ElementStyle="{StaticResource EchoCellText}">
+        <DataGridTextColumn.Header><TextBlock Text="Level" ToolTip="Right-click to filter Level"/></DataGridTextColumn.Header>
        </DataGridTextColumn>
-       <DataGridTextColumn Header="Computer" Binding="{Binding Computer}" Width="130" ElementStyle="{StaticResource EchoCellText}"/>
+       <DataGridTextColumn Binding="{Binding ID}" SortMemberPath="ID" Width="72" ElementStyle="{StaticResource EchoCellText}">
+        <DataGridTextColumn.Header><TextBlock Text="Event ID" ToolTip="Right-click to filter Event ID"/></DataGridTextColumn.Header>
+       </DataGridTextColumn>
+       <DataGridTextColumn Binding="{Binding Source}" SortMemberPath="Source" Width="130" ElementStyle="{StaticResource EchoCellText}">
+        <DataGridTextColumn.Header><TextBlock Text="Source" ToolTip="Right-click to filter Source"/></DataGridTextColumn.Header>
+       </DataGridTextColumn>
+       <DataGridTextColumn Binding="{Binding Computer}" SortMemberPath="Computer" Width="130" ElementStyle="{StaticResource EchoCellText}">
+        <DataGridTextColumn.Header><TextBlock Text="Computer" ToolTip="Right-click to filter Computer"/></DataGridTextColumn.Header>
+       </DataGridTextColumn>
        <DataGridTextColumn Header="Message" Binding="{Binding MessagePreview}" Width="*" MinWidth="150" ElementStyle="{StaticResource EchoCellText}"/>
       </DataGrid.Columns>
      </DataGrid>
@@ -508,6 +475,7 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
   </Grid>
   <Border Grid.Row="5" Background="#061A2C" BorderBrush="#1C405A" BorderThickness="1,1,0,0">
    <DockPanel Margin="10,4"><TextBlock x:Name="StatusText" Text="Ready" Foreground="#8FD4FF" VerticalAlignment="Center"/>
+    <TextBlock x:Name="UtcClock" DockPanel.Dock="Right" Foreground="#B7D8EA" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,2,0" ToolTip="Current UTC time"/>
     <TextBlock x:Name="CurrentClock" DockPanel.Dock="Right" Foreground="#B7D8EA" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,2,0" ToolTip="Current local date and time on the computer running ECHO"/>
     <ProgressBar x:Name="BusyBar" Width="130" Height="5" DockPanel.Dock="Right" IsIndeterminate="True" Visibility="Collapsed" Margin="10,5" Foreground="#24A9F8"/>
    </DockPanel>
@@ -517,32 +485,17 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
 '@
 $reader=New-Object System.Xml.XmlNodeReader $xaml
 $script:Window=[Windows.Markup.XamlReader]::Load($reader)
-$names=@('BrandIcon','VersionText','NavEvents','NavExport','NavSettings','BtnRefresh','BtnStop','BtnOpenSDDC','TimeFilter','SourceHeader','SourceHeaderLabel','SourceMenu','SourceAll','SourceNone','SourceChoices','LevelPicker','LevelPopup','LevelCritical','LevelError','LevelWarning','LevelInformation','LevelVerbose','LevelAll','LevelNone','EventCount','SearchBox','FilterTime','FilterLevel','FilterID','FilterSource','FilterComputer','FilterMessage','BtnClearFilters','BtnAddNode','BtnCorrelate','NodeTabs','LogTree','EventGrid','BtnCopy','DetailTabs','DetailTime','DetailLevel','DetailSource','DetailComputer','DetailMessage','StatusText','BusyBar','CurrentClock')
+$names=@('BrandIcon','VersionText','NavEvents','NavExport','NavSettings','BtnRefresh','BtnStop','BtnOpenSDDC','TimeFilter','LevelMenu','LevelSearch','LevelAll','LevelNone','LevelChoices','LevelHeaderLabel','EventIDMenu','EventIDSearch','EventIDAll','EventIDNone','EventIDChoices','EventIDHeaderLabel','SourceMenu','SourceSearch','SourceAll','SourceNone','SourceChoices','SourceHeaderLabel','ComputerMenu','ComputerSearch','ComputerAll','ComputerNone','ComputerChoices','ComputerHeaderLabel','EventCount','SearchBox','FilterTime','FilterLevel','FilterID','FilterSource','FilterComputer','FilterMessage','BtnClearFilters','BtnAddNode','BtnCorrelate','NodeTabs','LogTree','EventGrid','BtnCopy','DetailTabs','DetailTime','DetailLevel','DetailSource','DetailComputer','DetailMessage','StatusText','BusyBar','CurrentClock','UtcClock')
 foreach($n in $names){Set-Variable -Name $n -Scope Script -Value $script:Window.FindName($n)}
 $EventGrid.ItemsSource=$script:VisibleItems
-# Open the Source filter using a right-click anywhere on the Source column header.
-$EventGrid.Add_PreviewMouseRightButtonUp({
- param($sender,$e)
- $origin=$e.OriginalSource
- while($origin -and -not ($origin -is [System.Windows.Controls.Primitives.DataGridColumnHeader])){
-  $origin=[System.Windows.Media.VisualTreeHelper]::GetParent($origin)
- }
- if($origin -and $origin.Column -and $origin.Column.SortMemberPath -eq 'Source'){
-  Update-SourceChoices
-  $SourceMenu.PlacementTarget=$origin
-  $SourceMenu.Placement=[System.Windows.Controls.Primitives.PlacementMode]::Bottom
-  $SourceMenu.IsOpen=$true
-  $e.Handled=$true
- }
-})
 $VersionText.Text="v$script:Version"
 $BtnStop.IsEnabled=$false
 # Live local clock in the status bar (independent of event timestamps).
-$CurrentClock.Text=[datetime]::Now.ToString('ddd, MMM d, yyyy  h:mm:ss tt')
+$CurrentClock.Text='Local: '+[datetime]::Now.ToString('yyyy-MM-dd HH:mm:ss');$UtcClock.Text='UTC: '+[datetime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss')
 $script:ClockTimer=New-Object System.Windows.Threading.DispatcherTimer
 $script:ClockTimer.Interval=[TimeSpan]::FromSeconds(1)
 $script:ClockTimer.Add_Tick({
- $CurrentClock.Text=[datetime]::Now.ToString('ddd, MMM d, yyyy  h:mm:ss tt')
+ $CurrentClock.Text='Local: '+[datetime]::Now.ToString('yyyy-MM-dd HH:mm:ss');$UtcClock.Text='UTC: '+[datetime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss')
 })
 $script:ClockTimer.Start()
 $script:Window.Add_Closed({if($script:ClockTimer){$script:ClockTimer.Stop()}})
@@ -800,6 +753,34 @@ function Get-InstalledEventFeatureGroups([string]$computer,[string]$kind){
   }
   return $null
  }
+# Non-destructive search of the Event Sources navigation tree.
+# A match on a full channel path (e.g. Microsoft-Windows-Hyper-V-VMMS/Admin)
+# reveals its ancestors; matching a folder label reveals that entire branch.
+function Test-EchoSourceTreeMatch([System.Windows.Controls.TreeViewItem]$node,[string]$term,[bool]$ancestorMatches){
+ $display=if($node.Header -is [System.Windows.Controls.TextBlock]){[string]$node.Header.Text}else{[string]$node.Header}
+ $selfMatches=($term.Length -eq 0 -or $display.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0)
+ $channelMatches=($term.Length -gt 0 -and -not [string]::IsNullOrWhiteSpace([string]$node.ToolTip) -and ([string]$node.ToolTip).IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0)
+ $showBranch=$ancestorMatches -or $selfMatches
+ $childMatches=$false
+ foreach($child in $node.Items){
+  if($child -is [System.Windows.Controls.TreeViewItem]){
+   if(Test-EchoSourceTreeMatch $child $term $showBranch){$childMatches=$true}
+  }
+ }
+ $visible=$showBranch -or $channelMatches -or $childMatches
+ $node.Visibility=if($visible){[Windows.Visibility]::Visible}else{[Windows.Visibility]::Collapsed}
+ if($term.Length -gt 0 -and $childMatches){$node.IsExpanded=$true}
+ return [bool]$visible
+}
+function Filter-EchoEventSources {
+ if(-not $LogTree -or -not $SearchBox){return}
+ $term=[string]$SearchBox.Text.Trim()
+ foreach($root in $LogTree.Items){
+  if($root -is [System.Windows.Controls.TreeViewItem]){
+   [void](Test-EchoSourceTreeMatch $root $term $false)
+  }
+ }
+}
 function Populate-Tree {
  # Capture the outgoing channel BEFORE clearing the tree.
  if(-not [string]::IsNullOrWhiteSpace([string]$script:CurrentLog)){
@@ -989,6 +970,8 @@ function Populate-Tree {
    elseif($services.Items.Count){$services.IsExpanded=$true;$services.Items[0].IsSelected=$true}
   Set-Status "Selected $($s.Name) | $($available.Count) available event logs"
  } finally {$script:LoadingTree=$false}
+ # Reapply source-tree search when switching nodes or refreshing discovery.
+ Filter-EchoEventSources
  # On-demand query only after tree has finished building.
  if($LogTree.SelectedItem -and $LogTree.SelectedItem.Tag){Start-Query}
 }
@@ -1088,7 +1071,7 @@ function Start-Query {
  $script:CurrentLog=$path
  $script:LastSelectedLog=$path
  $script:Items.Clear();$script:VisibleItems.Clear();$script:PendingEvents.Clear()
- $SourceChoices.Children.Clear();$script:SourceControls.Clear();$script:SourceLastCount=-1
+ $script:ColumnLastCount=-1
  $DetailMessage.Text='';$DetailTime.Text='';$DetailLevel.Text='';$DetailSource.Text='';$DetailComputer.Text=''
  $EventCount.Text='Events (0)'
  $since=Get-Since
@@ -1271,45 +1254,198 @@ function Test-EchoTimeFilter([string]$filter,[string]$eventTime){
  }
  return ($eventTime.IndexOf($filter,[StringComparison]::OrdinalIgnoreCase) -ge 0)
 }
-$script:SourceSelection=@{}
-$script:SourceControls=@{}
-$script:SourceUpdating=$false
-$script:SourceLastCount=-1
-function Update-SourceChoices {
- if($script:SourceUpdating -or $script:SourceLastCount -eq $script:Items.Count){return}
- $script:SourceLastCount=$script:Items.Count
- $script:SourceUpdating=$true
+$script:ColumnSelection=@{};$script:ColumnControls=@{};$script:ColumnUpdating=$false;$script:ColumnLastCount=-1
+foreach($field in @('Level','EventID','Source','Computer')){$script:ColumnSelection[$field]=@{};$script:ColumnControls[$field]=@{}}
+
+# Use a high-contrast checkbox template rather than the OS theme's dark check glyph.
+# Unchecked: light square; checked: cyan square with a dark, visible check mark.
+$script:FilterCheckStyle=[Windows.Markup.XamlReader]::Parse(@'
+<Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="{x:Type CheckBox}">
+ <Setter Property="Template">
+  <Setter.Value>
+   <ControlTemplate TargetType="{x:Type CheckBox}">
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+     <Border x:Name="CheckSquare" Width="17" Height="17" Margin="0,0,8,0"
+             Background="#EAF7FF" BorderBrush="#91DFFF" BorderThickness="1" CornerRadius="2">
+      <Path x:Name="Tick" Data="M 3,8 L 7,12 L 14,4" Stroke="#062138"
+            StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+            Visibility="Collapsed"/>
+     </Border>
+     <ContentPresenter ContentSource="Content" VerticalAlignment="Center"/>
+    </StackPanel>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsChecked" Value="True">
+      <Setter TargetName="CheckSquare" Property="Background" Value="#6FE1FF"/>
+      <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+     </Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
+    </ControlTemplate.Triggers>
+   </ControlTemplate>
+  </Setter.Value>
+ </Setter>
+</Style>
+'@)
+
+# Build filter popups programmatically.  A ContextMenu nested in a DataGridColumn.Header
+# has its own WPF NameScope, so Window.FindName cannot resolve its controls.
+$script:ColumnPopups=@{}
+foreach($field in @('Level','EventID','Source','Computer')){
+ $columnIndex=switch($field){'Level'{1} 'EventID'{2} 'Source'{3} 'Computer'{4}}
+ $display=if($field -eq 'EventID'){'Event ID'}else{$field}
+ $label=New-Object System.Windows.Controls.TextBlock
+ $label.Text=$display;$label.ToolTip="Right-click to filter $display"
+ $label.Foreground=[Windows.Media.Brushes]::LightCyan
+ $EventGrid.Columns[$columnIndex].Header=$label
+ Set-Variable -Name ($field+'HeaderLabel') -Scope Script -Value $label
+ $popup=New-Object System.Windows.Controls.Primitives.Popup
+ $popup.Placement=[Windows.Controls.Primitives.PlacementMode]::Bottom
+ $popup.StaysOpen=$true;$popup.AllowsTransparency=$true
+ $popup.PopupAnimation=[Windows.Controls.Primitives.PopupAnimation]::Fade
+ $border=New-Object Windows.Controls.Border
+ $border.Background=[Windows.Media.BrushConverter]::new().ConvertFromString('#102B40')
+ $border.BorderBrush=[Windows.Media.BrushConverter]::new().ConvertFromString('#3988B5')
+ $border.BorderThickness=[Windows.Thickness]::new(1)
+ $border.Padding=[Windows.Thickness]::new(10)
+ $panel=New-Object Windows.Controls.StackPanel
+ $panel.MinWidth=280
+ $title=New-Object Windows.Controls.TextBlock
+ $title.Text="Show $display (uncheck to hide)"
+ $title.Foreground=[Windows.Media.BrushConverter]::new().ConvertFromString('#8EDBFF')
+ $title.FontWeight=[Windows.FontWeights]::SemiBold
+ $title.Margin=[Windows.Thickness]::new(0,0,0,7)
+ [void]$panel.Children.Add($title)
+ $search=New-Object Windows.Controls.TextBox
+ $search.Margin=[Windows.Thickness]::new(0,0,0,7)
+ $search.ToolTip='Search available values'
+ [void]$panel.Children.Add($search)
+ Set-Variable -Name ($field+'Search') -Scope Script -Value $search
+ $buttons=New-Object Windows.Controls.StackPanel
+ $buttons.Orientation=[Windows.Controls.Orientation]::Horizontal
+ $buttons.Margin=[Windows.Thickness]::new(0,0,0,7)
+ foreach($buttonKind in @('All','None')){
+  $button=New-Object Windows.Controls.Button
+  $button.Content=$buttonKind
+  $button.Padding=[Windows.Thickness]::new(12,4,12,4)
+  $button.Margin=[Windows.Thickness]::new(0,0,7,0)
+  $button.Background=[Windows.Media.BrushConverter]::new().ConvertFromString('#176092')
+  $button.Foreground=[Windows.Media.Brushes]::White
+  [void]$buttons.Children.Add($button)
+  Set-Variable -Name ($field+$buttonKind) -Scope Script -Value $button
+ }
+ [void]$panel.Children.Add($buttons)
+ $scroll=New-Object Windows.Controls.ScrollViewer
+ $scroll.MaxHeight=340
+ $scroll.VerticalScrollBarVisibility=[Windows.Controls.ScrollBarVisibility]::Auto
+ $choices=New-Object Windows.Controls.StackPanel
+ $scroll.Content=$choices
+ [void]$panel.Children.Add($scroll)
+ Set-Variable -Name ($field+'Choices') -Scope Script -Value $choices
+ $border.Child=$panel;$popup.Child=$border
+ $script:ColumnPopups[$field]=$popup
+}
+# Handled-events-too ensures headers intercepting right clicks cannot suppress the filter.
+$EventGrid.AddHandler([Windows.UIElement]::PreviewMouseRightButtonUpEvent,
+ [Windows.Input.MouseButtonEventHandler]{
+  param($sender,$e)
+  $origin=[Windows.DependencyObject]$e.OriginalSource
+  while($origin -and -not ($origin -is [Windows.Controls.Primitives.DataGridColumnHeader])){
+   try{$origin=[Windows.Media.VisualTreeHelper]::GetParent($origin)}catch{$origin=$null}
+  }
+  if(-not $origin -or -not $origin.Column){return}
+  $field=switch([string]$origin.Column.SortMemberPath){
+   'Level'{'Level'} 'ID'{'EventID'} 'Source'{'Source'} 'Computer'{'Computer'} default{$null}
+  }
+  if(-not $field){return}
+  try{
+   Update-ColumnChoices -Force
+   foreach($other in @($script:ColumnPopups.Keys)){$script:ColumnPopups[$other].IsOpen=$false}
+   $popup=$script:ColumnPopups[$field]
+   $popup.PlacementTarget=$origin
+   $popup.IsOpen=$true
+   $e.Handled=$true
+  }catch{Set-Status "Filter menu error: $($_.Exception.Message)"}
+ },$true)
+
+# The popup opens on button UP (not DOWN).  StaysOpen keeps checkbox clicks stable.
+# Close an open filter on a normal click elsewhere in ECHO or on Escape.
+$script:Window.Add_PreviewMouseDown({
+ param($sender,$e)
+ foreach($openPopup in @($script:ColumnPopups.Values)){
+  if($openPopup.IsOpen){$openPopup.IsOpen=$false}
+ }
+})
+$script:Window.Add_PreviewKeyDown({
+ param($sender,$e)
+ if($e.Key -eq [Windows.Input.Key]::Escape){
+  foreach($openPopup in @($script:ColumnPopups.Values)){
+   if($openPopup.IsOpen){$openPopup.IsOpen=$false;$e.Handled=$true}
+  }
+ }
+})
+
+function Update-ColumnChoices {
+ param([switch]$Force)
+ if($script:ColumnUpdating -or (-not $Force -and $script:ColumnLastCount -eq $script:Items.Count)){return}
+ $script:ColumnUpdating=$true
  try {
-  $names=@($script:Items | ForEach-Object {[string]$_.Source} | Where-Object {$_} | Sort-Object -Unique)
-  foreach($name in $names){
-   if(-not $script:SourceSelection.ContainsKey($name)){$script:SourceSelection[$name]=$true}
-   if(-not $script:SourceControls.ContainsKey($name)){
+  foreach($field in @('Level','EventID','Source','Computer')){
+   $panel=Get-Variable -Name ($field+'Choices') -ValueOnly
+   $panel.Children.Clear();$script:ColumnControls[$field].Clear()
+    # In PowerShell, switch sets $_ to its own input (the field name here).
+    # Capture the event before switching; otherwise every checkbox gets an empty label.
+    $values=@($script:Items | ForEach-Object {
+     $eventItem=$_
+     switch($field){
+      'Level'    {[string]$eventItem.Level}
+      'EventID'  {[string]$eventItem.ID}
+      'Source'   {[string]$eventItem.Source}
+      'Computer' {[string]$eventItem.Computer}
+     }
+    } | Where-Object {-not [string]::IsNullOrWhiteSpace($_)} | Sort-Object -Unique)
+    # Event IDs are numbers, not strings: 1, 2, 3, 10, 10016.
+    if($field -eq 'EventID'){ $values=@($values | Sort-Object -Property @{Expression={[long]$_}}) }
+   if($values.Count -eq 0){
+    $notice=New-Object System.Windows.Controls.TextBlock
+    $notice.Text='No event values loaded for this column.'
+    $notice.Foreground=[Windows.Media.Brushes]::LightGray
+    [void]$panel.Children.Add($notice)
+   }
+   foreach($value in $values){
+    if(-not $script:ColumnSelection[$field].ContainsKey($value)){$script:ColumnSelection[$field][$value]=$true}
     $cb=New-Object System.Windows.Controls.CheckBox
-    $cb.Content=$name;$cb.Tag=$name;$cb.IsChecked=[bool]$script:SourceSelection[$name]
-    $cb.Foreground=[Windows.Media.Brushes]::White
-    $cb.Margin=[Windows.Thickness]::new(0,3,0,3)
-    $cb.Add_Checked({if(-not $script:SourceUpdating){$script:SourceSelection[[string]$this.Tag]=$true;Apply-Filter}})
-    $cb.Add_Unchecked({if(-not $script:SourceUpdating){$script:SourceSelection[[string]$this.Tag]=$false;Apply-Filter}})
-    $script:SourceControls[$name]=$cb
-    [void]$SourceChoices.Children.Add($cb)
+    $cb.Content=$value;$cb.Tag=[pscustomobject]@{Field=$field;Value=$value};$cb.IsChecked=[bool]$script:ColumnSelection[$field][$value]
+    $cb.Foreground=[Windows.Media.Brushes]::White;$cb.Margin=[Windows.Thickness]::new(0,3,0,3)
+    $cb.Style=$script:FilterCheckStyle
+    $cb.Add_Checked({if(-not $script:ColumnUpdating){$script:ColumnSelection[$this.Tag.Field][$this.Tag.Value]=$true;Apply-Filter}})
+    $cb.Add_Unchecked({if(-not $script:ColumnUpdating){$script:ColumnSelection[$this.Tag.Field][$this.Tag.Value]=$false;Apply-Filter}})
+    $script:ColumnControls[$field][$value]=$cb;[void]$panel.Children.Add($cb)
    }
   }
- }finally{$script:SourceUpdating=$false}
+  $script:ColumnLastCount=$script:Items.Count
+ }finally{$script:ColumnUpdating=$false}
+ Update-ColumnSearch
+}
+function Update-ColumnSearch {
+ foreach($field in @('Level','EventID','Source','Computer')){
+  $search=Get-Variable -Name ($field+'Search') -ValueOnly
+  $term=[string]$search.Text
+  foreach($key in @($script:ColumnControls[$field].Keys)){
+   $script:ColumnControls[$field][$key].Visibility=if(-not $term -or $key.IndexOf($term,[StringComparison]::OrdinalIgnoreCase) -ge 0){'Visible'}else{'Collapsed'}
+  }
+ }
 }
 function Apply-Filter {
- Update-SourceChoices
- $term=$SearchBox.Text.Trim()
- $enabled=@{}
- foreach($name in @('Critical','Error','Warning','Information','Verbose')){
-  $control=Get-Variable -Name ('Level'+$name) -ValueOnly
-  $enabled[$name]=($control.IsChecked -eq $true)
- }
+ Update-ColumnChoices
+ $term='' # Top search has moved into EVENT SOURCES; grid filtering remains in the six column boxes.
  $columnFilters=@($FilterTime.Text,$FilterLevel.Text,$FilterID.Text,$FilterSource.Text,$FilterComputer.Text,$FilterMessage.Text)
  $script:VisibleItems.Clear()
  foreach($item in $script:Items){
-  if($script:SourceSelection.ContainsKey([string]$item.Source) -and -not $script:SourceSelection[[string]$item.Source]){continue}
-  $eventLevel=[string]$item.Level
-  if(-not $enabled.ContainsKey($eventLevel) -or -not $enabled[$eventLevel]){continue}
+  $hidden=$false
+  foreach($field in @('Level','EventID','Source','Computer')){
+   $value=switch($field){'Level'{[string]$item.Level} 'EventID'{[string]$item.ID} 'Source'{[string]$item.Source} 'Computer'{[string]$item.Computer}}
+   if($script:ColumnSelection[$field].ContainsKey($value) -and -not $script:ColumnSelection[$field][$value]){$hidden=$true;break}
+  }
+  if($hidden){continue}
   if($term -and -not ("$($item.Message) $($item.ID) $($item.Source) $($item.Computer) $($item.Log)" -like "*$term*")){continue}
   $columnValues=@([string]$item.Time,[string]$item.Level,[string]$item.ID,[string]$item.Source,[string]$item.Computer,[string]$item.Message)
   $matchesColumns=$true
@@ -1345,22 +1481,61 @@ function Apply-Filter {
   $script:VisibleItems.Add($item)
  }
  $EventCount.Text="Events ($($script:VisibleItems.Count))"
- $count=@($enabled.Values | Where-Object {$_}).Count
- $sourceCount=$script:SourceControls.Count
- $selectedSources=@($script:SourceControls.Keys | Where-Object {$script:SourceSelection[$_]}).Count
- $SourceHeaderLabel.Text=if($sourceCount -eq 0 -or $selectedSources -eq $sourceCount){'Source'}else{"Source ($selectedSources/$sourceCount)"}
- $LevelPicker.Content=if($count -eq 5){'Levels: All'}elseif($count -eq 0){'Levels: None'}else{"Levels: $count selected"}
+ foreach($field in @('Level','EventID','Source','Computer')){
+  $count=$script:ColumnControls[$field].Count
+  $selected=@($script:ColumnControls[$field].Keys | Where-Object {$script:ColumnSelection[$field][$_]}).Count
+  $label=Get-Variable -Name ($field+'HeaderLabel') -ValueOnly
+  $display=switch($field){'EventID'{'Event ID'}default{$field}}
+  $label.Text=if($count -eq 0 -or $selected -eq $count){$display}else{"$display ($selected/$count)"}
+ }
+}
+function ConvertTo-EchoCsvField([object]$Value){
+ $text=if($null -eq $Value){''}else{[string]$Value}
+ return ('"' + $text.Replace('"','""') + '"')
 }
 function Export-CSV {
- if(-not $script:VisibleItems.Count){[Windows.MessageBox]::Show('There are no displayed events to export.','ECHO')|Out-Null;return}
- $dlg=New-Object Microsoft.Win32.SaveFileDialog
- $dlg.Title='Export ECHO Events';$dlg.Filter='CSV files (*.csv)|*.csv';$dlg.FileName='ECHO-Events.csv';$dlg.AddExtension=$true
+ # Suppress duplicate modal dialogs from click/reentrancy.
+ if($script:ExportInProgress){return}
+ $script:ExportInProgress=$true
  try{
-  if($dlg.ShowDialog($script:Window)){
-   $script:VisibleItems | Select-Object Time,Level,ID,Source,Computer,Log,Message | Export-Csv -LiteralPath $dlg.FileName -NoTypeInformation -Encoding UTF8
-   Set-Status "Exported $($script:VisibleItems.Count) events to $($dlg.FileName)"
+  # Snapshot the actual rendered DataGrid view, which includes sorting and ALL filters.
+  $rows=New-Object 'System.Collections.Generic.List[object]'
+  foreach($entry in $EventGrid.Items){
+   if($null -eq $entry -or $entry -eq [Windows.Data.CollectionView]::NewItemPlaceholder){continue}
+   $rows.Add($entry)
   }
- }catch{[Windows.MessageBox]::Show("CSV export failed: $($_.Exception.Message)",'ECHO')|Out-Null}
+  if($rows.Count -eq 0){
+   [Windows.MessageBox]::Show('There are no displayed events to export.','ECHO')|Out-Null
+   return
+  }
+  $dlg=New-Object Microsoft.Win32.SaveFileDialog
+  $dlg.Title='Save ECHO events as CSV'
+  $dlg.Filter='CSV Files (*.csv)|*.csv'
+  $dlg.DefaultExt='csv'
+  $dlg.AddExtension=$true
+  $dlg.OverwritePrompt=$true
+  $dlg.FileName=('ECHO-Events-{0}.csv' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+  $approved=$dlg.ShowDialog($script:Window)
+  if($approved -ne $true){return}
+  $path=[string]$dlg.FileName
+  if([string]::IsNullOrWhiteSpace($path)){throw 'No destination filename was selected.'}
+  $writer=$null
+  try{
+   $utf8=New-Object System.Text.UTF8Encoding($true)
+   $writer=New-Object System.IO.StreamWriter($path,$false,$utf8)
+   $writer.WriteLine('"Time Created","Level","Event ID","Source","Computer","Log","Message"')
+   foreach($ev in $rows){
+    $cells=@($ev.Time,$ev.Level,$ev.ID,$ev.Source,$ev.Computer,$ev.Log,$ev.Message)
+    $quoted=@(foreach($cell in $cells){ConvertTo-EchoCsvField $cell})
+    $writer.WriteLine(($quoted -join ','))
+   }
+  }finally{if($writer){$writer.Dispose()}}
+  Set-Status "Exported $($rows.Count) displayed events to $path"
+  [Windows.MessageBox]::Show("Exported $($rows.Count) events successfully.`n`n$path",'ECHO CSV Export')|Out-Null
+ }catch{
+  Set-Status "CSV export failed: $($_.Exception.Message)"
+  [Windows.MessageBox]::Show("CSV export failed:`n$($_.Exception.Message)",'ECHO CSV Export')|Out-Null
+ }finally{$script:ExportInProgress=$false}
 }
 function Show-EchoFolderBrowser([string]$initialPath=''){
  [xml]$browserXaml=@'
@@ -1775,7 +1950,35 @@ function Update-Details {
  else{$DetailMessage.Text=$ev.Message}
 }
 
-$NodeTabs.Add_SelectionChanged({if($_.Source -eq $NodeTabs){Populate-Tree}})
+$script:RemoteProbeJob=$null
+$script:RemoteProbeTimer=New-Object System.Windows.Threading.DispatcherTimer
+$script:RemoteProbeTimer.Interval=[TimeSpan]::FromMilliseconds(150)
+$script:RemoteProbeTimer.Add_Tick({
+ if(-not $script:RemoteProbeJob -or $script:RemoteProbeJob.State -eq 'Running'){return}
+ $result=@(Receive-Job $script:RemoteProbeJob -ErrorAction SilentlyContinue)
+ Remove-Job $script:RemoteProbeJob -Force -ErrorAction SilentlyContinue
+ $script:RemoteProbeJob=$null;$script:RemoteProbeTimer.Stop()
+ $s=Get-Session
+ if(-not $s -or $s.Name -ne $script:ProbeNode){return}
+ if($result.Count -and $result[0] -eq $true){Populate-Tree}
+ else{$LogTree.Items.Clear();Set-Status "Node $($s.Name) is offline or unreachable. Select another node or refresh to retry."}
+})
+function Select-EchoNode {
+ $s=Get-Session
+ if(-not $s){return}
+ if($s.Kind -eq 'live' -and $s.Name -ne $env:COMPUTERNAME -and -not $s.DiscoveryCache){
+  if($script:RemoteProbeJob){Stop-Job $script:RemoteProbeJob -ErrorAction SilentlyContinue;Remove-Job $script:RemoteProbeJob -Force -ErrorAction SilentlyContinue}
+  $script:ProbeNode=$s.Name;$LogTree.Items.Clear();Set-Status "Checking connectivity to $($s.Name)..."
+  $script:RemoteProbeJob=Start-Job -ArgumentList $s.Name -ScriptBlock {
+   param($node)
+   $client=New-Object System.Net.Sockets.TcpClient
+   try{$async=$client.BeginConnect($node,135,$null,$null);if(-not $async.AsyncWaitHandle.WaitOne(1500)){return $false};$client.EndConnect($async);return $true}catch{return $false}finally{$client.Close()}
+  }
+  $script:RemoteProbeTimer.Start();return
+ }
+ Populate-Tree
+}
+$NodeTabs.Add_SelectionChanged({if($_.Source -eq $NodeTabs){Select-EchoNode}})
 # TreeViewItem handles selection for any click on its row; the expander retains its own click.
 $LogTree.AddHandler([System.Windows.Controls.TreeViewItem]::PreviewMouseLeftButtonDownEvent,
  [System.Windows.Input.MouseButtonEventHandler]{
@@ -1811,7 +2014,7 @@ $LogTree.Add_MouseDoubleClick({
  $selected=$LogTree.SelectedItem
  if($selected -and -not [string]::IsNullOrWhiteSpace([string]$selected.Tag)){Start-Query}
 })
-$SearchBox.Add_TextChanged({Apply-Filter})
+$SearchBox.Add_TextChanged({Filter-EchoEventSources})
 foreach($filterBox in @($FilterTime,$FilterLevel,$FilterID,$FilterSource,$FilterComputer,$FilterMessage)){
  $filterBox.Add_TextChanged({Apply-Filter})
 }
@@ -1819,22 +2022,20 @@ $BtnClearFilters.Add_Click({
  foreach($filterBox in @($FilterTime,$FilterLevel,$FilterID,$FilterSource,$FilterComputer,$FilterMessage)){$filterBox.Clear()}
  Apply-Filter
 })
-foreach($check in @($LevelCritical,$LevelError,$LevelWarning,$LevelInformation,$LevelVerbose)){
- $check.Add_Checked({if($script:VisibleItems){Apply-Filter}})
- $check.Add_Unchecked({if($script:VisibleItems){Apply-Filter}})
+foreach($field in @('Level','EventID','Source','Computer')){
+ $search=Get-Variable -Name ($field+'Search') -ValueOnly
+ $search.Add_TextChanged({Update-ColumnSearch})
+ $all=Get-Variable -Name ($field+'All') -ValueOnly
+ $none=Get-Variable -Name ($field+'None') -ValueOnly
+ $all.Tag=$field;$none.Tag=$field
+ $all.Add_Click({Set-ColumnAll ([string]$this.Tag) $true})
+ $none.Add_Click({Set-ColumnAll ([string]$this.Tag) $false})
 }
-$LevelAll.Add_Click({foreach($check in @($LevelCritical,$LevelError,$LevelWarning,$LevelInformation,$LevelVerbose)){$check.IsChecked=$true};Apply-Filter})
-$LevelNone.Add_Click({foreach($check in @($LevelCritical,$LevelError,$LevelWarning,$LevelInformation,$LevelVerbose)){$check.IsChecked=$false};Apply-Filter})
-$SourceAll.Add_Click({
- $script:SourceUpdating=$true
- try{foreach($name in @($script:SourceControls.Keys)){$script:SourceSelection[$name]=$true;$script:SourceControls[$name].IsChecked=$true}}finally{$script:SourceUpdating=$false}
+function Set-ColumnAll([string]$field,[bool]$value){
+ $script:ColumnUpdating=$true
+ try{foreach($key in @($script:ColumnControls[$field].Keys)){$script:ColumnSelection[$field][$key]=$value;$script:ColumnControls[$field][$key].IsChecked=$value}}finally{$script:ColumnUpdating=$false}
  Apply-Filter
-})
-$SourceNone.Add_Click({
- $script:SourceUpdating=$true
- try{foreach($name in @($script:SourceControls.Keys)){$script:SourceSelection[$name]=$false;$script:SourceControls[$name].IsChecked=$false}}finally{$script:SourceUpdating=$false}
- Apply-Filter
-})
+}
 $TimeFilter.Add_SelectionChanged({
  if($script:CustomDialogActive){return}
  if($TimeFilter.SelectedIndex -eq 6){
@@ -1854,16 +2055,10 @@ $script:SortHeaderNames=@('Time Created','Level','Event ID','Source','Computer',
 $EventGrid.Add_Sorting({
  param($sender,$e)
  $col=$e.Column
- $base=[string]$col.Header
- $base=$base -replace ' [\u2191\u2193]$',''
+ $base=switch([string]$col.SortMemberPath){'Time'{'Time Created'} 'ID'{'Event ID'} 'MessagePreview'{'Message'} default{[string]$col.SortMemberPath}}
  $direction=if($col.SortDirection -eq [System.ComponentModel.ListSortDirection]::Ascending){[System.ComponentModel.ListSortDirection]::Descending}else{[System.ComponentModel.ListSortDirection]::Ascending}
- foreach($c in $EventGrid.Columns){
-  $label=([string]$c.Header) -replace ' [\u2191\u2193]$',''
-  $c.Header=$label
-  $c.SortDirection=$null
- }
+ foreach($c in $EventGrid.Columns){$c.SortDirection=$null}
  $col.SortDirection=$direction
- $col.Header=$base + $(if($direction -eq [System.ComponentModel.ListSortDirection]::Ascending){' '+[char]0x2191}else{' '+[char]0x2193})
  $view=[System.Windows.Data.CollectionViewSource]::GetDefaultView($EventGrid.ItemsSource)
  $property=switch($base){'Time Created'{'Time'}'Event ID'{'ID'}'Message'{'MessagePreview'}default{$base}}
  $view.SortDescriptions.Clear()
