@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  ECHO v2.3.36 - Event Correlation & History Observer (WPF Edition)
+  ECHO v2.3.38 - Event Correlation & History Observer (WPF Edition)
 .DESCRIPTION
   Read-only, dark-themed event explorer for Windows, Azure Local and offline SDDC EVTX.
   Live nodes, optional cluster discovery, SDDC node tabs, correlation, filters and CSV export.
@@ -15,7 +15,7 @@
 # ECHO portable Log Parser payload: GZip + Base64, extracts only; no MSI install or registry changes.
 # Embedded Microsoft Log Parser binaries supplied by the user.
 
-$script:Version              = '2.3.36'
+$script:Version              = '2.3.38'
 
 # =====================================================
 #region Telemetry Information
@@ -413,7 +413,10 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
    <Border Grid.Column="0" Background="#0A1D2E" BorderBrush="#27485F" BorderThickness="1" CornerRadius="5" Margin="1,1,0,1">
     <DockPanel>
      <TextBlock DockPanel.Dock="Top" Text="  &#x25C9;  EVENT SOURCES" FontWeight="SemiBold" Foreground="#8EDBFF" FontSize="12" Padding="7,12" Background="#112D43"/>
-     <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Margin="8,8,8,3" Padding="6,5" Background="#112D43" Foreground="#E8F4FF" BorderBrush="#31516A" ToolTip="Search the Event Sources tree by name or full channel path (for example Hyper)"/>
+     <DockPanel DockPanel.Dock="Top" Margin="8,8,8,3" LastChildFill="True">
+      <Button x:Name="BtnResetSourceSearch" DockPanel.Dock="Right" Width="28" Margin="5,0,0,0" Padding="0" Content="&#x2715;" Style="{StaticResource ActionButton}" ToolTip="Reset Event Sources search and show all sources" IsEnabled="False"/>
+      <TextBox x:Name="SearchBox" Padding="6,5" Background="#112D43" Foreground="#E8F4FF" BorderBrush="#31516A" ToolTip="Search the Event Sources tree by name or full channel path (for example Hyper)"/>
+     </DockPanel>
      <TreeView x:Name="LogTree" Background="#0A1D2E" BorderThickness="0" Margin="8" Foreground="#E8F4FF"/>
     </DockPanel>
    </Border>
@@ -485,7 +488,7 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
 '@
 $reader=New-Object System.Xml.XmlNodeReader $xaml
 $script:Window=[Windows.Markup.XamlReader]::Load($reader)
-$names=@('BrandIcon','VersionText','NavEvents','NavExport','NavSettings','BtnRefresh','BtnStop','BtnOpenSDDC','TimeFilter','LevelMenu','LevelSearch','LevelAll','LevelNone','LevelChoices','LevelHeaderLabel','EventIDMenu','EventIDSearch','EventIDAll','EventIDNone','EventIDChoices','EventIDHeaderLabel','SourceMenu','SourceSearch','SourceAll','SourceNone','SourceChoices','SourceHeaderLabel','ComputerMenu','ComputerSearch','ComputerAll','ComputerNone','ComputerChoices','ComputerHeaderLabel','EventCount','SearchBox','FilterTime','FilterLevel','FilterID','FilterSource','FilterComputer','FilterMessage','BtnClearFilters','BtnAddNode','BtnCorrelate','NodeTabs','LogTree','EventGrid','BtnCopy','DetailTabs','DetailTime','DetailLevel','DetailSource','DetailComputer','DetailMessage','StatusText','BusyBar','CurrentClock','UtcClock')
+$names=@('BrandIcon','VersionText','NavEvents','NavExport','NavSettings','BtnRefresh','BtnStop','BtnOpenSDDC','TimeFilter','LevelMenu','LevelSearch','LevelAll','LevelNone','LevelChoices','LevelHeaderLabel','EventIDMenu','EventIDSearch','EventIDAll','EventIDNone','EventIDChoices','EventIDHeaderLabel','SourceMenu','SourceSearch','SourceAll','SourceNone','SourceChoices','SourceHeaderLabel','ComputerMenu','ComputerSearch','ComputerAll','ComputerNone','ComputerChoices','ComputerHeaderLabel','EventCount','SearchBox','BtnResetSourceSearch','FilterTime','FilterLevel','FilterID','FilterSource','FilterComputer','FilterMessage','BtnClearFilters','BtnAddNode','BtnCorrelate','NodeTabs','LogTree','EventGrid','BtnCopy','DetailTabs','DetailTime','DetailLevel','DetailSource','DetailComputer','DetailMessage','StatusText','BusyBar','CurrentClock','UtcClock')
 foreach($n in $names){Set-Variable -Name $n -Scope Script -Value $script:Window.FindName($n)}
 $EventGrid.ItemsSource=$script:VisibleItems
 $VersionText.Text="v$script:Version"
@@ -779,6 +782,26 @@ function Filter-EchoEventSources {
   if($root -is [System.Windows.Controls.TreeViewItem]){
    [void](Test-EchoSourceTreeMatch $root $term $false)
   }
+ }
+}
+# Reset the expanded branches after clearing an Event Sources search.
+# Preserve the normal top-level navigation layout while collapsing the
+# many nested branches that were automatically opened by search matches.
+function Reset-EchoSourceTreeExpansion {
+ if(-not $LogTree){return}
+ foreach($root in $LogTree.Items){
+  if($root -isnot [System.Windows.Controls.TreeViewItem]){continue}
+  $stack=New-Object 'System.Collections.Stack'
+  $stack.Push($root)
+  while($stack.Count -gt 0){
+   $node=$stack.Pop()
+   foreach($child in $node.Items){
+    if($child -is [System.Windows.Controls.TreeViewItem]){$stack.Push($child)}
+   }
+   $node.IsExpanded=$false
+  }
+  $label=if($root.Header -is [System.Windows.Controls.TextBlock]){[string]$root.Header.Text}else{[string]$root.Header}
+  if($label -in @('Windows Logs','Installed Features')){$root.IsExpanded=$true}
  }
 }
 function Populate-Tree {
@@ -2014,7 +2037,15 @@ $LogTree.Add_MouseDoubleClick({
  $selected=$LogTree.SelectedItem
  if($selected -and -not [string]::IsNullOrWhiteSpace([string]$selected.Tag)){Start-Query}
 })
-$SearchBox.Add_TextChanged({Filter-EchoEventSources})
+$SearchBox.Add_TextChanged({
+ $BtnResetSourceSearch.IsEnabled=(-not [string]::IsNullOrWhiteSpace([string]$SearchBox.Text))
+ Filter-EchoEventSources
+})
+$BtnResetSourceSearch.Add_Click({
+ $SearchBox.Clear()  # TextChanged restores visibility without changing other filters.
+ Reset-EchoSourceTreeExpansion  # Collapse search-expanded folders to the normal navigation layout.
+ $SearchBox.Focus()
+})
 foreach($filterBox in @($FilterTime,$FilterLevel,$FilterID,$FilterSource,$FilterComputer,$FilterMessage)){
  $filterBox.Add_TextChanged({Apply-Filter})
 }
