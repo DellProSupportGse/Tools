@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.734"
+    $ver="0.735"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -2565,7 +2565,7 @@ function Send-ToolTelemetry {
         if (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Fixing mismatched PS modules...Est time less than $($badModules.count+1) Minutes..."
             $solutionState=(Get-SolutionUpdate -Verbose:$false).State
-            if ($solutionState -eq "Installing" -or $solutionState -eq "InstallationFailed") {
+            if ($solutionState -eq "Installing") {
                 Write-ToHost "Cannot fix modules while a solution update is in process. Please complete the solution update" -Level 4 -Checkmark 4
             } else {
                 Invoke-Command -ComputerName $nodes -ScriptBlock {
@@ -2575,32 +2575,39 @@ function Send-ToolTelemetry {
                         Uninstall-Module -Name AzStackHci.EnvironmentChecker -AllVersions -ErrorAction SilentlyContinue -Force
                     }
                 }
-                if ($badModules.ModuleName -match "Az.Accounts") {
-                    $azAccountsVer=($badModules | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
-                } else {
-                    $azAccountsVer=[version]((Get-InstalledModule -Name Az.Accounts).Version)
-                }
-                Foreach ($badModule in $badModules) {    
-                    Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
-                        $badModule=$using:badModule
-                        #$badModule
-                        if (-not (((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version | Foreach {[version]$_}) -match $badModule.RequiredVersion)) {
-                                Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose
-                        }
+                If ((Get-Command Remediate-PSModules -ErrorAction SilentlyContinue)) {
 
-                    } -AsJob -JobName "InstallModules-$($badmodule.ModuleName)" | Out-Null
-                }
-                #Get-Job
-                Get-Job -Name "InstallModules*" | Receive-Job -Wait
-                Get-Job -Name "InstallModules*" | Remove-Job
-            
-                Foreach ($badModule in $badModules) {
-                    Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
-                        Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose }
+                    Invoke-Command -ComputerName ($badModules.NodeName | sort -Unique) -ScriptBlock {
+                            Remediate-PSModules
                     }
-                }
-                Invoke-Command -ComputerName $nodes -ScriptBlock {
-                    Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose }
+                } else {
+                    if ($badModules.ModuleName -match "Az.Accounts") {
+                        $azAccountsVer=($badModules | ? ModuleName -eq "Az.Accounts" | Select -first 1).RequiredVersion
+                    } else {
+                        $azAccountsVer=[version]((Get-InstalledModule -Name Az.Accounts).Version)
+                    }
+                    Foreach ($badModule in $badModules) {    
+                        Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
+                            $badModule=$using:badModule
+                            #$badModule
+                            if (-not (((Get-InstalledModule -Name $badModule.ModuleName -AllVersions).Version | Foreach {[version]$_}) -match $badModule.RequiredVersion)) {
+                                    Install-Module -Name $badModule.ModuleName -RequiredVersion $badModule.RequiredVersion -Force -Verbose
+                            }
+
+                        } -AsJob -JobName "InstallModules-$($badmodule.ModuleName)" | Out-Null
+                    }
+                    #Get-Job
+                    Get-Job -Name "InstallModules*" | Receive-Job -Wait
+                    Get-Job -Name "InstallModules*" | Remove-Job
+            
+                    Foreach ($badModule in $badModules) {
+                        Invoke-Command -ComputerName $badModule.NodeName -ScriptBlock {
+                            Get-InstalledModule -Name $using:badModule.ModuleName -AllVersions | Where-Object { [version]$_.Version -ne $using:badModule.RequiredVersion } | ForEach-Object { Uninstall-Module -Name $using:badModule.ModuleName -RequiredVersion $_.Version -Force -Verbose }
+                        }
+                    }
+                    Invoke-Command -ComputerName $nodes -ScriptBlock {
+                        Get-InstalledModule -Name Az.Accounts -AllVersions | Where-Object { [version]$_.Version -ne $using:azAccountsVer } | ForEach-Object { Uninstall-Module -Name Az.Accounts -RequiredVersion $_.Version -Force -Verbose }
+                    }
                 }
                 if (Test-MismatchedPSModules) {Write-ToHost "Fix mismatched PS modules failed !!!" -Checkmark 4 -Level 4;$testPass=2
                 } else {
@@ -2719,7 +2726,7 @@ function Send-ToolTelemetry {
         
         # Check if any non-compliant nodes have iDrac version less than 7.30.30.54
         $minIdracVersion = [version]::new(7, 30, 30, 54)
-        $outdatedIdracNodes = $nonCompliantCpuFreq | Where-Object { $_.IdracVersion -and $_.IdracVersion -lt $minIdracVersion }
+        $outdatedIdracNodes = $nonCompliantCpuFreq | Where-Object { $_.IdracVersion -and $_.IdracVersion -lt $minIdracVersion -and $_.IdracVersion -gt [version]::new(5,0,0,0) }
         
         if ($outdatedIdracNodes) {
             Write-Host "Recommendation: Update iDrac firmware on node(s) $($outdatedIdracNodes.NodeName -join ',') to version 7.30.30.54 or later"
