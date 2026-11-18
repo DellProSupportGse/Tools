@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  ECHO v2.3.48 - Event Correlation & History Observer (WPF Edition)
+  ECHO v2.3.53 - Event Correlation & History Observer (WPF Edition)
 .DESCRIPTION
   Read-only, dark-themed event explorer for Windows, Azure Local and offline SDDC EVTX.
   Live nodes, optional cluster discovery, SDDC node tabs, correlation, filters and CSV export.
@@ -13,7 +13,7 @@
 #>
 #Requires -Version 5.1
 
-$script:Version              = '2.3.48'
+$script:Version              = '2.3.53'
 
 # =====================================================
 #region Telemetry Information
@@ -147,6 +147,10 @@ $script:VisibleItems=New-Object 'System.Collections.ObjectModel.ObservableCollec
 $script:Sessions=@{}
 $script:CurrentSession=$null
 $script:CurrentLog=$null
+$script:SelectedLogPaths=New-Object System.Collections.ArrayList
+# User-selected channel paths are global across node tabs; tree rebuilds must not overwrite them.
+$script:StickyLogPaths=New-Object System.Collections.ArrayList
+$script:SuppressTreeSelection=$false
 $script:LastResults=@()
 $script:CurrentJob=$null
 $script:JobTimer=$null
@@ -374,6 +378,7 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
       <Button x:Name="BtnResetSourceSearch" DockPanel.Dock="Right" Width="28" Margin="5,0,0,0" Padding="0" Content="&#x2715;" Style="{StaticResource ActionButton}" ToolTip="Reset Event Sources search and show all sources" IsEnabled="False"/>
       <TextBox x:Name="SearchBox" Padding="6,5" Background="#112D43" Foreground="#E8F4FF" BorderBrush="#31516A" ToolTip="Search the Event Sources tree by name or full channel path (for example Hyper)"/>
      </DockPanel>
+      <TextBlock DockPanel.Dock="Top" Text="Ctrl+click: combine channels  |  Click: single" Foreground="#84B9D5" FontSize="10" Margin="10,0,4,2"/>
      <TreeView x:Name="LogTree" Background="#0A1D2E" BorderThickness="0" Margin="8" Foreground="#E8F4FF"/>
     </DockPanel>
    </Border>
@@ -405,7 +410,10 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
        <DataGridTextColumn Binding="{Binding Computer}" SortMemberPath="Computer" Width="130" ElementStyle="{StaticResource EchoCellText}">
         <DataGridTextColumn.Header><TextBlock Text="Computer" ToolTip="Right-click to filter Computer"/></DataGridTextColumn.Header>
        </DataGridTextColumn>
-       <DataGridTextColumn Header="Message" Binding="{Binding MessagePreview}" Width="*" MinWidth="150" ElementStyle="{StaticResource EchoCellText}"/>
+       <DataGridTextColumn Header="Message" Binding="{Binding MessagePreview}" Width="2*" MinWidth="150" ElementStyle="{StaticResource EchoCellText}"/>
+        <DataGridTextColumn Binding="{Binding Log}" SortMemberPath="Log" Width="180" ElementStyle="{StaticResource EchoCellText}">
+         <DataGridTextColumn.Header><TextBlock Text="Log" ToolTip="Right-click to show or hide loaded log channels without reloading"/></DataGridTextColumn.Header>
+        </DataGridTextColumn>
       </DataGrid.Columns>
      </DataGrid>
      <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" Background="#31516A"/>
@@ -475,6 +483,7 @@ function New-TreeNode([string]$name,[string]$tag,[string]$icon=([string][char]0x
  $node=New-Object System.Windows.Controls.TreeViewItem
  $header=New-Object System.Windows.Controls.TextBlock
  $header.Text=$name
+ $header.Tag=$name
  $header.TextTrimming=[Windows.TextTrimming]::CharacterEllipsis
  $binding=New-Object Windows.Data.Binding('Foreground')
  $binding.Source=$node
@@ -483,6 +492,46 @@ function New-TreeNode([string]$name,[string]$tag,[string]$icon=([string][char]0x
  $node.Tag=$tag
  $node.ToolTip=$name
  return $node
+}
+function Update-EchoSelectedChannelMarkers {
+ $queue=New-Object 'System.Collections.Queue'
+ foreach($root in $LogTree.Items){$queue.Enqueue($root)}
+ while($queue.Count -gt 0){
+  $node=$queue.Dequeue()
+  if($node -isnot [System.Windows.Controls.TreeViewItem]){continue}
+  $path=[string]$node.Tag
+  if($path){
+   $checked=($script:SelectedLogPaths.Contains($path))
+   if($node.Header -is [System.Windows.Controls.TextBlock]){
+    $node.Header.FontWeight=if($checked){[Windows.FontWeights]::Bold}else{[Windows.FontWeights]::Normal}
+    $original=[string]$node.Header.Tag
+    $node.Header.Text=if($checked){([string][char]0x2611)+' '+$original}else{$original}
+   }
+   $node.ToolTip=if($checked){"Included in timeline: $path"}else{$path}
+   $node.Background=if($checked){[Windows.Media.BrushConverter]::new().ConvertFromString('#14658B')}else{[Windows.Media.Brushes]::Transparent}
+  }
+  foreach($child in $node.Items){if($child -is [System.Windows.Controls.TreeViewItem]){$queue.Enqueue($child)}}
+ }
+}
+function Set-EchoSelectedChannels([string]$path,[bool]$toggle){
+ if([string]::IsNullOrWhiteSpace($path)){return}
+ if(-not $toggle){
+  $script:SelectedLogPaths.Clear()
+  [void]$script:SelectedLogPaths.Add($path)
+ }else{
+  if($script:SelectedLogPaths.Contains($path)){
+   [void]$script:SelectedLogPaths.Remove($path)
+  }else{[void]$script:SelectedLogPaths.Add($path)}
+ }
+ # Only an explicit user selection updates the sticky channel set.
+ $script:StickyLogPaths.Clear()
+ foreach($selectedPath in $script:SelectedLogPaths){[void]$script:StickyLogPaths.Add([string]$selectedPath)}
+ Update-EchoSelectedChannelMarkers
+ if($script:SelectedLogPaths.Count -gt 0){Start-Query}else{
+  Stop-Query -Silent $true
+  $script:Items.Clear();$script:VisibleItems.Clear();$script:PendingEvents.Clear()
+  $EventCount.Text='Events (0)';Set-Status 'No event channels selected'
+ }
 }
 function Add-LogHierarchy([Windows.Controls.TreeViewItem]$root,[string]$name,[string]$path,[hashtable]$cache){
  # Event Viewer hierarchy: hyphens and slashes separate levels, except Hyper-V.
@@ -508,6 +557,7 @@ function Add-LogHierarchy([Windows.Controls.TreeViewItem]$root,[string]$name,[st
    # A channel can itself be the parent of other channels; retain its log path.
    $parent.Tag=$path
    $parent.ToolTip=$name
+   if($path -match '(?i)\.evtx$'){Set-EchoOfflineEvtxMarker $parent $path}
   }
  }
 }
@@ -662,6 +712,57 @@ function Add-Session([string]$name,[string]$kind,[string]$path='', [string[]]$fi
  return $tab
 }
 function Get-Session {if($NodeTabs.SelectedItem){return $script:Sessions[[string]$NodeTabs.SelectedItem.Tag]}return $null}
+# Small EVTX files (typically ~68 KB) are often empty. Verify with a
+# one-record query instead of guessing solely from size. Larger files are not
+# scanned during tree construction, keeping offline folder opening responsive.
+$script:EchoEmptyEvtxCache=@{}
+function Get-EchoOfflineEvtxInfo([string]$path){
+ if($script:EchoEmptyEvtxCache.ContainsKey($path)){
+  return $script:EchoEmptyEvtxCache[$path]
+ }
+ $info=[pscustomobject]@{IsEmpty=$false;Small=$false;SizeBytes=0L;Verified=$false}
+ try {
+  $file=Get-Item -LiteralPath $path -ErrorAction Stop
+  $info.SizeBytes=[long]$file.Length
+  if($file.Length -le 73728){
+   $info.Small=$true
+   try {
+    $sample=Get-WinEvent -Path $path -MaxEvents 1 -ErrorAction Stop
+    $info.IsEmpty=($null -eq $sample)
+    $info.Verified=$true
+   }catch {
+    # Get-WinEvent throws when a valid file has no events. Distinguish that
+    # from access, corruption, and other errors to avoid false EMPTY labels.
+    $ex=$_.Exception
+    $fqid=[string]$_.FullyQualifiedErrorId
+    $message=[string]$ex.Message
+    if($fqid -match 'NoMatchingEventsFound' -or $message -match '(?i)no events were found|no events match'){
+     $info.IsEmpty=$true
+     $info.Verified=$true
+    }
+   }
+  }
+ }catch{}
+ $script:EchoEmptyEvtxCache[$path]=$info
+ return $info
+}
+function Set-EchoOfflineEvtxMarker($node,[string]$path){
+ if(-not $node -or [string]::IsNullOrWhiteSpace($path)){return}
+ $info=Get-EchoOfflineEvtxInfo $path
+ if($node.Header -isnot [Windows.Controls.TextBlock]){return}
+ $base=[string]$node.Header.Tag
+ if($info.IsEmpty){
+  $node.Header.Tag=$base+' [EMPTY]'
+  $node.Header.Text=$node.Header.Tag
+  $node.Header.Foreground=[Windows.Media.Brushes]::Gray
+  # Selected-channel styling binds Foreground to the node, so dim the node.
+  $node.Foreground=[Windows.Media.Brushes]::Gray
+  $node.ToolTip="Empty EVTX - no event records; $($info.SizeBytes) bytes`n$path"
+ }elseif($info.Small){
+  # A small unreadable log must not be described as definitely empty.
+  $node.ToolTip="Small EVTX ($($info.SizeBytes) bytes); empty status not confirmed`n$path"
+ }
+}
 function Get-LogName([string]$file){
  $n=[IO.Path]::GetFileNameWithoutExtension($file)
  $n=$n -replace '%4','/' -replace '_','-'
@@ -713,6 +814,39 @@ function Get-InstalledEventFeatureGroups([string]$computer,[string]$kind){
   }
   return $null
  }
+# Offline EVTX tabs store absolute file paths as TreeView tags, while live
+# nodes store event channel names. Sticky selections must compare a stable
+# channel identity and resolve it to the CURRENT node's own file path.
+function Get-EchoChannelIdentity([string]$path){
+ if([string]::IsNullOrWhiteSpace($path)){return ''}
+ if($path -like 'ECHO:BootstrapETLFile:*' -or $path -like 'ECHO:ECEETLFile:*'){
+  return $path.ToLowerInvariant()
+ }
+ $channel=$path
+ if($channel -match '(?i)\.evtx$'){
+  $channel=Get-LogName $channel
+ }
+ # Archived EVTX file names use '-' where Windows Event Log channels use '/'.
+ # Keep the provider and leaf name intact to distinguish SMBServer from SMBClient.
+ return ($channel -replace '/', '-' -replace '%4', '-').ToLowerInvariant()
+}
+function Find-EchoStickyLogTreeItem($nodes,[string]$wantedLog){
+ # Exact tag is always preferred (particularly on a single node).
+ $exact=Find-EchoLogTreeItem $nodes $wantedLog
+ if($exact){return $exact}
+ $identity=Get-EchoChannelIdentity $wantedLog
+ if(-not $identity){return $null}
+ $queue=New-Object 'System.Collections.Queue'
+ foreach($root in $nodes){$queue.Enqueue($root)}
+ while($queue.Count -gt 0){
+  $node=$queue.Dequeue()
+  if($node -isnot [System.Windows.Controls.TreeViewItem]){continue}
+  $candidate=[string]$node.Tag
+  if($candidate -and (Get-EchoChannelIdentity $candidate) -eq $identity){return $node}
+  foreach($child in $node.Items){$queue.Enqueue($child)}
+ }
+ return $null
+}
 # Non-destructive search of the Event Sources navigation tree.
 # A match on a full channel path (e.g. Microsoft-Windows-Hyper-V-VMMS/Admin)
 # reveals its ancestors; matching a folder label reveals that entire branch.
@@ -762,12 +896,10 @@ function Reset-EchoSourceTreeExpansion {
  }
 }
 function Populate-Tree {
- # Capture the outgoing channel BEFORE clearing the tree.
- if(-not [string]::IsNullOrWhiteSpace([string]$script:CurrentLog)){
-  $script:LastSelectedLog=[string]$script:CurrentLog
- }
+ # Preserve user-picked channels in StickyLogPaths; resolve offline file paths per node.
  $script:LoadingTree=$true
  try {
+  $script:SelectedLogPaths.Clear()
   $LogTree.Items.Clear()
   $s=Get-Session
   if(-not $s){return}
@@ -788,7 +920,7 @@ function Populate-Tree {
    $available=@($cached.Available)
   } elseif($s.Kind -eq 'offline'){
    foreach($file in $s.Files){$available+=,[pscustomobject]@{Name=(Get-LogName $file);Path=$file}}
-   $TimeFilter.SelectedIndex=1
+   # Preserve the current time preset when switching to an offline node.
   } else {
    # A single inaccessible/disabled channel must not abort enumeration on
    # Windows Server. Get-WinEvent -ListLog * can emit non-terminating errors.
@@ -953,6 +1085,7 @@ function Populate-Tree {
      $leaf.ToolTip=[string]$log.Name
      [void]$aseRoot.Items.Add($leaf)
     }elseif($name -in @('Application','Security','System','Setup','ForwardedEvents')){
+    if($s.Kind -eq 'offline'){Set-EchoOfflineEvtxMarker $item $path}
     [void]$windows.Items.Add($item)
    } else {
     $matched=$false
@@ -994,32 +1127,51 @@ function Populate-Tree {
   if($services.Items.Count){[void]$LogTree.Items.Add($services)}
   if($installedRoot.Items.Count){$installedRoot.IsExpanded=$true}
   $windows.IsExpanded=$true
-   # Carry the active channel across nodes. Search the complete hierarchy,
-   # including installed-feature and Applications/Services branches.
-   $wantedLog=[string]$script:LastSelectedLog
-   $restore=$null
-   if(-not [string]::IsNullOrWhiteSpace($wantedLog)){
-    $restore=Find-EchoLogTreeItem $LogTree.Items $wantedLog
+   # Restore by channel identity, then use THIS node's actual file path.
+   # EVTX folder nodes have identical channel names but different file paths.
+   $restoredItems=New-Object System.Collections.ArrayList
+   if($script:StickyLogPaths.Count -gt 0){
+    foreach($wantedLog in $script:StickyLogPaths){
+     $restore=Find-EchoStickyLogTreeItem $LogTree.Items ([string]$wantedLog)
+     if($restore){
+      [void]$script:SelectedLogPaths.Add([string]$restore.Tag)
+      [void]$restoredItems.Add($restore)
+     }
+    }
+   }else{
+    # Default only on first launch, before the user has picked a channel.
+    $default=Find-EchoLogTreeItem $LogTree.Items 'System'
+    if(-not $default){$default=Find-EchoLogTreeItem $LogTree.Items 'Application'}
+    if($default){
+     [void]$script:SelectedLogPaths.Add([string]$default.Tag)
+     [void]$restoredItems.Add($default)
+    }
    }
-   if($restore){
-    $ancestor=$restore.Parent
+   if($restoredItems.Count -gt 0){
+    $first=$restoredItems[0]
+    $ancestor=$first.Parent
     while($ancestor -is [System.Windows.Controls.TreeViewItem]){
      $ancestor.IsExpanded=$true
      $ancestor=$ancestor.Parent
     }
-    $restore.IsSelected=$true
-    $restore.BringIntoView()
-   }elseif($windows.Items.Count){
-    $systemLog=@($windows.Items | Where-Object {[string]$_.Tag -eq 'System'}) | Select-Object -First 1
-    if($systemLog){$systemLog.IsSelected=$true}else{$windows.Items[0].IsSelected=$true}
+    $first.IsSelected=$true
+    $first.BringIntoView()
    }
-   elseif($services.Items.Count){$services.IsExpanded=$true;$services.Items[0].IsSelected=$true}
+   Update-EchoSelectedChannelMarkers
   Set-Status "Selected $($s.Name) | $($available.Count) available event logs"
  } finally {$script:LoadingTree=$false}
  # Reapply source-tree search when switching nodes or refreshing discovery.
  Filter-EchoEventSources
- # On-demand query only after tree has finished building.
- if($LogTree.SelectedItem -and $LogTree.SelectedItem.Tag){Start-Query}
+ # Query the exact restored channel set. Never silently replace an unavailable
+ # user-selected channel with Application or System on another node.
+ if($script:SelectedLogPaths.Count -gt 0){
+  Start-Query
+ }elseif($script:StickyLogPaths.Count -gt 0){
+  Stop-Query -Silent $true
+  $script:Items.Clear();$script:VisibleItems.Clear();$script:PendingEvents.Clear()
+  $EventCount.Text='Events (0)'
+  Set-Status "Selected channel(s) are not available on $($s.Name): $($script:StickyLogPaths -join ', ')"
+ }
 }
 $script:CustomTimeSeconds=3600L
 $script:LastTimeIndex=1
@@ -1110,12 +1262,21 @@ function Start-Query {
  if($script:LoadingTree){return}
  $s=Get-Session
  if(-not $s){return}
- $item=$LogTree.SelectedItem
- if(-not $item -or -not $item.Tag){return}
- $path=[string]$item.Tag
+ if($script:SelectedLogPaths.Count -eq 0){
+  $item=$LogTree.SelectedItem
+  if(-not $item -or -not $item.Tag){return}
+  [void]$script:SelectedLogPaths.Add([string]$item.Tag)
+  Update-EchoSelectedChannelMarkers
+ }
+ $paths=@($script:SelectedLogPaths | ForEach-Object {[string]$_})
+ if($paths.Count -eq 0){return}
+ $path=[string]$paths[0]
  if($script:CurrentJob){Stop-Query -Silent $true}
  $script:CurrentLog=$path
  $script:LastSelectedLog=$path
+ $view=[System.Windows.Data.CollectionViewSource]::GetDefaultView($EventGrid.ItemsSource)
+ if($view){$view.SortDescriptions.Clear()}
+ foreach($col in $EventGrid.Columns){$col.SortDirection=$null}
  $script:Items.Clear();$script:VisibleItems.Clear();$script:PendingEvents.Clear()
  $script:ColumnLastCount=-1
  $DetailMessage.Text='';$DetailTime.Text='';$DetailLevel.Text='';$DetailSource.Text='';$DetailComputer.Text=''
@@ -1134,12 +1295,12 @@ function Start-Query {
  }
  $script:BootstrapWindowSeconds=$offlineWindowSeconds
  $script:IncrementalUnfiltered=$false
- if($path -like 'ECHO:BootstrapETLFile:*' -or $path -like 'ECHO:ECEETLFile:*'){
+ if($paths.Count -gt 1 -or $path -like 'ECHO:BootstrapETLFile:*' -or $path -like 'ECHO:ECEETLFile:*'){
   $script:IncrementalUnfiltered=$true
   foreach($box in @($FilterTime,$FilterLevel,$FilterID,$FilterSource,$FilterComputer,$FilterMessage)){
    if(-not [string]::IsNullOrWhiteSpace([string]$box.Text)){$script:IncrementalUnfiltered=$false;break}
   }
-  foreach($column in @('Level','EventID','Source','Computer')){
+  foreach($column in @('Level','EventID','Source','Computer','Log')){
    foreach($selected in @($script:ColumnSelection[$column].Values)){
     if($selected -eq $false){$script:IncrementalUnfiltered=$false;break}
    }
@@ -1152,8 +1313,8 @@ function Start-Query {
   if($chosen.Count -eq 0){Set-Status 'No tabs selected for correlation';return}
   $nodes=@($chosen | ForEach-Object { [pscustomobject]@{Name=$_.Name;Kind=$_.Kind;Files=@($_.Files)} })
  }elseif($s.Kind -eq 'live'){$nodes=@([pscustomobject]@{Name=$s.Name;Kind='live';Files=@()})}
- $script:CurrentJob=Start-Job -ArgumentList $s.Kind,$path,$nodes,$since,$offlineWindowSeconds -ScriptBlock {
-  param($kind,$log,$targets,$from,$offlineSeconds)
+ $script:CurrentJob=Start-Job -ArgumentList $s.Kind,$paths,$nodes,$since,$offlineWindowSeconds -ScriptBlock {
+  param($kind,$logs,$targets,$from,$offlineSeconds)
   function Get-OfflineStartTime([string]$evtx,[long]$seconds){
    if($seconds -le 0){return $null}
    # Query one record to obtain the actual most recent event timestamp.
@@ -1259,6 +1420,7 @@ function Start-Query {
     }finally{if($session){Remove-PSSession $session -ErrorAction SilentlyContinue}}
    }
   }
+  foreach($log in @($logs)){
   if($kind -eq 'offline'){
    $f=@{Path=$log}
    try{
@@ -1307,12 +1469,13 @@ function Start-Query {
     }
    }
   }
+  } # next selected channel
  }
  Set-Busy $true
- Set-Status "Querying $($s.Name) / $([IO.Path]::GetFileName($path))..."
+ Set-Status "Querying $($s.Name) / $($paths.Count) channel(s)..."
  if($script:JobTimer){$script:JobTimer.Stop()}
  $script:JobTimer=New-Object Windows.Threading.DispatcherTimer
- $script:JobTimer.Interval=[TimeSpan]::FromMilliseconds($(if($path -like 'ECHO:BootstrapETLFile:*' -or $path -like 'ECHO:ECEETLFile:*'){100}else{250}))
+ $script:JobTimer.Interval=[TimeSpan]::FromMilliseconds($(if($paths.Count -gt 1 -or $path -like 'ECHO:BootstrapETLFile:*' -or $path -like 'ECHO:ECEETLFile:*'){100}else{250}))
  $script:JobTimer.Add_Tick({
   if(-not $script:CurrentJob){$script:JobTimer.Stop();return}
   $job=$script:CurrentJob
@@ -1327,7 +1490,7 @@ function Start-Query {
    }
   }catch{}
   $processed=0
-   $displayBatch=if($script:CurrentLog -like 'ECHO:BootstrapETLFile:*' -or $script:CurrentLog -like 'ECHO:ECEETLFile:*'){2000}else{$script:BatchSize}
+   $displayBatch=if($script:SelectedLogPaths.Count -gt 1 -or $script:CurrentLog -like 'ECHO:BootstrapETLFile:*' -or $script:CurrentLog -like 'ECHO:ECEETLFile:*'){2000}else{$script:BatchSize}
    while($script:PendingEvents.Count -gt 0 -and $processed -lt $displayBatch){
     $ev=$script:PendingEvents.Dequeue()
     try{
@@ -1352,8 +1515,16 @@ function Start-Query {
    # Bootstrap presets were applied inside the reader before transmission.
    # Do one final refresh only if other column filters are active.
    if(-not $script:IncrementalUnfiltered){Apply-Filter}
-   if($errors.Count){Set-Status "Loaded $($script:Items.Count) events. Query error: $($errors[0])"}
-   else{Set-Status "Complete | $($script:CurrentLog) | $($script:Items.Count) events"}
+   if($script:SelectedLogPaths.Count -gt 1){
+    # Sort after loading: sorting a growing WPF grid every batch is expensive.
+    $view=[System.Windows.Data.CollectionViewSource]::GetDefaultView($EventGrid.ItemsSource)
+    $view.SortDescriptions.Clear()
+    $view.SortDescriptions.Add((New-Object System.ComponentModel.SortDescription('Time',[System.ComponentModel.ListSortDirection]::Descending)))
+    foreach($col in $EventGrid.Columns){$col.SortDirection=$null}
+    $EventGrid.Columns[0].SortDirection=[System.ComponentModel.ListSortDirection]::Descending
+   }
+   if($errors.Count){Set-Status "Loaded $($script:Items.Count) events from $($script:SelectedLogPaths.Count) channel(s). Error: $($errors[0])"}
+   else{Set-Status "Complete | $($script:SelectedLogPaths.Count) channel(s) | $($script:Items.Count) events"}
   }else{
    Set-Status "Loading $($script:CurrentLog): $($script:Items.Count) events displayed, $($script:PendingEvents.Count) queued..."
   }
@@ -1377,7 +1548,7 @@ function Test-EchoTimeFilter([string]$filter,[string]$eventTime){
  return ($eventTime.IndexOf($filter,[StringComparison]::OrdinalIgnoreCase) -ge 0)
 }
 $script:ColumnSelection=@{};$script:ColumnControls=@{};$script:ColumnUpdating=$false;$script:ColumnLastCount=-1
-foreach($field in @('Level','EventID','Source','Computer')){$script:ColumnSelection[$field]=@{};$script:ColumnControls[$field]=@{}}
+foreach($field in @('Level','EventID','Source','Computer','Log')){$script:ColumnSelection[$field]=@{};$script:ColumnControls[$field]=@{}}
 
 # Use a high-contrast checkbox template rather than the OS theme's dark check glyph.
 # Unchecked: light square; checked: cyan square with a dark, visible check mark.
@@ -1408,11 +1579,12 @@ $script:FilterCheckStyle=[Windows.Markup.XamlReader]::Parse(@'
 </Style>
 '@)
 
+# Right-click Log filters the already loaded events in memory; it does not change SelectedLogPaths or trigger Start-Query.
 # Build filter popups programmatically.  A ContextMenu nested in a DataGridColumn.Header
 # has its own WPF NameScope, so Window.FindName cannot resolve its controls.
 $script:ColumnPopups=@{}
-foreach($field in @('Level','EventID','Source','Computer')){
- $columnIndex=switch($field){'Level'{1} 'EventID'{2} 'Source'{3} 'Computer'{4}}
+foreach($field in @('Level','EventID','Source','Computer','Log')){
+ $columnIndex=switch($field){'Level'{1} 'EventID'{2} 'Source'{3} 'Computer'{4} 'Log'{6}}
  $display=if($field -eq 'EventID'){'Event ID'}else{$field}
  $label=New-Object System.Windows.Controls.TextBlock
  $label.Text=$display;$label.ToolTip="Right-click to filter $display"
@@ -1475,7 +1647,7 @@ $EventGrid.AddHandler([Windows.UIElement]::PreviewMouseRightButtonUpEvent,
   }
   if(-not $origin -or -not $origin.Column){return}
   $field=switch([string]$origin.Column.SortMemberPath){
-   'Level'{'Level'} 'ID'{'EventID'} 'Source'{'Source'} 'Computer'{'Computer'} default{$null}
+   'Level'{'Level'} 'ID'{'EventID'} 'Source'{'Source'} 'Computer'{'Computer'} 'Log'{'Log'} default{$null}
   }
   if(-not $field){return}
   try{
@@ -1510,7 +1682,7 @@ function Update-ColumnChoices {
  if($script:ColumnUpdating -or (-not $Force -and $script:ColumnLastCount -eq $script:Items.Count)){return}
  $script:ColumnUpdating=$true
  try {
-  foreach($field in @('Level','EventID','Source','Computer')){
+  foreach($field in @('Level','EventID','Source','Computer','Log')){
    $panel=Get-Variable -Name ($field+'Choices') -ValueOnly
    $panel.Children.Clear();$script:ColumnControls[$field].Clear()
     # In PowerShell, switch sets $_ to its own input (the field name here).
@@ -1522,6 +1694,7 @@ function Update-ColumnChoices {
       'EventID'  {[string]$eventItem.ID}
       'Source'   {[string]$eventItem.Source}
       'Computer' {[string]$eventItem.Computer}
+      'Log'      {[string]$eventItem.Log}
      }
     } | Where-Object {-not [string]::IsNullOrWhiteSpace($_)} | Sort-Object -Unique)
     # Event IDs are numbers, not strings: 1, 2, 3, 10, 10016.
@@ -1548,7 +1721,7 @@ function Update-ColumnChoices {
  Update-ColumnSearch
 }
 function Update-ColumnSearch {
- foreach($field in @('Level','EventID','Source','Computer')){
+ foreach($field in @('Level','EventID','Source','Computer','Log')){
   $search=Get-Variable -Name ($field+'Search') -ValueOnly
   $term=[string]$search.Text
   foreach($key in @($script:ColumnControls[$field].Keys)){
@@ -1564,8 +1737,8 @@ function Apply-Filter {
  $script:VisibleItems.Clear()
  foreach($item in $script:Items){
   $hidden=$false
-  foreach($field in @('Level','EventID','Source','Computer')){
-   $value=switch($field){'Level'{[string]$item.Level} 'EventID'{[string]$item.ID} 'Source'{[string]$item.Source} 'Computer'{[string]$item.Computer}}
+  foreach($field in @('Level','EventID','Source','Computer','Log')){
+   $value=switch($field){'Level'{[string]$item.Level} 'EventID'{[string]$item.ID} 'Source'{[string]$item.Source} 'Computer'{[string]$item.Computer} 'Log'{[string]$item.Log}}
    if($script:ColumnSelection[$field].ContainsKey($value) -and -not $script:ColumnSelection[$field][$value]){$hidden=$true;break}
   }
   if($hidden){continue}
@@ -1604,7 +1777,7 @@ function Apply-Filter {
   $script:VisibleItems.Add($item)
  }
  $EventCount.Text="Events ($($script:VisibleItems.Count))"
- foreach($field in @('Level','EventID','Source','Computer')){
+ foreach($field in @('Level','EventID','Source','Computer','Log')){
   $count=$script:ColumnControls[$field].Count
   $selected=@($script:ColumnControls[$field].Keys | Where-Object {$script:ColumnSelection[$field][$_]}).Count
   $label=Get-Variable -Name ($field+'HeaderLabel') -ValueOnly
@@ -2102,40 +2275,39 @@ function Select-EchoNode {
  Populate-Tree
 }
 $NodeTabs.Add_SelectionChanged({if($_.Source -eq $NodeTabs){Select-EchoNode}})
-# TreeViewItem handles selection for any click on its row; the expander retains its own click.
+# Ctrl+click adds/removes channels; ordinary click opens a single channel.
+# Handle leaves here before the TreeView changes SelectedItem (WPF normally only selects one).
 $LogTree.AddHandler([System.Windows.Controls.TreeViewItem]::PreviewMouseLeftButtonDownEvent,
  [System.Windows.Input.MouseButtonEventHandler]{
   param($sender,$e)
   $source=$e.OriginalSource
-  $expander=[Windows.DependencyObject]$source
-  while($expander -and $expander -ne $LogTree){
-   if($expander -is [Windows.Controls.Primitives.ToggleButton]){return}
-   $expander=[Windows.Media.VisualTreeHelper]::GetParent($expander)
+  $ancestor=[Windows.DependencyObject]$source
+  while($ancestor -and $ancestor -ne $LogTree){
+   if($ancestor -is [Windows.Controls.Primitives.ToggleButton]){return}
+   $ancestor=[Windows.Media.VisualTreeHelper]::GetParent($ancestor)
   }
   $current=[Windows.DependencyObject]$source
   while($current -and $current -ne $LogTree){
    if($current -is [Windows.Controls.TreeViewItem]){
-    $current.IsSelected=$true
-    $current.Focus() | Out-Null
-    if(-not $current.Tag){$current.IsExpanded=-not $current.IsExpanded}
+    $path=[string]$current.Tag
+    if(-not $path){$current.IsExpanded=-not $current.IsExpanded; $e.Handled=$true;return}
+    $toggle=(([Windows.Input.Keyboard]::Modifiers -band [Windows.Input.ModifierKeys]::Control) -ne 0)
+    $script:SuppressTreeSelection=$true
+    try{if(-not $toggle){$current.IsSelected=$true}}finally{$script:SuppressTreeSelection=$false}
+    Set-EchoSelectedChannels $path $toggle
+    $e.Handled=$true
     return
    }
    $current=[Windows.Media.VisualTreeHelper]::GetParent($current)
   }
  },$true)
 $LogTree.Add_SelectedItemChanged({
- if($script:LoadingTree){return}
+ if($script:LoadingTree -or $script:SuppressTreeSelection){return}
  $selected=$_.NewValue
- if(-not $selected){return}
- if([string]::IsNullOrWhiteSpace([string]$selected.Tag)){
-  if($selected.HasItems){$selected.IsExpanded=-not $selected.IsExpanded}
-  return
+ if($selected -and -not [string]::IsNullOrWhiteSpace([string]$selected.Tag)){
+  # Keyboard navigation is single-select.
+  Set-EchoSelectedChannels ([string]$selected.Tag) $false
  }
- Start-Query
-})
-$LogTree.Add_MouseDoubleClick({
- $selected=$LogTree.SelectedItem
- if($selected -and -not [string]::IsNullOrWhiteSpace([string]$selected.Tag)){Start-Query}
 })
 $SearchBox.Add_TextChanged({
  $BtnResetSourceSearch.IsEnabled=(-not [string]::IsNullOrWhiteSpace([string]$SearchBox.Text))
@@ -2153,7 +2325,7 @@ $BtnClearFilters.Add_Click({
  foreach($filterBox in @($FilterTime,$FilterLevel,$FilterID,$FilterSource,$FilterComputer,$FilterMessage)){$filterBox.Clear()}
  Apply-Filter
 })
-foreach($field in @('Level','EventID','Source','Computer')){
+foreach($field in @('Level','EventID','Source','Computer','Log')){
  $search=Get-Variable -Name ($field+'Search') -ValueOnly
  $search.Add_TextChanged({Update-ColumnSearch})
  $all=Get-Variable -Name ($field+'All') -ValueOnly
@@ -2182,7 +2354,7 @@ $BtnStop.Add_Click({Stop-Query})
 $BtnOpenSDDC.Add_Click({Open-SDDC})
 $BtnAddNode.Add_Click({Add-RemoteNode})
 # Explicit sort indicators, including after changing to another column.
-$script:SortHeaderNames=@('Time Created','Level','Event ID','Source','Computer','Message')
+$script:SortHeaderNames=@('Time Created','Level','Event ID','Source','Computer','Message','Log')
 $EventGrid.Add_Sorting({
  param($sender,$e)
  $col=$e.Column
