@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-  ECHO v2.3.53 - Event Correlation & History Observer (WPF Edition)
+  ECHO v2.3.55 - Event Correlation & History Observer (WPF Edition)
 .DESCRIPTION
   Read-only, dark-themed event explorer for Windows, Azure Local and offline SDDC EVTX.
-  Live nodes, optional cluster discovery, SDDC node tabs, correlation, filters and CSV export.
+  Live nodes, optional cluster discovery, SDDC node tabs, parallel correlation, filters and CSV export.
 .USAGE
   powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\ECHO-WPF-v2.0.ps1
 .NOTES
@@ -13,7 +13,7 @@
 #>
 #Requires -Version 5.1
 
-$script:Version              = '2.3.53'
+$script:Version              = '2.3.54'
 
 # =====================================================
 #region Telemetry Information
@@ -159,7 +159,18 @@ $script:SettingsFolder=Join-Path $env:APPDATA 'ECHO'
 $script:SettingsFile=Join-Path $script:SettingsFolder 'LastSDDCFolder.txt'
 $script:LoadingTree=$false
 $script:CancelRequested=$false
-$script:BatchSize=300
+$script:BatchSize=2000
+$script:PreferenceFile=Join-Path $script:SettingsFolder 'Preferences.json'
+$script:QueryWatch=New-Object System.Diagnostics.Stopwatch
+$script:QueryElapsedSeconds=0.0
+try {
+ if(Test-Path -LiteralPath $script:PreferenceFile){
+  $prefs=Get-Content -LiteralPath $script:PreferenceFile -Raw -ErrorAction Stop | ConvertFrom-Json
+  $size=[int]$prefs.DisplayBatchSize
+  if($size -ge 100 -and $size -le 20000){$script:BatchSize=$size}
+ }
+}catch{}
+$script:LastFilterRefresh=[datetime]::MinValue
 $script:PendingEvents=New-Object 'System.Collections.Generic.Queue[object]'
 $script:CorrelationSelection=@{}
 # Each imported SDDC collection receives one distinct, reusable tab color.
@@ -395,7 +406,7 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
       <TextBox x:Name="FilterMessage" Grid.Column="5" Margin="3,5" ToolTip="Filter Message" VerticalContentAlignment="Center" />
       <Button x:Name="BtnClearFilters" Grid.Column="6" Content="Clear" Style="{StaticResource ActionButton}" Margin="3,5" Padding="4,2" ToolTip="Clear all six column filters"/>
      </Grid>
-     <DataGrid x:Name="EventGrid" Grid.Row="1" ItemsSource="{x:Null}" AlternationCount="2" Margin="1">
+     <DataGrid x:Name="EventGrid" Grid.Row="1" ItemsSource="{x:Null}" AlternationCount="2" Margin="1" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True">
       <DataGrid.Columns>
        <DataGridTextColumn Header="Time Created" Binding="{Binding Time}" Width="158" ElementStyle="{StaticResource EchoCellText}"/>
 <DataGridTextColumn Binding="{Binding Level}" SortMemberPath="Level" Width="100" ElementStyle="{StaticResource EchoCellText}">
@@ -443,6 +454,7 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
   </Grid>
   <Border Grid.Row="5" Background="#061A2C" BorderBrush="#1C405A" BorderThickness="1,1,0,0">
    <DockPanel Margin="10,4"><TextBlock x:Name="StatusText" Text="Ready" Foreground="#8FD4FF" VerticalAlignment="Center"/>
+    <TextBlock x:Name="QueryDuration" DockPanel.Dock="Left" Text="Query: --" Foreground="#B7D8EA" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" ToolTip="Elapsed time from query start through completion, including row display"/>
     <TextBlock x:Name="UtcClock" DockPanel.Dock="Right" Foreground="#B7D8EA" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,2,0" ToolTip="Current UTC time"/>
     <TextBlock x:Name="CurrentClock" DockPanel.Dock="Right" Foreground="#B7D8EA" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,2,0" ToolTip="Current local date and time on the computer running ECHO"/>
     <ProgressBar x:Name="BusyBar" Width="130" Height="5" DockPanel.Dock="Right" IsIndeterminate="True" Visibility="Collapsed" Margin="10,5" Foreground="#24A9F8"/>
@@ -453,7 +465,7 @@ $script:NodeColorIndex=Get-Random -Minimum 0 -Maximum $script:SDDCGroupColors.Co
 '@
 $reader=New-Object System.Xml.XmlNodeReader $xaml
 $script:Window=[Windows.Markup.XamlReader]::Load($reader)
-$names=@('BrandIcon','VersionText','NavEvents','NavExport','NavSettings','BtnRefresh','BtnStop','BtnOpenSDDC','TimeFilter','LevelMenu','LevelSearch','LevelAll','LevelNone','LevelChoices','LevelHeaderLabel','EventIDMenu','EventIDSearch','EventIDAll','EventIDNone','EventIDChoices','EventIDHeaderLabel','SourceMenu','SourceSearch','SourceAll','SourceNone','SourceChoices','SourceHeaderLabel','ComputerMenu','ComputerSearch','ComputerAll','ComputerNone','ComputerChoices','ComputerHeaderLabel','EventCount','SearchBox','BtnResetSourceSearch','FilterTime','FilterLevel','FilterID','FilterSource','FilterComputer','FilterMessage','BtnClearFilters','BtnAddNode','BtnCorrelate','NodeTabs','LogTree','EventGrid','BtnCopy','DetailTabs','DetailTime','DetailLevel','DetailSource','DetailComputer','DetailMessage','StatusText','BusyBar','CurrentClock','UtcClock')
+$names=@('BrandIcon','VersionText','NavEvents','NavExport','NavSettings','BtnRefresh','BtnStop','BtnOpenSDDC','TimeFilter','LevelMenu','LevelSearch','LevelAll','LevelNone','LevelChoices','LevelHeaderLabel','EventIDMenu','EventIDSearch','EventIDAll','EventIDNone','EventIDChoices','EventIDHeaderLabel','SourceMenu','SourceSearch','SourceAll','SourceNone','SourceChoices','SourceHeaderLabel','ComputerMenu','ComputerSearch','ComputerAll','ComputerNone','ComputerChoices','ComputerHeaderLabel','EventCount','SearchBox','BtnResetSourceSearch','FilterTime','FilterLevel','FilterID','FilterSource','FilterComputer','FilterMessage','BtnClearFilters','BtnAddNode','BtnCorrelate','NodeTabs','LogTree','EventGrid','BtnCopy','DetailTabs','DetailTime','DetailLevel','DetailSource','DetailComputer','DetailMessage','StatusText','QueryDuration','BusyBar','CurrentClock','UtcClock')
 foreach($n in $names){Set-Variable -Name $n -Scope Script -Value $script:Window.FindName($n)}
 $EventGrid.ItemsSource=$script:VisibleItems
 $VersionText.Text="v$script:Version"
@@ -1250,11 +1262,16 @@ function Set-Busy([bool]$busy){
 function Stop-Query {
  param([bool]$Silent=$false)
  if($script:CurrentJob){
-  try{Stop-Job -Job $script:CurrentJob -ErrorAction SilentlyContinue}catch{}
-  try{Remove-Job -Job $script:CurrentJob -Force -ErrorAction SilentlyContinue}catch{}
+  foreach($activeJob in @($script:CurrentJob)){
+   try{Stop-Job -Job $activeJob -ErrorAction SilentlyContinue}catch{}
+   try{Remove-Job -Job $activeJob -Force -ErrorAction SilentlyContinue}catch{}
+  }
   $script:CurrentJob=$null
  }
  if($script:JobTimer){$script:JobTimer.Stop()}
+ if($script:QueryWatch.IsRunning){$script:QueryWatch.Stop()}
+ $script:QueryElapsedSeconds=$script:QueryWatch.Elapsed.TotalSeconds
+ $QueryDuration.Text=('Query: {0:N2}s' -f $script:QueryElapsedSeconds)
  Set-Busy $false
  if(-not $Silent){Set-Status 'Query cancelled'}
 }
@@ -1272,6 +1289,8 @@ function Start-Query {
  if($paths.Count -eq 0){return}
  $path=[string]$paths[0]
  if($script:CurrentJob){Stop-Query -Silent $true}
+ $script:QueryWatch.Restart()
+ $QueryDuration.Text='Query: 0.00s'
  $script:CurrentLog=$path
  $script:LastSelectedLog=$path
  $view=[System.Windows.Data.CollectionViewSource]::GetDefaultView($EventGrid.ItemsSource)
@@ -1294,18 +1313,18 @@ function Start-Query {
   default {0L}
  }
  $script:BootstrapWindowSeconds=$offlineWindowSeconds
- $script:IncrementalUnfiltered=$false
- if($paths.Count -gt 1 -or $path -like 'ECHO:BootstrapETLFile:*' -or $path -like 'ECHO:ECEETLFile:*'){
-  $script:IncrementalUnfiltered=$true
-  foreach($box in @($FilterTime,$FilterLevel,$FilterID,$FilterSource,$FilterComputer,$FilterMessage)){
-   if(-not [string]::IsNullOrWhiteSpace([string]$box.Text)){$script:IncrementalUnfiltered=$false;break}
-  }
-  foreach($column in @('Level','EventID','Source','Computer','Log')){
-   foreach($selected in @($script:ColumnSelection[$column].Values)){
-    if($selected -eq $false){$script:IncrementalUnfiltered=$false;break}
-   }
+ # Fast path applies to EVERY channel type, including offline System EVTX.
+ # Previously single-channel Windows logs rebuilt all visible rows every 300 records.
+ $script:IncrementalUnfiltered=$true
+ foreach($box in @($FilterTime,$FilterLevel,$FilterID,$FilterSource,$FilterComputer,$FilterMessage)){
+  if(-not [string]::IsNullOrWhiteSpace([string]$box.Text)){$script:IncrementalUnfiltered=$false;break}
+ }
+ foreach($column in @('Level','EventID','Source','Computer','Log')){
+  foreach($selected in @($script:ColumnSelection[$column].Values)){
+   if($selected -eq $false){$script:IncrementalUnfiltered=$false;break}
   }
  }
+ $script:LastFilterRefresh=[datetime]::UtcNow
  $nodes=@()
  if($s.Kind -eq 'correlate'){
   $chosen=@($script:Sessions.Values | Where-Object {$_.Kind -ne 'correlate' -and $script:CorrelationSelection.ContainsKey($_.Key)})
@@ -1313,7 +1332,7 @@ function Start-Query {
   if($chosen.Count -eq 0){Set-Status 'No tabs selected for correlation';return}
   $nodes=@($chosen | ForEach-Object { [pscustomobject]@{Name=$_.Name;Kind=$_.Kind;Files=@($_.Files)} })
  }elseif($s.Kind -eq 'live'){$nodes=@([pscustomobject]@{Name=$s.Name;Kind='live';Files=@()})}
- $script:CurrentJob=Start-Job -ArgumentList $s.Kind,$paths,$nodes,$since,$offlineWindowSeconds -ScriptBlock {
+ $echoQueryWorker = {
   param($kind,$logs,$targets,$from,$offlineSeconds)
   function Get-OfflineStartTime([string]$evtx,[long]$seconds){
    if($seconds -le 0){return $null}
@@ -1329,6 +1348,19 @@ function Start-Query {
     Id=$record.Id;ProviderName=$record.ProviderName;MachineName=$record.MachineName
     Message=$record.Message;LogName=$record.LogName;XML=try{$record.ToXml()}catch{''}
    }
+  }
+  # Convert the Windows event stream into packets before it crosses the job boundary.
+  # The command still streams; no full log is materialized in the background job.
+  function Send-WindowsEvents {
+   begin {$packet=New-Object 'System.Collections.Generic.List[object]' 1000}
+   process {
+    [void]$packet.Add((Convert-Record $_))
+    if($packet.Count -ge 1000){
+     [pscustomobject]@{__EchoBatch=$true;Events=$packet.ToArray()}
+     $packet.Clear()
+    }
+   }
+   end {if($packet.Count){[pscustomobject]@{__EchoBatch=$true;Events=$packet.ToArray()}}}
   }
   function Read-AzureLocalETL([string]$computer,[string]$fileName,[string]$sourceKind,[long]$windowSeconds){
    # Both Azure Local Observability and Bootstrap use the same Get-ASEvent
@@ -1426,7 +1458,7 @@ function Start-Query {
    try{
     $fileStart=Get-OfflineStartTime $log $offlineSeconds
     if($fileStart){$f.StartTime=$fileStart}
-    Get-WinEvent -FilterHashtable $f -ErrorAction Stop | ForEach-Object {Convert-Record $_}
+    Get-WinEvent -FilterHashtable $f -ErrorAction Stop | Send-WindowsEvents
    }catch{
     if($_.FullyQualifiedErrorId -notmatch 'NoMatchingEventsFound' -and $_.Exception.Message -notmatch 'No events were found'){Write-Error "${log}: $($_.Exception.Message)"}
    }
@@ -1440,7 +1472,7 @@ function Start-Query {
       try{
        $fileStart=Get-OfflineStartTime $file $offlineSeconds
        if($fileStart){$of.StartTime=$fileStart}
-       Get-WinEvent -FilterHashtable $of -ErrorAction Stop | ForEach-Object {Convert-Record $_}
+       Get-WinEvent -FilterHashtable $of -ErrorAction Stop | Send-WindowsEvents
       }catch{
        if($_.FullyQualifiedErrorId -notmatch 'NoMatchingEventsFound' -and $_.Exception.Message -notmatch 'No events were found'){
         Write-Error "${file}: $($_.Exception.Message)"
@@ -1462,8 +1494,8 @@ function Start-Query {
      $f=@{LogName=$log}
     if($from){$f.StartTime=$from}
     try{
-     if($node -eq $env:COMPUTERNAME){Get-WinEvent -FilterHashtable $f -ErrorAction Stop | ForEach-Object {Convert-Record $_}}
-     else{Get-WinEvent -ComputerName $node -FilterHashtable $f -ErrorAction Stop | ForEach-Object {Convert-Record $_}}
+     if($node -eq $env:COMPUTERNAME){Get-WinEvent -FilterHashtable $f -ErrorAction Stop | Send-WindowsEvents}
+     else{Get-WinEvent -ComputerName $node -FilterHashtable $f -ErrorAction Stop | Send-WindowsEvents}
     }catch{
      if($_.FullyQualifiedErrorId -notmatch 'NoMatchingEventsFound' -and $_.Exception.Message -notmatch 'No events were found'){Write-Error "${node} / ${log}: $($_.Exception.Message)"}
     }
@@ -1471,26 +1503,39 @@ function Start-Query {
   }
   } # next selected channel
  }
+ # Correlation runs one independent reader job per target. All workers stream
+ # batches to the UI concurrently; no one slow node holds up the other nodes.
+ $script:CurrentJob=@(
+  if($s.Kind -eq 'correlate'){
+   foreach($target in $nodes){
+    Start-Job -ScriptBlock $echoQueryWorker -ArgumentList $s.Kind,$paths,(@($target)),$since,$offlineWindowSeconds
+   }
+  }else{
+   Start-Job -ScriptBlock $echoQueryWorker -ArgumentList $s.Kind,$paths,$nodes,$since,$offlineWindowSeconds
+  }
+ )
  Set-Busy $true
  Set-Status "Querying $($s.Name) / $($paths.Count) channel(s)..."
  if($script:JobTimer){$script:JobTimer.Stop()}
  $script:JobTimer=New-Object Windows.Threading.DispatcherTimer
- $script:JobTimer.Interval=[TimeSpan]::FromMilliseconds($(if($paths.Count -gt 1 -or $path -like 'ECHO:BootstrapETLFile:*' -or $path -like 'ECHO:ECEETLFile:*'){100}else{250}))
+ $script:JobTimer.Interval=[TimeSpan]::FromMilliseconds(100)
  $script:JobTimer.Add_Tick({
   if(-not $script:CurrentJob){$script:JobTimer.Stop();return}
-  $job=$script:CurrentJob
-  # Drain available job output without waiting for the entire EVTX query.
-  try {
-   $newEvents=@(Receive-Job -Job $job -ErrorAction SilentlyContinue)
-   foreach($ev in $newEvents){
+  $jobs=@($script:CurrentJob)
+  # Drain each independent node job without waiting on the other workers.
+  foreach($job in $jobs){
+   try {
+    $newEvents=@(Receive-Job -Job $job -ErrorAction SilentlyContinue)
+    foreach($ev in $newEvents){
     if($null -eq $ev){continue}
     if($ev.PSObject.Properties['__EchoBatch'] -and $ev.__EchoBatch){
      foreach($record in $ev.Events){if($null -ne $record){$script:PendingEvents.Enqueue($record)}}
     }else{$script:PendingEvents.Enqueue($ev)}
-   }
-  }catch{}
+    }
+   }catch{}
+  }
   $processed=0
-   $displayBatch=if($script:SelectedLogPaths.Count -gt 1 -or $script:CurrentLog -like 'ECHO:BootstrapETLFile:*' -or $script:CurrentLog -like 'ECHO:ECEETLFile:*'){2000}else{$script:BatchSize}
+   $displayBatch=$script:BatchSize
    while($script:PendingEvents.Count -gt 0 -and $processed -lt $displayBatch){
     $ev=$script:PendingEvents.Dequeue()
     try{
@@ -1503,19 +1548,30 @@ function Start-Query {
   if($processed){
    if($script:IncrementalUnfiltered){
     $EventCount.Text="Events ($($script:VisibleItems.Count))"
-   }else{Apply-Filter}
+   }else{
+    # Filtered views are recalculated periodically, not on every incoming batch.
+    # The final pass below guarantees the exact result set after loading.
+    $utcNow=[datetime]::UtcNow
+    if(($utcNow-$script:LastFilterRefresh).TotalSeconds -ge 2){
+     Apply-Filter
+     $script:LastFilterRefresh=$utcNow
+    }
+   }
   }
-  $finished=($job.State -in @('Completed','Failed','Stopped'))
+  $finished=(@($jobs | Where-Object {$_.State -notin @('Completed','Failed','Stopped')}).Count -eq 0)
   if($finished -and $script:PendingEvents.Count -eq 0){
    $script:JobTimer.Stop()
-   $errors=@($job.ChildJobs | ForEach-Object {$_.Error} | ForEach-Object {$_.ToString()})
-   Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+   $errors=@($jobs | ForEach-Object {$_.ChildJobs} | ForEach-Object {$_.Error} | ForEach-Object {$_.ToString()})
+   foreach($doneJob in $jobs){Remove-Job -Job $doneJob -Force -ErrorAction SilentlyContinue}
+   $script:QueryWatch.Stop()
+   $script:QueryElapsedSeconds=$script:QueryWatch.Elapsed.TotalSeconds
+   $QueryDuration.Text=('Query: {0:N2}s' -f $script:QueryElapsedSeconds)
    $script:CurrentJob=$null
    Set-Busy $false
    # Bootstrap presets were applied inside the reader before transmission.
    # Do one final refresh only if other column filters are active.
    if(-not $script:IncrementalUnfiltered){Apply-Filter}
-   if($script:SelectedLogPaths.Count -gt 1){
+   if($script:SelectedLogPaths.Count -gt 1 -or (Get-Session).Kind -eq 'correlate'){
     # Sort after loading: sorting a growing WPF grid every batch is expensive.
     $view=[System.Windows.Data.CollectionViewSource]::GetDefaultView($EventGrid.ItemsSource)
     $view.SortDescriptions.Clear()
@@ -1526,7 +1582,9 @@ function Start-Query {
    if($errors.Count){Set-Status "Loaded $($script:Items.Count) events from $($script:SelectedLogPaths.Count) channel(s). Error: $($errors[0])"}
    else{Set-Status "Complete | $($script:SelectedLogPaths.Count) channel(s) | $($script:Items.Count) events"}
   }else{
-   Set-Status "Loading $($script:CurrentLog): $($script:Items.Count) events displayed, $($script:PendingEvents.Count) queued..."
+   $QueryDuration.Text=('Query: {0:N2}s' -f $script:QueryWatch.Elapsed.TotalSeconds)
+   $running=@($jobs | Where-Object {$_.State -notin @('Completed','Failed','Stopped')}).Count
+   Set-Status "Loading $($script:CurrentLog): $($script:Items.Count) events displayed, $($script:PendingEvents.Count) queued, $running/$($jobs.Count) readers active..."
   }
  })
  $script:JobTimer.Start()
@@ -2422,7 +2480,61 @@ $BtnCopy.Add_Click({
 })
 $NavEvents.Add_Click({$LogTree.Focus()})
 $NavExport.Add_Click({Export-CSV})
-$NavSettings.Add_Click({[Windows.MessageBox]::Show("ECHO v$script:Version`nEvent limit: Unlimited (display batches of $script:BatchSize)`nSDDC location: $script:SettingsFile`n`nRead-only event explorer.",'ECHO Settings')|Out-Null})
+$NavSettings.Add_Click({
+ $dialog=New-Object System.Windows.Window
+ $dialog.Title="ECHO v$script:Version - Settings"
+ $dialog.Width=440;$dialog.Height=258
+ $dialog.WindowStartupLocation='CenterOwner';$dialog.Owner=$script:Window
+ $dialog.ResizeMode='NoResize';$dialog.Background=[Windows.Media.Brushes]::White
+ $panel=New-Object System.Windows.Controls.StackPanel
+ $panel.Margin=New-Object System.Windows.Thickness(18)
+ $label=New-Object System.Windows.Controls.TextBlock
+ $label.Text='Display batch size (events per GUI refresh)'
+ $label.FontWeight='SemiBold';$label.Margin='0,0,0,8'
+ [void]$panel.Children.Add($label)
+ $combo=New-Object System.Windows.Controls.ComboBox
+ $combo.Height=30;$combo.IsEditable=$true
+ foreach($choice in @(100,250,500,1000,2000,5000,10000,20000)){
+  [void]$combo.Items.Add([string]$choice)
+ }
+ $combo.Text=[string]$script:BatchSize
+ [void]$panel.Children.Add($combo)
+ $hint=New-Object System.Windows.Controls.TextBlock
+ $hint.Text='Range: 100-20,000. Larger batches can load faster but may make the UI less responsive. Applies to new queries.'
+ $hint.TextWrapping='Wrap';$hint.Margin='0,10,0,10'
+ [void]$panel.Children.Add($hint)
+ $info=New-Object System.Windows.Controls.TextBlock
+ $info.Text='Correlation: one background reader per selected node. Event limit: Unlimited.'
+ $info.TextWrapping='Wrap';$info.Margin='0,0,0,12'
+ [void]$panel.Children.Add($info)
+ $buttons=New-Object System.Windows.Controls.StackPanel
+ $buttons.Orientation='Horizontal';$buttons.HorizontalAlignment='Right'
+ $cancel=New-Object System.Windows.Controls.Button
+ $cancel.Content='Cancel';$cancel.Width=80;$cancel.Margin='0,0,8,0'
+ $cancel.Add_Click({$dialog.DialogResult=$false})
+ [void]$buttons.Children.Add($cancel)
+ $save=New-Object System.Windows.Controls.Button
+ $save.Content='Save';$save.Width=80;$save.IsDefault=$true
+ $save.Add_Click({
+  $number=0
+  if(-not [int]::TryParse($combo.Text,[ref]$number) -or $number -lt 100 -or $number -gt 20000){
+   [Windows.MessageBox]::Show('Enter a display batch size from 100 to 20,000.','ECHO Settings')|Out-Null
+   return
+  }
+  try{
+   if(-not (Test-Path -LiteralPath $script:SettingsFolder)){
+    [void](New-Item -ItemType Directory -Path $script:SettingsFolder -Force -ErrorAction Stop)
+   }
+   @{DisplayBatchSize=$number} | ConvertTo-Json | Set-Content -LiteralPath $script:PreferenceFile -Encoding UTF8 -ErrorAction Stop
+   $script:BatchSize=$number
+   $dialog.DialogResult=$true
+  }catch{[Windows.MessageBox]::Show("Could not save settings: $($_.Exception.Message)",'ECHO Settings')|Out-Null}
+ })
+ [void]$buttons.Children.Add($save)
+ [void]$panel.Children.Add($buttons)
+ $dialog.Content=$panel
+ [void]$dialog.ShowDialog()
+})
 # Use the standard Windows caption controls (minimize, maximize, close).
 # Request a light caption regardless of the dark client area so the buttons remain visible.
 try {
