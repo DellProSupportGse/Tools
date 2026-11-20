@@ -7,7 +7,7 @@ param(
     [switch]$ApproveAllFixesAutomatically,
     [switch]$IgnoreAzureLocalRequired
 )
-    $ver="0.735"
+    $ver="0.736"
 
     # Check if the current session is running as Administrator
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -2264,7 +2264,7 @@ function Send-ToolTelemetry {
     If ($disksInMaint)  {
         If (($FixErrors -or $FixWarningsAlso) -and $MasUpdateNotRunning) {
             Write-Host "Taking disks out of maintenance mode. Est Time is less than five minutes" -ForegroundColor Cyan
-            Repair-ClusterS2D -DisableStorageMaintenenceMode -Verbose
+            Repair-ClusterS2D -DisableStorageMaintenanceMode -Verbose
             $disksFixed=foreach ($disk in $disksInMaint) {
                 try {
                     if (($disk | Get-PhysicalDisk).OperationalStatus -ne "OK") {
